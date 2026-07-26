@@ -1,0 +1,82 @@
+import { and, eq } from "drizzle-orm";
+import { notFound } from "next/navigation";
+import { AppShell } from "@/components/app-shell";
+import { ExpenseForm } from "@/components/expense-form";
+import { Button } from "@/components/ui/button";
+import { db } from "@/db";
+import { expenseSplits, expenses, groups, members } from "@/db/schema";
+import { requireMember } from "@/lib/auth-guards";
+import { formatCents } from "@/lib/money";
+import { deleteExpenseAction, updateExpenseAction } from "../actions";
+
+export default async function ExpenseDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string; expenseId: string }>;
+}) {
+  const { id, expenseId } = await params;
+  await requireMember(id);
+
+  const [group] = await db
+    .select()
+    .from(groups)
+    .where(eq(groups.id, id))
+    .limit(1);
+
+  const [expense] = await db
+    .select()
+    .from(expenses)
+    .where(and(eq(expenses.id, expenseId), eq(expenses.groupId, id)))
+    .limit(1);
+
+  if (!group || !expense) notFound();
+
+  const roster = await db
+    .select({ id: members.id, displayName: members.displayName })
+    .from(members)
+    .where(eq(members.groupId, id))
+    .orderBy(members.createdAt);
+
+  const splits = await db
+    .select()
+    .from(expenseSplits)
+    .where(eq(expenseSplits.expenseId, expenseId));
+
+  const weights: Record<string, number> = {};
+  for (const s of splits) {
+    weights[s.memberId] = Number(s.weight ?? s.amountCents);
+  }
+
+  const action = updateExpenseAction.bind(null, id, expenseId);
+
+  return (
+    <AppShell title="Expense" backHref={`/g/${id}`}>
+      <ExpenseForm
+        members={roster}
+        currency={group.currency}
+        defaultPaidById={expense.paidByMemberId}
+        action={action}
+        submitLabel="Save changes"
+        defaultValues={{
+          description: expense.description,
+          amount: formatCents(expense.amountCents),
+          paidByMemberId: expense.paidByMemberId,
+          spentAt: expense.spentAt.toISOString().slice(0, 10),
+          splitMode: expense.splitMode,
+          notes: expense.notes ?? undefined,
+          weights,
+          included: splits.map((s) => s.memberId),
+        }}
+      />
+
+      <form
+        action={deleteExpenseAction.bind(null, id, expenseId)}
+        className="mt-6"
+      >
+        <Button type="submit" variant="destructive" className="w-full">
+          Delete expense
+        </Button>
+      </form>
+    </AppShell>
+  );
+}
