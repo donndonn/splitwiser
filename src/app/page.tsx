@@ -91,7 +91,7 @@ export default async function HomePage() {
       </div>
 
       <div className="mb-4 flex gap-2">
-        <Button asChild className="flex-1">
+        <Button asChild size="lg" className="flex-1">
           <Link href="/new">
             <Plus className="size-4" />
             Create group

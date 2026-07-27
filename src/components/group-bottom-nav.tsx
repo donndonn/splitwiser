@@ -32,8 +32,8 @@ export function GroupBottomNav({ groupId }: { groupId: string }) {
   const base = `/g/${groupId}`;
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 pb-[env(safe-area-inset-bottom)]">
-      <ul className="mx-auto flex max-w-lg items-stretch justify-around">
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border/60 bg-card/90 backdrop-blur-xl supports-[backdrop-filter]:bg-card/80 pb-[env(safe-area-inset-bottom)]">
+      <ul className="mx-auto flex max-w-lg items-stretch justify-around px-2">
         {tabs.map((tab) => {
           const href = `${base}${tab.href}`;
           const active =
@@ -46,13 +46,16 @@ export function GroupBottomNav({ groupId }: { groupId: string }) {
               <Link
                 href={href}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 px-2 py-2.5 text-xs transition-colors",
+                  "relative flex min-h-16 flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-medium transition-colors",
                   active
-                    ? "text-foreground"
+                    ? "text-primary"
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                <Icon className="size-5" strokeWidth={active ? 2.25 : 1.75} />
+                {active && (
+                  <span className="absolute top-1 h-1 w-5 rounded-full bg-primary" />
+                )}
+                <Icon className="size-5" strokeWidth={active ? 2.4 : 1.8} />
                 <span>{tab.label}</span>
               </Link>
             </li>
