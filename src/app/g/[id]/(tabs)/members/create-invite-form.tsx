@@ -8,6 +8,27 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { createInviteAction } from "./actions";
 
+async function shareOrCopyInvite(url: string, groupTitle: string) {
+  if (typeof navigator.share === "function") {
+    try {
+      await navigator.share({
+        title: groupTitle,
+        text: "Join this Splitwiser group",
+        url,
+      });
+      return "shared" as const;
+    } catch (err) {
+      // User cancelled the share sheet — don't fall through to clipboard.
+      if (err instanceof DOMException && err.name === "AbortError") {
+        return "cancelled" as const;
+      }
+    }
+  }
+
+  await navigator.clipboard.writeText(url);
+  return "copied" as const;
+}
+
 export function CreateInviteForm({ groupId }: { groupId: string }) {
   const [pending, startTransition] = useTransition();
   const [link, setLink] = useState<string | null>(null);
@@ -25,8 +46,15 @@ export function CreateInviteForm({ groupId }: { groupId: string }) {
               const token = await createInviteAction(groupId, formData);
               const url = `${window.location.origin}/join/${token}`;
               setLink(url);
-              await navigator.clipboard.writeText(url);
-              toast.success("Invite link copied");
+              const result = await shareOrCopyInvite(
+                url,
+                "Join my Splitwiser group",
+              );
+              if (result === "copied") {
+                toast.success("Invite link copied");
+              } else if (result === "shared") {
+                toast.success("Invite link shared");
+              }
             } catch (err) {
               toast.error(
                 err instanceof Error ? err.message : "Could not create invite",
@@ -57,7 +85,7 @@ export function CreateInviteForm({ groupId }: { groupId: string }) {
           </div>
         </div>
         <Button type="submit" disabled={pending} className="w-full">
-          {pending ? "Creating…" : "Create & copy link"}
+          {pending ? "Creating…" : "Create & share link"}
         </Button>
       </form>
       {link && (

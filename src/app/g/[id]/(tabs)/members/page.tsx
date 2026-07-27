@@ -71,10 +71,10 @@ export default async function MembersPage({
       {me.isAdmin ? (
         <div className="space-y-6">
           <div className="space-y-3 rounded-xl border p-4">
-            <h3 className="text-sm font-medium">Add placeholder</h3>
+            <h3 className="text-sm font-medium">Add people by name</h3>
             <p className="text-xs text-muted-foreground">
-              For people who will not sign in. They can claim later via an
-              invite.
+              Add everyone you expect on the trip, then share an invite so they
+              can pick their name when they join.
             </p>
             <form
               action={addPlaceholderAction.bind(null, id)}

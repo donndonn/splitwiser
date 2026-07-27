@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { db } from "@/db";
 import { groups, invites, members } from "@/db/schema";
 import { getOptionalUser } from "@/lib/auth-guards";
@@ -140,6 +139,7 @@ export default async function JoinPage({
 
   const defaultName =
     user.name?.trim() || user.email?.split("@")[0] || "Me";
+  const hasPlaceholders = placeholders.length > 0;
 
   return (
     <AppShell title="Join group" backHref="/">
@@ -151,64 +151,64 @@ export default async function JoinPage({
           </p>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Join as a new member</CardTitle>
-            <CardDescription>
-              Create your own spot in this group.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form action={joinAsNewMemberAction} className="space-y-4">
-              <input type="hidden" name="token" value={token} />
-              <div className="space-y-2">
-                <Label htmlFor="displayName">Your display name</Label>
-                <Input
-                  id="displayName"
-                  name="displayName"
-                  defaultValue={defaultName}
-                  required
-                />
-              </div>
-              <Button type="submit" className="w-full">
-                Join group
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+        <div className="space-y-2">
+          <h3 className="text-base font-medium">Who are you joining as?</h3>
+          {hasPlaceholders && (
+            <p className="text-sm text-muted-foreground">
+              Pick your name if you&apos;re already on the list — that keeps
+              expenses logged under it. Or join with a new name below.
+            </p>
+          )}
+        </div>
 
-        {placeholders.length > 0 && (
-          <>
-            <Separator />
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">
-                  Or claim a placeholder
-                </CardTitle>
-                <CardDescription>
-                  Someone already added these names. Claiming inherits their
-                  expense history.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {placeholders.map((p) => (
-                  <form key={p.id} action={claimPlaceholderAction}>
+        {hasPlaceholders && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Already on the list?</p>
+            <ul className="space-y-2">
+              {placeholders.map((p) => (
+                <li key={p.id}>
+                  <form action={claimPlaceholderAction}>
                     <input type="hidden" name="token" value={token} />
                     <input type="hidden" name="memberId" value={p.id} />
                     <Button
                       type="submit"
                       variant="outline"
                       className="w-full justify-between"
+                      size="lg"
                     >
                       <span>{p.displayName}</span>
-                      <span className="text-muted-foreground">Claim</span>
+                      <span className="text-muted-foreground">Join as</span>
                     </Button>
                   </form>
-                ))}
-              </CardContent>
-            </Card>
-          </>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
+
+        <form action={joinAsNewMemberAction} className="space-y-3">
+          <input type="hidden" name="token" value={token} />
+          <div className="space-y-2">
+            <Label htmlFor="displayName">
+              {hasPlaceholders ? "Or join as" : "Join as"}
+            </Label>
+            <Input
+              id="displayName"
+              name="displayName"
+              placeholder="Your name"
+              defaultValue={hasPlaceholders ? undefined : defaultName}
+              required
+            />
+          </div>
+          <Button
+            type="submit"
+            className="w-full"
+            variant={hasPlaceholders ? "secondary" : "default"}
+            size="lg"
+          >
+            Join group
+          </Button>
+        </form>
       </div>
     </AppShell>
   );
