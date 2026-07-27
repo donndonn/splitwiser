@@ -255,7 +255,7 @@ export async function createExpenseAction(groupId: string, formData: FormData) {
 
   revalidatePath(`/g/${groupId}`);
   revalidatePath(`/g/${groupId}/balances`);
-  redirect(`/g/${groupId}/expenses/${expenseId}`);
+  redirect(`/g/${groupId}`);
 }
 
 export async function updateExpenseAction(
@@ -340,7 +340,7 @@ export async function updateExpenseAction(
   revalidatePath(`/g/${groupId}`);
   revalidatePath(`/g/${groupId}/balances`);
   revalidatePath(`/g/${groupId}/expenses/${expenseId}`);
-  redirect(`/g/${groupId}/expenses/${expenseId}`);
+  redirect(`/g/${groupId}`);
 }
 
 /** Delete an expense and revalidate; does not redirect (for in-list deletes). */

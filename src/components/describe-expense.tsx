@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { ChevronLeft, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { Camera, ChevronLeft, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import {
   ExpenseForm,
@@ -121,6 +122,18 @@ export function DescribeExpense({
           Enter manually
         </Button>
       </div>
+
+      <Button
+        asChild
+        type="button"
+        variant="ghost"
+        className="w-full gap-2 text-muted-foreground"
+      >
+        <Link href={`/g/${groupId}/expenses/scan`}>
+          <Camera className="size-4" />
+          Scan receipt
+        </Link>
+      </Button>
     </div>
   );
 }

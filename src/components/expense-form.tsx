@@ -1185,14 +1185,13 @@ export function ExpenseForm({
                         ? "border-primary/25 bg-accent text-accent-foreground"
                         : "border-border bg-card hover:bg-muted",
                     )}
-                    onClick={() =>
-                      {
-                        setSplitInteracted(true);
+                    onClick={() => {
+                      setSplitInteracted(true);
                       updateItem(activeAssignmentItem.key, {
                         memberIds: members.map((member) => member.id),
-                      })
-                      }
-                    }
+                      });
+                      setAssignmentItemKey(null);
+                    }}
                   >
                     <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
                       <Users className="size-5" />
