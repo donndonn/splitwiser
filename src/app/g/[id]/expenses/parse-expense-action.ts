@@ -9,6 +9,7 @@ import {
   parseExpenseTextWithGemini,
   type ParsedExpenseDefaults,
 } from "@/lib/ai/parse-expense-text";
+import { consumeAiParseQuota } from "@/lib/ai/rate-limit";
 
 export type ParseExpenseTextResult =
   | { ok: true; defaults: ParsedExpenseDefaults }
@@ -19,7 +20,7 @@ export async function parseExpenseTextAction(
   text: string,
 ): Promise<ParseExpenseTextResult> {
   try {
-    const { member } = await requireMember(groupId);
+    const { user, member } = await requireMember(groupId);
 
     const [[group], roster] = await Promise.all([
       db.select().from(groups).where(eq(groups.id, groupId)).limit(1),
@@ -43,6 +44,11 @@ export async function parseExpenseTextAction(
         ok: false,
         error: `Keep the description under ${MAX_EXPENSE_TEXT_LENGTH} characters.`,
       };
+    }
+
+    const quota = await consumeAiParseQuota(user.id);
+    if (!quota.ok) {
+      return { ok: false, error: quota.error };
     }
 
     const defaults = await parseExpenseTextWithGemini({

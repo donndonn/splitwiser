@@ -241,9 +241,30 @@ export const settlements = pgTable(
   (table) => [index("settlements_group_id_idx").on(table.groupId)],
 );
 
+/** Tracks Gemini expense-parse calls for per-user rate limiting. */
+export const aiParseRequests = pgTable(
+  "ai_parse_requests",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("ai_parse_requests_user_created_idx").on(
+      table.userId,
+      table.createdAt,
+    ),
+  ],
+);
+
 export const usersRelations = relations(users, ({ many }) => ({
   accounts: many(accounts),
   members: many(members),
+  aiParseRequests: many(aiParseRequests),
 }));
 
 export const accountsRelations = relations(accounts, ({ one }) => ({
@@ -338,6 +359,16 @@ export const settlementsRelations = relations(settlements, ({ one }) => ({
   }),
 }));
 
+export const aiParseRequestsRelations = relations(
+  aiParseRequests,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [aiParseRequests.userId],
+      references: [users.id],
+    }),
+  }),
+);
+
 export type User = typeof users.$inferSelect;
 export type Group = typeof groups.$inferSelect;
 export type Member = typeof members.$inferSelect;
@@ -347,5 +378,6 @@ export type ExpenseItem = typeof expenseItems.$inferSelect;
 export type ExpenseItemAssignment = typeof expenseItemAssignments.$inferSelect;
 export type ExpenseSplit = typeof expenseSplits.$inferSelect;
 export type Settlement = typeof settlements.$inferSelect;
+export type AiParseRequest = typeof aiParseRequests.$inferSelect;
 export type SplitMode = (typeof splitModeEnum.enumValues)[number];
 export type ExpenseEntryMode = (typeof expenseEntryModeEnum.enumValues)[number];
