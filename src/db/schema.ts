@@ -175,6 +175,7 @@ export const expenseItems = pgTable(
       .references(() => expenses.id, { onDelete: "cascade" }),
     description: text("description").notNull(),
     amountCents: bigint("amount_cents", { mode: "number" }).notNull(),
+    quantity: integer("quantity").notNull().default(1),
     sortOrder: integer("sort_order").notNull(),
   },
   (table) => [index("expense_items_expense_id_idx").on(table.expenseId)],

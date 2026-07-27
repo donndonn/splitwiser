@@ -86,6 +86,7 @@ function parseItemizedPayload(raw: string): ItemizedPayload {
       if (
         typeof item.description !== "string" ||
         !Number.isInteger(item.amountCents) ||
+        !Number.isInteger(item.quantity) ||
         !Array.isArray(item.memberIds) ||
         !item.memberIds.every((id) => typeof id === "string")
       ) {
@@ -94,6 +95,7 @@ function parseItemizedPayload(raw: string): ItemizedPayload {
       return {
         description: item.description.trim(),
         amountCents: Number(item.amountCents),
+        quantity: Number(item.quantity),
         memberIds: item.memberIds,
       };
     }),
@@ -236,6 +238,7 @@ export async function createExpenseAction(groupId: string, formData: FormData) {
           expenseId: expense.id,
           description: item.description,
           amountCents: item.amountCents,
+          quantity: item.quantity,
           sortOrder,
         })
         .returning({ id: expenseItems.id });
@@ -321,6 +324,7 @@ export async function updateExpenseAction(
           expenseId,
           description: item.description,
           amountCents: item.amountCents,
+          quantity: item.quantity,
           sortOrder,
         })
         .returning({ id: expenseItems.id });

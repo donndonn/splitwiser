@@ -7,6 +7,7 @@ import {
   ChevronRight,
   CircleCheck,
   CircleDollarSign,
+  Minus,
   Plus,
   ReceiptText,
   Scale,
@@ -27,6 +28,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import {
   calculateItemizedExpense,
+  lineTotalCents,
   type ItemizedExpenseItemInput,
 } from "@/lib/itemized-expense";
 import {
@@ -63,6 +65,7 @@ export type ItemizedExpenseDefaults = CommonDefaults & {
   items: {
     description: string;
     amount: string;
+    quantity: number;
     memberIds: string[];
   }[];
 };
@@ -80,6 +83,7 @@ type ItemDraft = {
   key: string;
   description: string;
   amount: string;
+  quantity: number;
   memberIds: string[];
 };
 
@@ -148,13 +152,17 @@ export function ExpenseForm({
     itemizedDefaults
       ? itemizedDefaults.items.map((item, index) => ({
           key: `saved-${index}`,
-          ...item,
+          description: item.description,
+          amount: item.amount,
+          quantity: item.quantity ?? 1,
+          memberIds: item.memberIds,
         }))
       : [
           {
             key: "new-0",
             description: "",
             amount: "",
+            quantity: 1,
             memberIds: members.map((member) => member.id),
           },
         ],
@@ -220,10 +228,11 @@ export function ExpenseForm({
           );
         }
         const amountCents = parseAmountToCents(item.amount);
-        itemSubtotalCents += amountCents;
+        itemSubtotalCents += lineTotalCents(amountCents, item.quantity);
         return {
           description: item.description,
           amountCents,
+          quantity: item.quantity,
           memberIds: item.memberIds,
         };
       });
@@ -401,6 +410,7 @@ export function ExpenseForm({
         key,
         description: "",
         amount: "",
+        quantity: 1,
         memberIds: members.map((member) => member.id),
       },
     ]);
@@ -843,6 +853,16 @@ export function ExpenseForm({
                   const assigned = assignedMembersFor(item);
                   const visibleAssignees = assigned.slice(0, 4);
                   const extraAssignees = assigned.length - visibleAssignees.length;
+                  let unitCents: number | null = null;
+                  try {
+                    if (item.amount.trim()) {
+                      unitCents = parseAmountToCents(item.amount);
+                    }
+                  } catch {
+                    unitCents = null;
+                  }
+                  const showLineTotal =
+                    item.quantity > 1 && unitCents != null && unitCents > 0;
                   return (
                   <article
                     key={item.key}
@@ -882,15 +902,15 @@ export function ExpenseForm({
                         htmlFor={`item-amount-${item.key}`}
                         className="sr-only"
                       >
-                        Item {index + 1} amount
+                        Item {index + 1} unit price
                       </Label>
-                      <div className="relative w-[5.75rem] shrink-0">
+                      <div className="relative w-[5.25rem] shrink-0">
                         <span className="pointer-events-none absolute inset-y-0 left-1 flex items-center text-xs text-muted-foreground">
                           {currencySymbol}
                         </span>
                         <Input
                           id={`item-amount-${item.key}`}
-                          aria-label={`Item ${index + 1} amount`}
+                          aria-label={`Item ${index + 1} unit price`}
                           className="h-10 border-0 bg-transparent px-1 pl-4 text-right font-semibold tabular-nums shadow-none focus-visible:bg-secondary/70 focus-visible:ring-0"
                           inputMode="decimal"
                           value={item.amount}
@@ -907,6 +927,44 @@ export function ExpenseForm({
                           }}
                           placeholder="0.00"
                         />
+                      </div>
+
+                      <div className="flex h-9 shrink-0 items-center rounded-xl bg-secondary/70 px-0.5">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          className="size-7 text-muted-foreground"
+                          aria-label={`Decrease quantity for item ${index + 1}`}
+                          disabled={item.quantity <= 1}
+                          onClick={() =>
+                            updateItem(item.key, {
+                              quantity: Math.max(1, item.quantity - 1),
+                            })
+                          }
+                        >
+                          <Minus className="size-3.5" />
+                        </Button>
+                        <span
+                          className="min-w-7 text-center text-xs font-semibold tabular-nums"
+                          aria-label={`Quantity ${item.quantity}`}
+                        >
+                          ×{item.quantity}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          className="size-7 text-muted-foreground"
+                          aria-label={`Increase quantity for item ${index + 1}`}
+                          onClick={() =>
+                            updateItem(item.key, {
+                              quantity: item.quantity + 1,
+                            })
+                          }
+                        >
+                          <Plus className="size-3.5" />
+                        </Button>
                       </div>
 
                       <Button
@@ -929,6 +987,12 @@ export function ExpenseForm({
                         <Trash2 className="size-3.5" />
                       </Button>
                     </div>
+
+                    {showLineTotal && unitCents != null && (
+                      <p className="mt-0.5 pr-[4.75rem] text-right text-xs tabular-nums text-muted-foreground">
+                        = {formatMoney(lineTotalCents(unitCents, item.quantity), currency)}
+                      </p>
+                    )}
 
                     <button
                       type="button"

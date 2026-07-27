@@ -3,6 +3,7 @@ import { allocateSplits, type SplitResult } from "@/lib/money";
 export type ItemizedExpenseItemInput = {
   description: string;
   amountCents: number;
+  quantity: number;
   memberIds: string[];
 };
 
@@ -30,6 +31,10 @@ export function assertAllowedMemberIds(
   }
 }
 
+export function lineTotalCents(amountCents: number, quantity: number) {
+  return amountCents * quantity;
+}
+
 export function calculateItemizedExpense(
   input: ItemizedExpenseInput,
 ): ItemizedExpenseCalculation {
@@ -53,6 +58,9 @@ export function calculateItemizedExpense(
     if (!Number.isInteger(item.amountCents) || item.amountCents <= 0) {
       throw new Error("Every receipt item must be greater than zero");
     }
+    if (!Number.isInteger(item.quantity) || item.quantity < 1) {
+      throw new Error("Every receipt item needs a quantity of at least 1");
+    }
 
     const uniqueMemberIds = [...new Set(item.memberIds)].sort();
     if (uniqueMemberIds.length === 0) {
@@ -62,9 +70,10 @@ export function calculateItemizedExpense(
       throw new Error(`"${item.description.trim()}" has duplicate participants`);
     }
 
-    itemSubtotalCents += item.amountCents;
+    const itemLineTotalCents = lineTotalCents(item.amountCents, item.quantity);
+    itemSubtotalCents += itemLineTotalCents;
     const itemSplits = allocateSplits(
-      item.amountCents,
+      itemLineTotalCents,
       "equal",
       uniqueMemberIds.map((memberId) => ({ memberId, weight: 1 })),
     );

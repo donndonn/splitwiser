@@ -102,6 +102,7 @@ export default async function ExpenseDetailPage({
                 items: itemRows.map((item) => ({
                   description: item.description,
                   amount: formatCents(item.amountCents),
+                  quantity: item.quantity,
                   memberIds: assignedMembers.get(item.id) ?? [],
                 })),
               }

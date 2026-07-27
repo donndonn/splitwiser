@@ -14,6 +14,7 @@ function receipt(
       {
         description: "Dinner",
         amountCents: 1000,
+        quantity: 1,
         memberIds: ["a"],
       },
     ],
@@ -30,11 +31,13 @@ describe("calculateItemizedExpense", () => {
           {
             description: "Shared appetizer",
             amountCents: 101,
+            quantity: 1,
             memberIds: ["a", "b"],
           },
           {
             description: "Drink",
             amountCents: 50,
+            quantity: 1,
             memberIds: ["b"],
           },
         ],
@@ -52,13 +55,60 @@ describe("calculateItemizedExpense", () => {
     ]);
   });
 
+  it("multiplies unit price by quantity for line totals", () => {
+    const result = calculateItemizedExpense(
+      receipt({
+        amountCents: 11729,
+        items: [
+          {
+            description: "Scallops Risotto",
+            amountCents: 2100,
+            quantity: 2,
+            memberIds: ["a"],
+          },
+          {
+            description: "Truffle Fries",
+            amountCents: 1200,
+            quantity: 1,
+            memberIds: ["b"],
+          },
+          {
+            description: "Cajun Fried Oysters",
+            amountCents: 1800,
+            quantity: 1,
+            memberIds: ["a", "b"],
+          },
+          {
+            description: "Mushroom Risotto",
+            amountCents: 1700,
+            quantity: 1,
+            memberIds: ["b"],
+          },
+          {
+            description: "filet sand",
+            amountCents: 2100,
+            quantity: 1,
+            memberIds: ["a"],
+          },
+        ],
+      }),
+    );
+
+    expect(result.itemSubtotalCents).toBe(11000);
+    expect(result.taxAndTipCents).toBe(729);
+    expect(result.splits).toEqual([
+      { memberId: "a", amountCents: 7677, weight: 7200 },
+      { memberId: "b", amountCents: 4052, weight: 3800 },
+    ]);
+  });
+
   it("allocates tax and tip residual proportionally", () => {
     const result = calculateItemizedExpense(
       receipt({
         amountCents: 12000,
         items: [
-          { description: "A", amountCents: 6000, memberIds: ["a"] },
-          { description: "B", amountCents: 4000, memberIds: ["b"] },
+          { description: "A", amountCents: 6000, quantity: 1, memberIds: ["a"] },
+          { description: "B", amountCents: 4000, quantity: 1, memberIds: ["b"] },
         ],
       }),
     );
@@ -88,14 +138,42 @@ describe("calculateItemizedExpense", () => {
     [
       "a zero-price line",
       receipt({
-        items: [{ description: "Free", amountCents: 0, memberIds: ["a"] }],
+        items: [
+          {
+            description: "Free",
+            amountCents: 0,
+            quantity: 1,
+            memberIds: ["a"],
+          },
+        ],
       }),
       /greater than zero/i,
     ],
     [
+      "a zero quantity",
+      receipt({
+        items: [
+          {
+            description: "Dinner",
+            amountCents: 1000,
+            quantity: 0,
+            memberIds: ["a"],
+          },
+        ],
+      }),
+      /quantity/i,
+    ],
+    [
       "an unassigned line",
       receipt({
-        items: [{ description: "Dinner", amountCents: 1000, memberIds: [] }],
+        items: [
+          {
+            description: "Dinner",
+            amountCents: 1000,
+            quantity: 1,
+            memberIds: [],
+          },
+        ],
       }),
       /assign/i,
     ],
@@ -106,6 +184,7 @@ describe("calculateItemizedExpense", () => {
           {
             description: "Dinner",
             amountCents: 1000,
+            quantity: 1,
             memberIds: ["a", "a"],
           },
         ],
