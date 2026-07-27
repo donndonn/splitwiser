@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { and, eq } from "drizzle-orm";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
@@ -11,36 +12,39 @@ export type SessionUser = {
   image?: string | null;
 };
 
+const getSessionUser = cache(async (): Promise<SessionUser | null> => {
+  const session = await auth();
+  if (!session?.user?.id) return null;
+  return session.user as SessionUser;
+});
+
 export async function requireUser(
   callbackUrl?: string,
 ): Promise<SessionUser> {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const user = await getSessionUser();
+  if (!user) {
     const params = callbackUrl
       ? `?callbackUrl=${encodeURIComponent(callbackUrl)}`
       : "";
     redirect(`/signin${params}`);
   }
-  return session.user as SessionUser;
+  return user;
 }
 
 export async function getOptionalUser(): Promise<SessionUser | null> {
-  const session = await auth();
-  if (!session?.user?.id) return null;
-  return session.user as SessionUser;
+  return getSessionUser();
 }
 
-export async function getMembership(
-  groupId: string,
-  userId: string,
-): Promise<Member | null> {
-  const [member] = await db
-    .select()
-    .from(members)
-    .where(and(eq(members.groupId, groupId), eq(members.userId, userId)))
-    .limit(1);
-  return member ?? null;
-}
+export const getMembership = cache(
+  async (groupId: string, userId: string): Promise<Member | null> => {
+    const [member] = await db
+      .select()
+      .from(members)
+      .where(and(eq(members.groupId, groupId), eq(members.userId, userId)))
+      .limit(1);
+    return member ?? null;
+  },
+);
 
 export async function requireMember(groupId: string): Promise<{
   user: SessionUser;

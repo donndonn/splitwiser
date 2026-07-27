@@ -19,42 +19,41 @@ export type MemberBalance = {
 export async function getGroupBalances(
   groupId: string,
 ): Promise<MemberBalance[]> {
-  const paid = await db
-    .select({
-      memberId: expenses.paidByMemberId,
-      total: sql<number>`coalesce(sum(${expenses.amountCents}), 0)::bigint`,
-    })
-    .from(expenses)
-    .where(eq(expenses.groupId, groupId))
-    .groupBy(expenses.paidByMemberId);
-
-  const owed = await db
-    .select({
-      memberId: expenseSplits.memberId,
-      total: sql<number>`coalesce(sum(${expenseSplits.amountCents}), 0)::bigint`,
-    })
-    .from(expenseSplits)
-    .innerJoin(expenses, eq(expenseSplits.expenseId, expenses.id))
-    .where(eq(expenses.groupId, groupId))
-    .groupBy(expenseSplits.memberId);
-
-  const settledOut = await db
-    .select({
-      memberId: settlements.fromMemberId,
-      total: sql<number>`coalesce(sum(${settlements.amountCents}), 0)::bigint`,
-    })
-    .from(settlements)
-    .where(eq(settlements.groupId, groupId))
-    .groupBy(settlements.fromMemberId);
-
-  const settledIn = await db
-    .select({
-      memberId: settlements.toMemberId,
-      total: sql<number>`coalesce(sum(${settlements.amountCents}), 0)::bigint`,
-    })
-    .from(settlements)
-    .where(eq(settlements.groupId, groupId))
-    .groupBy(settlements.toMemberId);
+  const [paid, owed, settledOut, settledIn] = await Promise.all([
+    db
+      .select({
+        memberId: expenses.paidByMemberId,
+        total: sql<number>`coalesce(sum(${expenses.amountCents}), 0)::bigint`,
+      })
+      .from(expenses)
+      .where(eq(expenses.groupId, groupId))
+      .groupBy(expenses.paidByMemberId),
+    db
+      .select({
+        memberId: expenseSplits.memberId,
+        total: sql<number>`coalesce(sum(${expenseSplits.amountCents}), 0)::bigint`,
+      })
+      .from(expenseSplits)
+      .innerJoin(expenses, eq(expenseSplits.expenseId, expenses.id))
+      .where(eq(expenses.groupId, groupId))
+      .groupBy(expenseSplits.memberId),
+    db
+      .select({
+        memberId: settlements.fromMemberId,
+        total: sql<number>`coalesce(sum(${settlements.amountCents}), 0)::bigint`,
+      })
+      .from(settlements)
+      .where(eq(settlements.groupId, groupId))
+      .groupBy(settlements.fromMemberId),
+    db
+      .select({
+        memberId: settlements.toMemberId,
+        total: sql<number>`coalesce(sum(${settlements.amountCents}), 0)::bigint`,
+      })
+      .from(settlements)
+      .where(eq(settlements.groupId, groupId))
+      .groupBy(settlements.toMemberId),
+  ]);
 
   const nets = new Map<string, number>();
   const bump = (id: string, delta: number) => {
