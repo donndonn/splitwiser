@@ -1,18 +1,17 @@
 import { desc, eq } from "drizzle-orm";
 import { AppShell } from "@/components/app-shell";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { db } from "@/db";
 import { invites, members, type Invite } from "@/db/schema";
 import { requireMember } from "@/lib/auth-guards";
-import {
-  addPlaceholderAction,
-  removeMemberAction,
-  renameMemberAction,
-  revokeInviteAction,
-} from "./actions";
+import { cn } from "@/lib/utils";
+import { addPlaceholderAction, revokeInviteAction } from "./actions";
 import { CreateInviteForm } from "./create-invite-form";
+import { MemberRow } from "./member-row";
+
+const groupCardClass =
+  "overflow-hidden rounded-2xl bg-card shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]";
 
 export default async function MembersPage({
   params,
@@ -49,60 +48,25 @@ export default async function MembersPage({
 
   return (
     <AppShell title="Members" backHref={`/g/${id}`} withBottomNav>
-      <ul className="mb-6 space-y-2">
-        {roster.map((m) => (
-          <li key={m.id} className="rounded-xl border px-3 py-3">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="font-medium">
-                  {m.displayName}
-                  {m.id === me.id ? " (you)" : ""}
-                </p>
-                <div className="mt-1 flex flex-wrap gap-1">
-                  {m.isAdmin && <Badge variant="secondary">Admin</Badge>}
-                  {m.userId == null ? (
-                    <Badge variant="outline">Placeholder</Badge>
-                  ) : (
-                    <Badge variant="outline">Signed in</Badge>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {(me.isAdmin || me.id === m.id) && (
-              <form
-                action={renameMemberAction.bind(null, id, m.id)}
-                className="mt-3 flex gap-2"
-              >
-                <Input
-                  name="displayName"
-                  defaultValue={m.displayName}
-                  className="h-8"
-                />
-                <Button type="submit" size="sm" variant="secondary">
-                  Rename
-                </Button>
-              </form>
-            )}
-
-            {me.isAdmin && me.id !== m.id && (
-              <form
-                action={removeMemberAction.bind(null, id, m.id)}
-                className="mt-2"
-              >
-                <Button
-                  type="submit"
-                  size="sm"
-                  variant="ghost"
-                  className="text-destructive"
-                >
-                  Remove
-                </Button>
-              </form>
-            )}
-          </li>
-        ))}
-      </ul>
+      <div className={cn(groupCardClass, "mb-6")}>
+        <ul className="divide-y divide-border">
+          {roster.map((m) => (
+            <MemberRow
+              key={m.id}
+              groupId={id}
+              member={{
+                id: m.id,
+                displayName: m.displayName,
+                isAdmin: m.isAdmin,
+                isPlaceholder: m.userId == null,
+              }}
+              isSelf={m.id === me.id}
+              canRename={me.isAdmin || me.id === m.id}
+              canRemove={me.isAdmin && me.id !== m.id}
+            />
+          ))}
+        </ul>
+      </div>
 
       {me.isAdmin ? (
         <div className="space-y-6">

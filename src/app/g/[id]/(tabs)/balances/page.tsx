@@ -1,5 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import { AppShell } from "@/components/app-shell";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,8 +13,12 @@ import { groups, members, settlements } from "@/db/schema";
 import { requireMember } from "@/lib/auth-guards";
 import { getGroupBalances } from "@/lib/balances";
 import { formatCents, formatMoney, suggestSettlements } from "@/lib/money";
+import { cn } from "@/lib/utils";
 import { RecordPaymentForm } from "./record-payment-form";
 import { recordSettlementAction } from "./actions";
+
+const groupCardClass =
+  "overflow-hidden rounded-2xl bg-card shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]";
 
 export default async function BalancesPage({
   params,
@@ -56,69 +61,86 @@ export default async function BalancesPage({
 
   return (
     <AppShell title="Balances" backHref={`/g/${id}`} withBottomNav>
-      <ul className="mb-6 space-y-2">
-        {rows.map((r) => (
-          <li key={r.memberId}>
-            <Card>
-              <CardHeader className="flex-row items-center justify-between space-y-0 py-3">
-                <CardTitle className="text-sm font-medium">
+      <div className={cn(groupCardClass, "mb-6")}>
+        <ul className="divide-y divide-border">
+          {rows.map((r) => (
+            <li
+              key={r.memberId}
+              className="flex items-center justify-between gap-3 px-4 py-3"
+            >
+              <div className="flex min-w-0 items-center gap-2.5">
+                <Avatar size="sm">
+                  <AvatarFallback>
+                    {r.displayName.slice(0, 1).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="truncate text-sm font-medium">
                   {r.displayName}
-                </CardTitle>
-                <p
-                  className={
-                    r.netCents > 0
-                      ? "text-sm font-medium text-emerald-600"
-                      : r.netCents < 0
-                        ? "text-sm font-medium text-rose-600"
-                        : "text-sm text-muted-foreground"
-                  }
-                >
-                  {r.netCents === 0
-                    ? "settled"
-                    : r.netCents > 0
-                      ? `owed ${formatMoney(r.netCents, group.currency)}`
-                      : `owes ${formatMoney(-r.netCents, group.currency)}`}
-                </p>
-              </CardHeader>
-            </Card>
-          </li>
-        ))}
-      </ul>
+                </span>
+              </div>
+              <span
+                className={cn(
+                  "shrink-0 text-sm font-medium",
+                  r.netCents > 0
+                    ? "text-emerald-600"
+                    : r.netCents < 0
+                      ? "text-rose-600"
+                      : "text-muted-foreground",
+                )}
+              >
+                {r.netCents === 0
+                  ? "settled"
+                  : r.netCents > 0
+                    ? `owed ${formatMoney(r.netCents, group.currency)}`
+                    : `owes ${formatMoney(-r.netCents, group.currency)}`}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
 
       {suggestions.length > 0 && (
         <div className="mb-6 space-y-2">
           <h2 className="text-sm font-medium text-muted-foreground">
             Suggested settle-up
           </h2>
-          <ul className="space-y-2">
-            {suggestions.map((s) => (
-              <li key={`${s.fromMemberId}-${s.toMemberId}`}>
-                <Card>
-                  <CardHeader className="space-y-2 py-3">
-                    <CardTitle className="text-sm font-medium">
-                      {nameById.get(s.fromMemberId)} pays{" "}
-                      {nameById.get(s.toMemberId)}{" "}
+          <div className={groupCardClass}>
+            <ul className="divide-y divide-border">
+              {suggestions.map((s) => (
+                <li
+                  key={`${s.fromMemberId}-${s.toMemberId}`}
+                  className="flex items-center justify-between gap-3 px-4 py-3"
+                >
+                  <p className="min-w-0 truncate text-sm">
+                    {nameById.get(s.fromMemberId)} pays{" "}
+                    {nameById.get(s.toMemberId)}{" "}
+                    <span className="font-medium">
                       {formatMoney(s.amountCents, group.currency)}
-                    </CardTitle>
-                    <form
-                      action={async () => {
-                        "use server";
-                        const fd = new FormData();
-                        fd.set("fromMemberId", s.fromMemberId);
-                        fd.set("toMemberId", s.toMemberId);
-                        fd.set("amount", formatCents(s.amountCents));
-                        await recordSettlementAction(id, fd);
-                      }}
+                    </span>
+                  </p>
+                  <form
+                    action={async () => {
+                      "use server";
+                      const fd = new FormData();
+                      fd.set("fromMemberId", s.fromMemberId);
+                      fd.set("toMemberId", s.toMemberId);
+                      fd.set("amount", formatCents(s.amountCents));
+                      await recordSettlementAction(id, fd);
+                    }}
+                  >
+                    <Button
+                      type="submit"
+                      size="sm"
+                      variant="secondary"
+                      className="shrink-0"
                     >
-                      <Button type="submit" size="sm" variant="secondary">
-                        Record this
-                      </Button>
-                    </form>
-                  </CardHeader>
-                </Card>
-              </li>
-            ))}
-          </ul>
+                      Record
+                    </Button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       )}
 
@@ -147,18 +169,17 @@ export default async function BalancesPage({
           <h2 className="text-sm font-medium text-muted-foreground">
             Recent payments
           </h2>
-          <ul className="space-y-2 text-sm">
-            {recentSettlements.map((s) => (
-              <li
-                key={s.id}
-                className="rounded-lg border px-3 py-2 text-muted-foreground"
-              >
-                {nameById.get(s.fromMemberId)} → {nameById.get(s.toMemberId)}{" "}
-                · {formatMoney(s.amountCents, group.currency)}
-                {s.note ? ` · ${s.note}` : ""}
-              </li>
-            ))}
-          </ul>
+          <div className={groupCardClass}>
+            <ul className="divide-y divide-border text-sm text-muted-foreground">
+              {recentSettlements.map((s) => (
+                <li key={s.id} className="truncate px-4 py-2.5">
+                  {nameById.get(s.fromMemberId)} → {nameById.get(s.toMemberId)}{" "}
+                  · {formatMoney(s.amountCents, group.currency)}
+                  {s.note ? ` · ${s.note}` : ""}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       )}
     </AppShell>
