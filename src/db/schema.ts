@@ -21,6 +21,11 @@ export const splitModeEnum = pgEnum("split_mode", [
   "shares",
 ]);
 
+export const expenseEntryModeEnum = pgEnum("expense_entry_mode", [
+  "simple",
+  "itemized",
+]);
+
 export const users = pgTable("users", {
   id: text("id")
     .primaryKey()
@@ -139,7 +144,14 @@ export const expenses = pgTable(
       .notNull()
       .references(() => members.id, { onDelete: "restrict" }),
     spentAt: timestamp("spent_at", { mode: "date" }).notNull().defaultNow(),
+    entryMode: expenseEntryModeEnum("entry_mode").notNull().default("simple"),
     splitMode: splitModeEnum("split_mode").notNull().default("equal"),
+    taxCents: bigint("tax_cents", { mode: "number" }).notNull().default(0),
+    tipCents: bigint("tip_cents", { mode: "number" }).notNull().default(0),
+    feeCents: bigint("fee_cents", { mode: "number" }).notNull().default(0),
+    discountCents: bigint("discount_cents", { mode: "number" })
+      .notNull()
+      .default(0),
     notes: text("notes"),
     createdByMemberId: text("created_by_member_id")
       .notNull()
@@ -149,6 +161,38 @@ export const expenses = pgTable(
   (table) => [
     index("expenses_group_id_idx").on(table.groupId),
     index("expenses_spent_at_idx").on(table.spentAt),
+  ],
+);
+
+export const expenseItems = pgTable(
+  "expense_items",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    expenseId: text("expense_id")
+      .notNull()
+      .references(() => expenses.id, { onDelete: "cascade" }),
+    description: text("description").notNull(),
+    amountCents: bigint("amount_cents", { mode: "number" }).notNull(),
+    sortOrder: integer("sort_order").notNull(),
+  },
+  (table) => [index("expense_items_expense_id_idx").on(table.expenseId)],
+);
+
+export const expenseItemAssignments = pgTable(
+  "expense_item_assignments",
+  {
+    expenseItemId: text("expense_item_id")
+      .notNull()
+      .references(() => expenseItems.id, { onDelete: "cascade" }),
+    memberId: text("member_id")
+      .notNull()
+      .references(() => members.id, { onDelete: "restrict" }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.expenseItemId, table.memberId] }),
+    index("expense_item_assignments_member_id_idx").on(table.memberId),
   ],
 );
 
@@ -217,6 +261,7 @@ export const membersRelations = relations(members, ({ one, many }) => ({
   user: one(users, { fields: [members.userId], references: [users.id] }),
   paidExpenses: many(expenses, { relationName: "paidBy" }),
   splits: many(expenseSplits),
+  itemAssignments: many(expenseItemAssignments),
 }));
 
 export const invitesRelations = relations(invites, ({ one }) => ({
@@ -239,7 +284,30 @@ export const expensesRelations = relations(expenses, ({ one, many }) => ({
     references: [members.id],
   }),
   splits: many(expenseSplits),
+  items: many(expenseItems),
 }));
+
+export const expenseItemsRelations = relations(expenseItems, ({ one, many }) => ({
+  expense: one(expenses, {
+    fields: [expenseItems.expenseId],
+    references: [expenses.id],
+  }),
+  assignments: many(expenseItemAssignments),
+}));
+
+export const expenseItemAssignmentsRelations = relations(
+  expenseItemAssignments,
+  ({ one }) => ({
+    expenseItem: one(expenseItems, {
+      fields: [expenseItemAssignments.expenseItemId],
+      references: [expenseItems.id],
+    }),
+    member: one(members, {
+      fields: [expenseItemAssignments.memberId],
+      references: [members.id],
+    }),
+  }),
+);
 
 export const expenseSplitsRelations = relations(expenseSplits, ({ one }) => ({
   expense: one(expenses, {
@@ -274,6 +342,9 @@ export type Group = typeof groups.$inferSelect;
 export type Member = typeof members.$inferSelect;
 export type Invite = typeof invites.$inferSelect;
 export type Expense = typeof expenses.$inferSelect;
+export type ExpenseItem = typeof expenseItems.$inferSelect;
+export type ExpenseItemAssignment = typeof expenseItemAssignments.$inferSelect;
 export type ExpenseSplit = typeof expenseSplits.$inferSelect;
 export type Settlement = typeof settlements.$inferSelect;
 export type SplitMode = (typeof splitModeEnum.enumValues)[number];
+export type ExpenseEntryMode = (typeof expenseEntryModeEnum.enumValues)[number];

@@ -4,7 +4,14 @@ import { AppShell } from "@/components/app-shell";
 import { ExpenseForm } from "@/components/expense-form";
 import { Button } from "@/components/ui/button";
 import { db } from "@/db";
-import { expenseSplits, expenses, groups, members } from "@/db/schema";
+import {
+  expenseItemAssignments,
+  expenseItems,
+  expenseSplits,
+  expenses,
+  groups,
+  members,
+} from "@/db/schema";
 import { requireMember } from "@/lib/auth-guards";
 import { formatCents } from "@/lib/money";
 import { deleteExpenseAction, updateExpenseAction } from "../actions";
@@ -42,6 +49,32 @@ export default async function ExpenseDetailPage({
     .from(expenseSplits)
     .where(eq(expenseSplits.expenseId, expenseId));
 
+  const itemRows = await db
+    .select()
+    .from(expenseItems)
+    .where(eq(expenseItems.expenseId, expenseId))
+    .orderBy(expenseItems.sortOrder);
+
+  const assignmentRows = await db
+    .select({
+      expenseItemId: expenseItemAssignments.expenseItemId,
+      memberId: expenseItemAssignments.memberId,
+    })
+    .from(expenseItemAssignments)
+    .innerJoin(
+      expenseItems,
+      eq(expenseItemAssignments.expenseItemId, expenseItems.id),
+    )
+    .where(eq(expenseItems.expenseId, expenseId));
+
+  const assignedMembers = new Map<string, string[]>();
+  for (const assignment of assignmentRows) {
+    assignedMembers.set(assignment.expenseItemId, [
+      ...(assignedMembers.get(assignment.expenseItemId) ?? []),
+      assignment.memberId,
+    ]);
+  }
+
   const weights: Record<string, number> = {};
   for (const s of splits) {
     weights[s.memberId] = Number(s.weight ?? s.amountCents);
@@ -57,16 +90,37 @@ export default async function ExpenseDetailPage({
         defaultPaidById={expense.paidByMemberId}
         action={action}
         submitLabel="Save changes"
-        defaultValues={{
-          description: expense.description,
-          amount: formatCents(expense.amountCents),
-          paidByMemberId: expense.paidByMemberId,
-          spentAt: expense.spentAt.toISOString().slice(0, 10),
-          splitMode: expense.splitMode,
-          notes: expense.notes ?? undefined,
-          weights,
-          included: splits.map((s) => s.memberId),
-        }}
+        defaultValues={
+          expense.entryMode === "itemized"
+            ? {
+                entryMode: "itemized",
+                description: expense.description,
+                amount: formatCents(expense.amountCents),
+                paidByMemberId: expense.paidByMemberId,
+                spentAt: expense.spentAt.toISOString().slice(0, 10),
+                notes: expense.notes ?? undefined,
+                tax: formatCents(expense.taxCents),
+                tip: formatCents(expense.tipCents),
+                fee: formatCents(expense.feeCents),
+                discount: formatCents(expense.discountCents),
+                items: itemRows.map((item) => ({
+                  description: item.description,
+                  amount: formatCents(item.amountCents),
+                  memberIds: assignedMembers.get(item.id) ?? [],
+                })),
+              }
+            : {
+                entryMode: "simple",
+                description: expense.description,
+                amount: formatCents(expense.amountCents),
+                paidByMemberId: expense.paidByMemberId,
+                spentAt: expense.spentAt.toISOString().slice(0, 10),
+                splitMode: expense.splitMode,
+                notes: expense.notes ?? undefined,
+                weights,
+                included: splits.map((split) => split.memberId),
+              }
+        }
       />
 
       <form

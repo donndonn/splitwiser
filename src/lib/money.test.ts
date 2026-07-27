@@ -85,6 +85,15 @@ describe("allocateSplits", () => {
     expect(result.find((r) => r.memberId === "a")?.amountCents).toBe(250);
     expect(result.find((r) => r.memberId === "b")?.amountCents).toBe(750);
   });
+
+  it("rejects negative weights", () => {
+    expect(() =>
+      allocateSplits(1000, "shares", [
+        { memberId: "a", weight: 2 },
+        { memberId: "b", weight: -1 },
+      ]),
+    ).toThrow(/non-negative/);
+  });
 });
 
 describe("suggestSettlements", () => {

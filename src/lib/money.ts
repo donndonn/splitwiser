@@ -56,6 +56,13 @@ export function allocateSplits(
   if (!Number.isInteger(totalCents) || totalCents < 0) {
     throw new Error("Total must be a non-negative integer number of cents");
   }
+  if (
+    inputs.some(
+      (input) => !Number.isFinite(input.weight) || input.weight < 0,
+    )
+  ) {
+    throw new Error("Weights must be non-negative numbers");
+  }
 
   switch (mode) {
     case "equal":
