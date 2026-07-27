@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { AppShell } from "@/components/app-shell";
-import { ExpenseForm } from "@/components/expense-form";
+import { DescribeExpense } from "@/components/describe-expense";
 import { db } from "@/db";
 import { groups, members } from "@/db/schema";
 import { requireMember } from "@/lib/auth-guards";
@@ -29,12 +29,12 @@ export default async function NewExpensePage({
 
   return (
     <AppShell title="Add expense" backHref={`/g/${id}`} withBottomNav>
-      <ExpenseForm
+      <DescribeExpense
+        groupId={id}
         members={roster}
         currency={group.currency}
         defaultPaidById={member.id}
         action={action}
-        submitLabel="Add expense"
       />
     </AppShell>
   );
