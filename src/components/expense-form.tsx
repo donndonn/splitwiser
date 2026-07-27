@@ -1,9 +1,8 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CircleCheck,
@@ -11,7 +10,6 @@ import {
   Plus,
   ReceiptText,
   Scale,
-  Sparkles,
   Trash2,
   Users,
 } from "lucide-react";
@@ -62,10 +60,6 @@ export type SimpleExpenseDefaults = CommonDefaults & {
 
 export type ItemizedExpenseDefaults = CommonDefaults & {
   entryMode: "itemized";
-  tax?: string;
-  tip?: string;
-  fee?: string;
-  discount?: string;
   items: {
     description: string;
     amount: string;
@@ -91,11 +85,11 @@ type ItemDraft = {
 
 type SplitStatus = "idle" | "incomplete" | "invalid" | "balanced";
 
-function parseAdjustment(value: string, label: string): number {
-  if (!value.trim()) return 0;
-  const cents = parseAmountToCents(value);
-  if (cents < 0) throw new Error(`${label} cannot be negative`);
-  return cents;
+function memberInitials(displayName: string) {
+  const parts = displayName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
+  return `${parts[0].slice(0, 1)}${parts[1].slice(0, 1)}`.toUpperCase();
 }
 
 export function ExpenseForm({
@@ -148,6 +142,8 @@ export function ExpenseForm({
   });
 
   const nextItemKey = useRef((itemizedDefaults?.items.length ?? 0) + 1);
+  const focusItemKeyRef = useRef<string | null>(null);
+  const itemNameInputRefs = useRef(new Map<string, HTMLInputElement>());
   const [items, setItems] = useState<ItemDraft[]>(() =>
     itemizedDefaults
       ? itemizedDefaults.items.map((item, index) => ({
@@ -159,24 +155,12 @@ export function ExpenseForm({
             key: "new-0",
             description: "",
             amount: "",
-            memberIds: [defaultPaidById],
+            memberIds: members.map((member) => member.id),
           },
         ],
   );
-  const [tax, setTax] = useState(itemizedDefaults?.tax ?? "");
-  const [tip, setTip] = useState(itemizedDefaults?.tip ?? "");
-  const [fee, setFee] = useState(itemizedDefaults?.fee ?? "");
-  const [discount, setDiscount] = useState(itemizedDefaults?.discount ?? "");
   const [paidByMemberId, setPaidByMemberId] = useState(
     defaultValues?.paidByMemberId ?? defaultPaidById,
-  );
-  const [adjustmentsExpanded, setAdjustmentsExpanded] = useState(() =>
-    [
-      itemizedDefaults?.tax,
-      itemizedDefaults?.tip,
-      itemizedDefaults?.fee,
-      itemizedDefaults?.discount,
-    ].some((value) => value != null && Number(value) !== 0),
   );
   const [assignmentItemKey, setAssignmentItemKey] = useState<string | null>(
     null,
@@ -185,6 +169,16 @@ export function ExpenseForm({
   const [splitEditorOpen, setSplitEditorOpen] = useState(false);
   const [splitInteracted, setSplitInteracted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const key = focusItemKeyRef.current;
+    if (!key) return;
+    const input = itemNameInputRefs.current.get(key);
+    if (input) {
+      input.focus();
+      focusItemKeyRef.current = null;
+    }
+  }, [items]);
 
   const selectedMembers = members.filter((member) => included[member.id]);
 
@@ -215,7 +209,7 @@ export function ExpenseForm({
 
   const itemizedPreview = useMemo(() => {
     let itemSubtotalCents = 0;
-    let calculatedTotalCents: number | null = null;
+    let taxAndTipCents: number | null = null;
     let printedTotalCents: number | null = null;
     try {
       printedTotalCents = parseAmountToCents(amount);
@@ -233,18 +227,9 @@ export function ExpenseForm({
           memberIds: item.memberIds,
         };
       });
-      const taxCents = parseAdjustment(tax, "Tax");
-      const tipCents = parseAdjustment(tip, "Tip");
-      const feeCents = parseAdjustment(fee, "Fee");
-      const discountCents = parseAdjustment(discount, "Discount");
-      calculatedTotalCents =
-        itemSubtotalCents + taxCents + tipCents + feeCents - discountCents;
+      taxAndTipCents = printedTotalCents - itemSubtotalCents;
       const calculation = calculateItemizedExpense({
         amountCents: printedTotalCents,
-        taxCents,
-        tipCents,
-        feeCents,
-        discountCents,
         items: parsedItems,
       });
       return {
@@ -252,7 +237,7 @@ export function ExpenseForm({
         parsedItems,
         calculation,
         itemSubtotalCents,
-        calculatedTotalCents,
+        taxAndTipCents: calculation.taxAndTipCents,
         printedTotalCents,
       };
     } catch (previewError) {
@@ -263,11 +248,11 @@ export function ExpenseForm({
             ? previewError.message
             : "Invalid itemized expense",
         itemSubtotalCents,
-        calculatedTotalCents,
+        taxAndTipCents,
         printedTotalCents,
       };
     }
-  }, [amount, discount, fee, items, tax, tip]);
+  }, [amount, items]);
 
   const remainder =
     simplePreview?.ok && mode === "exact"
@@ -300,17 +285,10 @@ export function ExpenseForm({
   const activeAssignmentItem = items.find(
     (item) => item.key === assignmentItemKey,
   );
-  const adjustmentCents =
-    itemizedPreview.calculatedTotalCents == null
-      ? null
-      : itemizedPreview.calculatedTotalCents -
-        itemizedPreview.itemSubtotalCents;
-  const itemizedDifference =
-    itemizedPreview.calculatedTotalCents == null ||
+  const taxAndTipCents =
     itemizedPreview.printedTotalCents == null
       ? null
-      : itemizedPreview.printedTotalCents -
-        itemizedPreview.calculatedTotalCents;
+      : itemizedPreview.printedTotalCents - itemizedPreview.itemSubtotalCents;
   const splitStatus: SplitStatus = (() => {
     if (entryMode === "simple") {
       if (!amount.trim()) {
@@ -349,10 +327,6 @@ export function ExpenseForm({
       for (const item of items) {
         if (item.amount.trim()) parseAmountToCents(item.amount);
       }
-      parseAdjustment(tax, "Tax");
-      parseAdjustment(tip, "Tip");
-      parseAdjustment(fee, "Fee");
-      parseAdjustment(discount, "Discount");
     } catch {
       return "invalid";
     }
@@ -369,8 +343,8 @@ export function ExpenseForm({
     ) {
       return "invalid";
     }
-    if (itemizedDifference != null && itemizedDifference !== 0) {
-      return "incomplete";
+    if (taxAndTipCents != null && taxAndTipCents < 0) {
+      return "invalid";
     }
     return "invalid";
   })();
@@ -382,11 +356,18 @@ export function ExpenseForm({
       item.memberIds.includes(member.id),
     );
     if (assigned.length === members.length && members.length > 0) {
-      return "Shared by everyone";
+      return "Everyone";
     }
     if (assigned.length === 0) return "Choose people";
     if (assigned.length === 1) return assigned[0].displayName;
+    if (assigned.length === 2) {
+      return `${assigned[0].displayName}, ${assigned[1].displayName}`;
+    }
     return `${assigned[0].displayName} +${assigned.length - 1}`;
+  }
+
+  function assignedMembersFor(item: ItemDraft) {
+    return members.filter((member) => item.memberIds.includes(member.id));
   }
 
   function friendlyItemizedError(message: string) {
@@ -394,7 +375,12 @@ export function ExpenseForm({
     if (message.includes("assigned to at least one member")) {
       return "Choose who shared each receipt item.";
     }
-    if (message.includes("description")) return "Add a name for each item.";
+    if (message.includes("cannot exceed the total")) {
+      return "Item amounts add up to more than the receipt total.";
+    }
+    if (message.includes("description") || message.includes("name")) {
+      return "Add a name for each item.";
+    }
     if (message.includes("amount")) return "Enter a valid amount for each item.";
     return message;
   }
@@ -408,13 +394,14 @@ export function ExpenseForm({
   function addItem() {
     const key = `new-${nextItemKey.current}`;
     nextItemKey.current += 1;
+    focusItemKeyRef.current = key;
     setItems((current) => [
       ...current,
       {
         key,
         description: "",
         amount: "",
-        memberIds: [defaultPaidById],
+        memberIds: members.map((member) => member.id),
       },
     ]);
   }
@@ -631,11 +618,6 @@ export function ExpenseForm({
           </SheetFooter>
         </SheetContent>
       </Sheet>
-
-      <input type="hidden" name="tax" value={tax} />
-      <input type="hidden" name="tip" value={tip} />
-      <input type="hidden" name="fee" value={fee} />
-      <input type="hidden" name="discount" value={discount} />
 
       {splitEditorOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-background">
@@ -857,15 +839,19 @@ export function ExpenseForm({
               </div>
             ) : (
               <div className="overflow-hidden rounded-2xl bg-card shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
-                {items.map((item, index) => (
+                {items.map((item, index) => {
+                  const assigned = assignedMembersFor(item);
+                  const visibleAssignees = assigned.slice(0, 4);
+                  const extraAssignees = assigned.length - visibleAssignees.length;
+                  return (
                   <article
                     key={item.key}
                     className={cn(
-                      "min-w-0 px-3 py-2.5",
+                      "min-w-0 px-3 py-3",
                       index > 0 && "border-t border-border/65",
                     )}
                   >
-                    <div className="flex min-w-0 items-center gap-1.5">
+                    <div className="flex min-w-0 items-center gap-1">
                       <Label
                         htmlFor={`item-name-${item.key}`}
                         className="sr-only"
@@ -875,8 +861,15 @@ export function ExpenseForm({
                       <Input
                         id={`item-name-${item.key}`}
                         aria-label={`Item ${index + 1} name`}
-                        className="h-10 min-w-0 flex-1 border-0 bg-transparent px-1 shadow-none placeholder:text-muted-foreground focus-visible:bg-secondary/70 focus-visible:ring-0"
+                        className="h-10 min-w-0 flex-1 border-0 bg-transparent px-1 text-base font-medium shadow-none placeholder:text-muted-foreground focus-visible:bg-secondary/70 focus-visible:ring-0"
                         value={item.description}
+                        ref={(element) => {
+                          if (element) {
+                            itemNameInputRefs.current.set(item.key, element);
+                          } else {
+                            itemNameInputRefs.current.delete(item.key);
+                          }
+                        }}
                         onChange={(event) =>
                           updateItem(item.key, {
                             description: event.target.value,
@@ -891,14 +884,14 @@ export function ExpenseForm({
                       >
                         Item {index + 1} amount
                       </Label>
-                      <div className="relative w-[5.5rem] shrink-0">
+                      <div className="relative w-[5.75rem] shrink-0">
                         <span className="pointer-events-none absolute inset-y-0 left-1 flex items-center text-xs text-muted-foreground">
                           {currencySymbol}
                         </span>
                         <Input
                           id={`item-amount-${item.key}`}
                           aria-label={`Item ${index + 1} amount`}
-                          className="h-10 border-0 bg-transparent px-1 pl-4 text-right font-semibold shadow-none focus-visible:bg-secondary/70 focus-visible:ring-0"
+                          className="h-10 border-0 bg-transparent px-1 pl-4 text-right font-semibold tabular-nums shadow-none focus-visible:bg-secondary/70 focus-visible:ring-0"
                           inputMode="decimal"
                           value={item.amount}
                           onChange={(event) =>
@@ -906,6 +899,12 @@ export function ExpenseForm({
                               amount: event.target.value,
                             })
                           }
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              addItem();
+                            }
+                          }}
                           placeholder="0.00"
                         />
                       </div>
@@ -914,7 +913,7 @@ export function ExpenseForm({
                         type="button"
                         variant="ghost"
                         size="icon-sm"
-                        className="shrink-0 text-muted-foreground hover:text-destructive"
+                        className="shrink-0 text-muted-foreground/70 hover:text-destructive"
                         aria-label={`Remove item ${index + 1}`}
                         onClick={() => {
                           setItems((current) =>
@@ -927,29 +926,49 @@ export function ExpenseForm({
                           }
                         }}
                       >
-                        <Trash2 className="size-4" />
+                        <Trash2 className="size-3.5" />
                       </Button>
                     </div>
 
                     <button
                       type="button"
                       className={cn(
-                        "mt-0.5 flex h-9 w-full min-w-0 items-center gap-2 rounded-xl px-2 text-left text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/20",
+                        "mt-1 flex h-9 w-full min-w-0 items-center gap-2 rounded-xl px-1.5 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/20",
                         item.memberIds.length === 0 && splitInteracted
-                          ? "border-destructive/35 bg-destructive/5 text-destructive"
-                          : "text-foreground hover:bg-secondary/70",
+                          ? "bg-destructive/5 text-destructive"
+                          : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground",
                       )}
                       aria-label={`Choose who shared item ${index + 1}. Currently ${assignmentSummary(item)}`}
                       onClick={() => setAssignmentItemKey(item.key)}
                     >
-                      <Users className="size-4 shrink-0 text-muted-foreground" />
-                      <span className="min-w-0 flex-1 truncate">
+                      {assigned.length > 0 ? (
+                        <span className="flex shrink-0 items-center -space-x-1.5">
+                          {visibleAssignees.map((member) => (
+                            <span
+                              key={member.id}
+                              className="flex size-6 items-center justify-center rounded-full bg-secondary text-[10px] font-bold text-secondary-foreground ring-2 ring-card"
+                              title={member.displayName}
+                            >
+                              {memberInitials(member.displayName)}
+                            </span>
+                          ))}
+                          {extraAssignees > 0 && (
+                            <span className="flex size-6 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground ring-2 ring-card">
+                              +{extraAssignees}
+                            </span>
+                          )}
+                        </span>
+                      ) : (
+                        <Users className="size-4 shrink-0" />
+                      )}
+                      <span className="min-w-0 flex-1 truncate font-medium">
                         {assignmentSummary(item)}
                       </span>
-                      <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                      <ChevronRight className="size-4 shrink-0 opacity-60" />
                     </button>
                   </article>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -962,65 +981,6 @@ export function ExpenseForm({
               <Plus className="size-4" />
               Add another item
             </Button>
-          </section>
-
-          <section className="overflow-hidden rounded-2xl bg-card shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
-            <button
-              type="button"
-              className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left text-sm font-semibold"
-              aria-expanded={adjustmentsExpanded}
-              onClick={() => setAdjustmentsExpanded((current) => !current)}
-            >
-              <span className="flex size-9 items-center justify-center rounded-xl bg-secondary">
-                <Sparkles className="size-4" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block">Adjustments</span>
-                <span className="block text-xs font-normal text-muted-foreground">
-                  Tax, tip, fees and discounts
-                </span>
-              </span>
-              {adjustmentCents != null && adjustmentCents !== 0 && (
-                <span className="text-xs text-muted-foreground">
-                  {adjustmentCents > 0 ? "+" : ""}
-                  {formatMoney(adjustmentCents, currency)}
-                </span>
-              )}
-              <ChevronDown
-                className={cn(
-                  "size-4 text-muted-foreground transition-transform",
-                  adjustmentsExpanded && "rotate-180",
-                )}
-              />
-            </button>
-            <div
-              className={cn(
-                "grid grid-cols-2 gap-3 border-t border-border/65 p-4",
-                !adjustmentsExpanded && "hidden",
-              )}
-            >
-              {[
-                ["Tax", "tax", tax, setTax],
-                ["Tip", "tip", tip, setTip],
-                ["Fee", "fee", fee, setFee],
-                ["Discount", "discount", discount, setDiscount],
-              ].map(([label, name, value, setter]) => (
-                <div className="space-y-1.5" key={String(name)}>
-                  <Label htmlFor={String(name)} className="text-xs">
-                    {String(label)}
-                  </Label>
-                  <Input
-                    id={String(name)}
-                    inputMode="decimal"
-                    value={String(value)}
-                    onChange={(event) =>
-                      (setter as (next: string) => void)(event.target.value)
-                    }
-                    placeholder="0.00"
-                  />
-                </div>
-              ))}
-            </div>
           </section>
 
           <section
@@ -1053,37 +1013,35 @@ export function ExpenseForm({
               <div className="min-w-0">
                 <h3 className="font-semibold">
                   {splitStatus === "invalid"
-                    ? "Check the receipt details"
-                    : itemizedDifference == null
-                    ? "Finish the receipt"
+                    ? taxAndTipCents != null && taxAndTipCents < 0
+                      ? "Items exceed the total"
+                      : "Check the receipt details"
                     : splitStatus === "balanced"
-                      ? "Balanced"
-                      : itemizedDifference > 0
-                        ? `${formatMoney(itemizedDifference, currency)} left to add`
-                        : itemizedDifference < 0
-                          ? `Items are ${formatMoney(-itemizedDifference, currency)} over`
-                          : "Finish the item details"}
+                      ? "Tax & tip included"
+                      : "Finish the receipt"}
                 </h3>
                 <p className="mt-0.5 text-xs opacity-70">
                   {splitStatus === "balanced"
-                    ? "Everything matches the receipt total."
+                    ? "Tax & tip is what’s left after your items."
                     : splitStatus === "invalid"
                       ? "Fix the highlighted value before finishing."
-                    : "Items and adjustments should match the receipt total."}
+                      : "Add item names, amounts, and who shared each one."}
                 </p>
               </div>
             </div>
             <div className="space-y-2.5 text-sm">
               <div className="flex justify-between">
-                <span className="opacity-65">Items subtotal</span>
-                <span>{formatMoney(itemizedPreview.itemSubtotalCents, currency)}</span>
+                <span className="opacity-65">Items</span>
+                <span>
+                  {formatMoney(itemizedPreview.itemSubtotalCents, currency)}
+                </span>
               </div>
               <div className="flex justify-between">
-                <span className="opacity-65">Adjustments</span>
+                <span className="opacity-65">Tax & tip</span>
                 <span>
-                  {adjustmentCents == null
+                  {taxAndTipCents == null
                     ? "—"
-                    : formatMoney(adjustmentCents, currency)}
+                    : formatMoney(taxAndTipCents, currency)}
                 </span>
               </div>
               <div className="flex justify-between border-t border-current/10 pt-2.5 font-semibold">
@@ -1106,11 +1064,19 @@ export function ExpenseForm({
                     key={split.memberId}
                     className="flex min-h-12 items-center justify-between border-b border-border/65 px-4 text-sm last:border-b-0"
                   >
-                    <span>
-                      {members.find((member) => member.id === split.memberId)
-                        ?.displayName ?? "Unknown"}
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary text-[10px] font-bold">
+                        {memberInitials(
+                          members.find((member) => member.id === split.memberId)
+                            ?.displayName ?? "?",
+                        )}
+                      </span>
+                      <span className="truncate">
+                        {members.find((member) => member.id === split.memberId)
+                          ?.displayName ?? "Unknown"}
+                      </span>
                     </span>
-                    <span className="font-semibold">
+                    <span className="font-semibold tabular-nums">
                       {formatMoney(split.amountCents, currency)}
                     </span>
                   </div>
@@ -1123,7 +1089,7 @@ export function ExpenseForm({
             <p className="rounded-xl bg-destructive/8 px-3 py-2 text-sm text-destructive">
               {friendlyItemizedError(itemizedPreview.message)}
             </p>
-            )}
+          )}
 
           <Sheet
             open={assignmentItemKey != null}
@@ -1165,7 +1131,7 @@ export function ExpenseForm({
                     }
                   >
                     <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-                      <Sparkles className="size-5" />
+                      <Users className="size-5" />
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-semibold">

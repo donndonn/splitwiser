@@ -10,10 +10,6 @@ function receipt(
 ): ItemizedExpenseInput {
   return {
     amountCents: 1000,
-    taxCents: 0,
-    tipCents: 0,
-    feeCents: 0,
-    discountCents: 0,
     items: [
       {
         description: "Dinner",
@@ -45,6 +41,7 @@ describe("calculateItemizedExpense", () => {
       }),
     );
 
+    expect(result.taxAndTipCents).toBe(0);
     expect(result.memberItemSubtotals).toEqual([
       { memberId: "a", amountCents: 51, weight: 51 },
       { memberId: "b", amountCents: 100, weight: 100 },
@@ -55,12 +52,10 @@ describe("calculateItemizedExpense", () => {
     ]);
   });
 
-  it("allocates positive adjustments proportionally", () => {
+  it("allocates tax and tip residual proportionally", () => {
     const result = calculateItemizedExpense(
       receipt({
         amountCents: 12000,
-        taxCents: 1000,
-        tipCents: 1000,
         items: [
           { description: "A", amountCents: 6000, memberIds: ["a"] },
           { description: "B", amountCents: 4000, memberIds: ["b"] },
@@ -68,34 +63,24 @@ describe("calculateItemizedExpense", () => {
       }),
     );
 
+    expect(result.itemSubtotalCents).toBe(10000);
+    expect(result.taxAndTipCents).toBe(2000);
     expect(result.splits).toEqual([
       { memberId: "a", amountCents: 7200, weight: 6000 },
       { memberId: "b", amountCents: 4800, weight: 4000 },
     ]);
   });
 
-  it("allocates discounts proportionally", () => {
-    const result = calculateItemizedExpense(
-      receipt({
-        amountCents: 8000,
-        discountCents: 2000,
-        items: [
-          { description: "A", amountCents: 7500, memberIds: ["a"] },
-          { description: "B", amountCents: 2500, memberIds: ["b"] },
-        ],
-      }),
-    );
-
-    expect(result.splits).toEqual([
-      { memberId: "a", amountCents: 6000, weight: 7500 },
-      { memberId: "b", amountCents: 2000, weight: 2500 },
-    ]);
+  it("allows a zero tax and tip residual", () => {
+    const result = calculateItemizedExpense(receipt());
+    expect(result.taxAndTipCents).toBe(0);
+    expect(result.calculatedTotalCents).toBe(1000);
   });
 
-  it("rejects totals that do not reconcile", () => {
+  it("rejects when items exceed the total", () => {
     expect(() =>
       calculateItemizedExpense(receipt({ amountCents: 999 })),
-    ).toThrow(/match the total/);
+    ).toThrow(/cannot exceed the total/);
   });
 
   it.each([

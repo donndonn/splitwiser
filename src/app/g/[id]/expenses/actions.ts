@@ -100,11 +100,6 @@ function parseItemizedPayload(raw: string): ItemizedPayload {
   };
 }
 
-function parseOptionalAmount(formData: FormData, name: string): number {
-  const raw = String(formData.get(name) ?? "").trim();
-  return raw ? parseAmountToCents(raw) : 0;
-}
-
 async function getGroupMemberIds(groupId: string): Promise<Set<string>> {
   const roster = await db
     .select({ id: members.id })
@@ -144,28 +139,20 @@ function parseExpenseDetails(
   entryMode: ExpenseEntryMode,
 ) {
   if (entryMode === "itemized") {
-    const taxCents = parseOptionalAmount(formData, "tax");
-    const tipCents = parseOptionalAmount(formData, "tip");
-    const feeCents = parseOptionalAmount(formData, "fee");
-    const discountCents = parseOptionalAmount(formData, "discount");
     const payload = parseItemizedPayload(
       String(formData.get("itemizedPayload") ?? "{}"),
     );
     const calculation = calculateItemizedExpense({
       amountCents,
-      taxCents,
-      tipCents,
-      feeCents,
-      discountCents,
       items: payload.items,
     });
     return {
       entryMode,
       splitMode: "exact" as const,
-      taxCents,
-      tipCents,
-      feeCents,
-      discountCents,
+      taxCents: calculation.taxAndTipCents,
+      tipCents: 0,
+      feeCents: 0,
+      discountCents: 0,
       items: payload.items,
       splits: calculation.splits,
     };

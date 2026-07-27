@@ -99,10 +99,6 @@ export default async function ExpenseDetailPage({
                 paidByMemberId: expense.paidByMemberId,
                 spentAt: expense.spentAt.toISOString().slice(0, 10),
                 notes: expense.notes ?? undefined,
-                tax: formatCents(expense.taxCents),
-                tip: formatCents(expense.tipCents),
-                fee: formatCents(expense.feeCents),
-                discount: formatCents(expense.discountCents),
                 items: itemRows.map((item) => ({
                   description: item.description,
                   amount: formatCents(item.amountCents),

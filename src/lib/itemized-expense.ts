@@ -8,15 +8,12 @@ export type ItemizedExpenseItemInput = {
 
 export type ItemizedExpenseInput = {
   amountCents: number;
-  taxCents: number;
-  tipCents: number;
-  feeCents: number;
-  discountCents: number;
   items: ItemizedExpenseItemInput[];
 };
 
 export type ItemizedExpenseCalculation = {
   itemSubtotalCents: number;
+  taxAndTipCents: number;
   calculatedTotalCents: number;
   memberItemSubtotals: SplitResult[];
   splits: SplitResult[];
@@ -36,28 +33,10 @@ export function assertAllowedMemberIds(
 export function calculateItemizedExpense(
   input: ItemizedExpenseInput,
 ): ItemizedExpenseCalculation {
-  const {
-    amountCents,
-    taxCents,
-    tipCents,
-    feeCents,
-    discountCents,
-    items,
-  } = input;
+  const { amountCents, items } = input;
 
   if (!Number.isInteger(amountCents) || amountCents <= 0) {
     throw new Error("Amount must be greater than zero");
-  }
-
-  for (const [label, value] of [
-    ["Tax", taxCents],
-    ["Tip", tipCents],
-    ["Fee", feeCents],
-    ["Discount", discountCents],
-  ] as const) {
-    if (!Number.isInteger(value) || value < 0) {
-      throw new Error(`${label} must be a non-negative amount`);
-    }
   }
 
   if (items.length === 0) {
@@ -97,10 +76,9 @@ export function calculateItemizedExpense(
     }
   }
 
-  const calculatedTotalCents =
-    itemSubtotalCents + taxCents + tipCents + feeCents - discountCents;
-  if (calculatedTotalCents !== amountCents) {
-    throw new Error("Receipt items and adjustments must match the total");
+  const taxAndTipCents = amountCents - itemSubtotalCents;
+  if (taxAndTipCents < 0) {
+    throw new Error("Receipt items cannot exceed the total");
   }
 
   const memberItemSubtotals = [...memberItemCents.entries()].map(
@@ -121,7 +99,8 @@ export function calculateItemizedExpense(
 
   return {
     itemSubtotalCents,
-    calculatedTotalCents,
+    taxAndTipCents,
+    calculatedTotalCents: amountCents,
     memberItemSubtotals,
     splits,
   };
