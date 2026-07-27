@@ -343,7 +343,8 @@ export async function updateExpenseAction(
   redirect(`/g/${groupId}/expenses/${expenseId}`);
 }
 
-export async function deleteExpenseAction(groupId: string, expenseId: string) {
+/** Delete an expense and revalidate; does not redirect (for in-list deletes). */
+export async function removeExpenseAction(groupId: string, expenseId: string) {
   await requireMember(groupId);
 
   await db
@@ -352,5 +353,11 @@ export async function deleteExpenseAction(groupId: string, expenseId: string) {
 
   revalidatePath(`/g/${groupId}`);
   revalidatePath(`/g/${groupId}/balances`);
+  return { ok: true as const };
+}
+
+/** Detail-page delete: remove then redirect back to the group dashboard. */
+export async function deleteExpenseAction(groupId: string, expenseId: string) {
+  await removeExpenseAction(groupId, expenseId);
   redirect(`/g/${groupId}`);
 }

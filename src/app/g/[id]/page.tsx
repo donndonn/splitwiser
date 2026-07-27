@@ -3,6 +3,7 @@ import { desc, eq } from "drizzle-orm";
 import { Plus, Settings } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { GroupBottomNav } from "@/components/group-bottom-nav";
+import { RecentExpensesList } from "@/components/recent-expenses-list";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -95,44 +96,20 @@ export default async function GroupDashboardPage({
         <h2 className="mb-2 text-sm font-medium text-muted-foreground">
           Recent expenses
         </h2>
-        {recent.length === 0 ? (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">No expenses yet</CardTitle>
-              <CardDescription>
-                Add the first one to start splitting.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        ) : (
-          <ul className="space-y-2">
-            {recent.map((e) => (
-              <li key={e.id}>
-                <Link href={`/g/${id}/expenses/${e.id}`}>
-                  <Card className="transition-colors hover:bg-muted/40">
-                    <CardHeader className="flex-row items-center justify-between gap-3 space-y-0 py-3">
-                      <div className="min-w-0">
-                        <CardTitle className="truncate text-sm font-medium">
-                          {e.description}
-                        </CardTitle>
-                        <CardDescription className="text-xs">
-                          {e.paidByName} ·{" "}
-                          {e.spentAt.toLocaleDateString(undefined, {
-                            month: "short",
-                            day: "numeric",
-                          })}
-                        </CardDescription>
-                      </div>
-                      <p className="shrink-0 text-sm font-medium">
-                        {formatMoney(e.amountCents, group.currency)}
-                      </p>
-                    </CardHeader>
-                  </Card>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
+        <RecentExpensesList
+          groupId={id}
+          currency={group.currency}
+          expenses={recent.map((e) => ({
+            id: e.id,
+            description: e.description,
+            amountCents: e.amountCents,
+            paidByName: e.paidByName,
+            spentAtLabel: e.spentAt.toLocaleDateString(undefined, {
+              month: "short",
+              day: "numeric",
+            }),
+          }))}
+        />
       </AppShell>
       <GroupBottomNav groupId={id} />
     </>
