@@ -18,8 +18,8 @@ export default async function ProfilePage() {
   const name = dbUser
     ? displayNameForUser(dbUser)
     : displayNameForUser(sessionUser);
-  const email = dbUser?.email ?? sessionUser.email;
-  const image = dbUser?.image ?? sessionUser.image;
+  const email = dbUser?.email ?? sessionUser.email ?? null;
+  const image = dbUser?.image ?? sessionUser.image ?? null;
   const username = dbUser?.username ?? null;
 
   return (
