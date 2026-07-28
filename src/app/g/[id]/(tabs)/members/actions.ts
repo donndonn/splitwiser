@@ -1,11 +1,12 @@
 "use server";
 
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
-import { invites, members } from "@/db/schema";
+import { invites, members, users } from "@/db/schema";
 import { requireAdmin, requireMember } from "@/lib/auth-guards";
+import { areFriends, displayNameForUser } from "@/lib/friends";
 
 export async function createInviteAction(groupId: string, formData: FormData) {
   await requireAdmin(groupId);
@@ -67,6 +68,69 @@ export async function addPlaceholderAction(
   });
 
   revalidatePath(`/g/${groupId}/members`);
+}
+
+export async function addFriendAsMemberAction(
+  groupId: string,
+  friendUserId: string,
+) {
+  const { user } = await requireAdmin(groupId);
+
+  if (!(await areFriends(user.id, friendUserId))) {
+    throw new Error("That person is not your friend");
+  }
+
+  const [existing] = await db
+    .select({ id: members.id })
+    .from(members)
+    .where(
+      and(eq(members.groupId, groupId), eq(members.userId, friendUserId)),
+    )
+    .limit(1);
+
+  if (existing) {
+    throw new Error("They are already in this group");
+  }
+
+  const [friend] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, friendUserId))
+    .limit(1);
+
+  if (!friend) {
+    throw new Error("User not found");
+  }
+
+  const displayName = displayNameForUser(friend);
+
+  const [nameTaken] = await db
+    .select({ id: members.id })
+    .from(members)
+    .where(
+      and(
+        eq(members.groupId, groupId),
+        sql`lower(${members.displayName}) = lower(${displayName})`,
+      ),
+    )
+    .limit(1);
+
+  if (nameTaken) {
+    throw new Error(
+      `Someone in this group is already named "${displayName}". Rename them first, then try again.`,
+    );
+  }
+
+  await db.insert(members).values({
+    groupId,
+    userId: friendUserId,
+    displayName,
+    isAdmin: false,
+  });
+
+  revalidatePath(`/g/${groupId}/members`);
+  revalidatePath(`/g/${groupId}`);
+  revalidatePath("/");
 }
 
 export async function renameMemberAction(

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { eq } from "drizzle-orm";
-import { Plus } from "lucide-react";
+import { Plus, Users } from "lucide-react";
 import { signOut } from "@/auth";
 import { AppShell } from "@/components/app-shell";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -12,15 +12,16 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { db } from "@/db";
-import { groups, members } from "@/db/schema";
+import { groups, members, users } from "@/db/schema";
 import { getOptionalUser } from "@/lib/auth-guards";
+import { displayNameForUser } from "@/lib/friends";
 import { formatMoney } from "@/lib/money";
 import { getGroupBalances } from "@/lib/balances";
 
 export default async function HomePage() {
-  const user = await getOptionalUser();
+  const sessionUser = await getOptionalUser();
 
-  if (!user) {
+  if (!sessionUser) {
     return (
       <div className="mx-auto flex min-h-full w-full max-w-lg flex-col justify-center gap-8 px-6 py-16">
         <div className="space-y-3 text-center">
@@ -40,17 +41,26 @@ export default async function HomePage() {
     );
   }
 
-  const memberships = await db
-    .select({
-      groupId: groups.id,
-      groupName: groups.name,
-      currency: groups.currency,
-      memberId: members.id,
-      displayName: members.displayName,
-    })
-    .from(members)
-    .innerJoin(groups, eq(members.groupId, groups.id))
-    .where(eq(members.userId, user.id));
+  const [[dbUser], memberships] = await Promise.all([
+    db.select().from(users).where(eq(users.id, sessionUser.id)).limit(1),
+    db
+      .select({
+        groupId: groups.id,
+        groupName: groups.name,
+        currency: groups.currency,
+        memberId: members.id,
+        displayName: members.displayName,
+      })
+      .from(members)
+      .innerJoin(groups, eq(members.groupId, groups.id))
+      .where(eq(members.userId, sessionUser.id)),
+  ]);
+
+  const profileName = dbUser
+    ? displayNameForUser(dbUser)
+    : displayNameForUser(sessionUser);
+  const profileImage = dbUser?.image ?? sessionUser.image;
+  const profileEmail = dbUser?.email ?? sessionUser.email;
 
   const withBalances = await Promise.all(
     memberships.map(async (m) => {
@@ -77,24 +87,36 @@ export default async function HomePage() {
         </form>
       }
     >
-      <div className="mb-4 flex items-center gap-3 rounded-xl border bg-card p-3">
+      <Link
+        href="/profile"
+        className="mb-4 flex items-center gap-3 rounded-xl border bg-card p-3 transition-colors hover:bg-muted/40"
+      >
         <Avatar>
-          <AvatarImage src={user.image ?? undefined} alt="" />
+          <AvatarImage src={profileImage ?? undefined} alt="" />
           <AvatarFallback>
-            {(user.name ?? user.email ?? "?").slice(0, 1).toUpperCase()}
+            {profileName.slice(0, 1).toUpperCase()}
           </AvatarFallback>
         </Avatar>
         <div className="min-w-0 flex-1">
-          <p className="truncate font-medium">{user.name ?? "You"}</p>
-          <p className="truncate text-sm text-muted-foreground">{user.email}</p>
+          <p className="truncate font-medium">{profileName}</p>
+          <p className="truncate text-sm text-muted-foreground">
+            {profileEmail}
+          </p>
         </div>
-      </div>
+        <span className="shrink-0 text-xs text-muted-foreground">Profile</span>
+      </Link>
 
       <div className="mb-4 flex gap-2">
         <Button asChild size="lg" className="flex-1">
           <Link href="/new">
             <Plus className="size-4" />
             Create group
+          </Link>
+        </Button>
+        <Button asChild size="lg" variant="secondary" className="flex-1">
+          <Link href="/friends">
+            <Users className="size-4" />
+            Friends
           </Link>
         </Button>
       </div>

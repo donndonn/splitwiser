@@ -5,7 +5,9 @@ import { Input } from "@/components/ui/input";
 import { db } from "@/db";
 import { invites, members, type Invite } from "@/db/schema";
 import { requireMember } from "@/lib/auth-guards";
+import { listFriends } from "@/lib/friends";
 import { cn, groupedListClass } from "@/lib/utils";
+import { AddFriendsToGroup } from "./add-friends-to-group";
 import { addPlaceholderAction, revokeInviteAction } from "./actions";
 import { CreateInviteForm } from "./create-invite-form";
 import { MemberRow } from "./member-row";
@@ -16,9 +18,9 @@ export default async function MembersPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { member: me } = await requireMember(id);
+  const { user, member: me } = await requireMember(id);
 
-  const [roster, activeInvites] = await Promise.all([
+  const [roster, activeInvites, friends] = await Promise.all([
     db
       .select()
       .from(members)
@@ -31,7 +33,13 @@ export default async function MembersPage({
           .where(eq(invites.groupId, id))
           .orderBy(desc(invites.createdAt))
       : Promise.resolve([] as Invite[]),
+    me.isAdmin ? listFriends(user.id) : Promise.resolve([]),
   ]);
+
+  const linkedUserIds = new Set(
+    roster.map((m) => m.userId).filter((uid): uid is string => uid != null),
+  );
+  const friendsToAdd = friends.filter((f) => !linkedUserIds.has(f.id));
 
   const inviteRows = activeInvites.map((inv) => ({
     ...inv,
@@ -67,6 +75,8 @@ export default async function MembersPage({
 
       {me.isAdmin ? (
         <div className="space-y-6">
+          <AddFriendsToGroup groupId={id} friends={friendsToAdd} />
+
           <div className="space-y-3 rounded-xl border p-4">
             <h3 className="text-sm font-medium">Add people by name</h3>
             <p className="text-xs text-muted-foreground">

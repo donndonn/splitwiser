@@ -261,10 +261,54 @@ export const aiParseRequests = pgTable(
   ],
 );
 
+/** Mutual friends. userIdA < userIdB lexicographically for uniqueness. */
+export const friendships = pgTable(
+  "friendships",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userIdA: text("user_id_a")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    userIdB: text("user_id_b")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("friendships_pair_unique").on(table.userIdA, table.userIdB),
+    index("friendships_user_a_idx").on(table.userIdA),
+    index("friendships_user_b_idx").on(table.userIdB),
+  ],
+);
+
+export const friendInvites = pgTable(
+  "friend_invites",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    token: text("token").notNull().unique(),
+    createdByUserId: text("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at", { mode: "date" }),
+    maxUses: integer("max_uses"),
+    uses: integer("uses").notNull().default(0),
+    revokedAt: timestamp("revoked_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("friend_invites_created_by_user_id_idx").on(table.createdByUserId),
+  ],
+);
+
 export const usersRelations = relations(users, ({ many }) => ({
   accounts: many(accounts),
   members: many(members),
   aiParseRequests: many(aiParseRequests),
+  friendInvites: many(friendInvites),
 }));
 
 export const accountsRelations = relations(accounts, ({ one }) => ({
@@ -369,10 +413,32 @@ export const aiParseRequestsRelations = relations(
   }),
 );
 
+export const friendshipsRelations = relations(friendships, ({ one }) => ({
+  userA: one(users, {
+    fields: [friendships.userIdA],
+    references: [users.id],
+    relationName: "friendshipUserA",
+  }),
+  userB: one(users, {
+    fields: [friendships.userIdB],
+    references: [users.id],
+    relationName: "friendshipUserB",
+  }),
+}));
+
+export const friendInvitesRelations = relations(friendInvites, ({ one }) => ({
+  createdBy: one(users, {
+    fields: [friendInvites.createdByUserId],
+    references: [users.id],
+  }),
+}));
+
 export type User = typeof users.$inferSelect;
 export type Group = typeof groups.$inferSelect;
 export type Member = typeof members.$inferSelect;
 export type Invite = typeof invites.$inferSelect;
+export type Friendship = typeof friendships.$inferSelect;
+export type FriendInvite = typeof friendInvites.$inferSelect;
 export type Expense = typeof expenses.$inferSelect;
 export type ExpenseItem = typeof expenseItems.$inferSelect;
 export type ExpenseItemAssignment = typeof expenseItemAssignments.$inferSelect;
