@@ -21,6 +21,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { formatMoney } from "@/lib/money";
+import { groupedListClass } from "@/lib/utils";
 
 export type RecentExpenseItem = {
   id: string;
@@ -84,21 +85,23 @@ export function RecentExpensesList({
 
   return (
     <>
-      <ul className="space-y-2">
-        {items.map((e) => (
-          <li key={e.id}>
-            <SwipeableExpenseRow
-              href={`/g/${groupId}/expenses/${e.id}`}
-              description={e.description}
-              subtitle={`${e.paidByName} · ${e.spentAtLabel}`}
-              amountLabel={formatMoney(e.amountCents, currency)}
-              open={openId === e.id}
-              onOpenChange={(next) => setOpenId(next ? e.id : null)}
-              onDeleteRequest={() => setPendingDelete(e)}
-            />
-          </li>
-        ))}
-      </ul>
+      <div className={groupedListClass}>
+        <ul className="divide-y divide-border">
+          {items.map((e) => (
+            <li key={e.id}>
+              <SwipeableExpenseRow
+                href={`/g/${groupId}/expenses/${e.id}`}
+                description={e.description}
+                subtitle={`${e.paidByName} · ${e.spentAtLabel}`}
+                amountLabel={formatMoney(e.amountCents, currency)}
+                open={openId === e.id}
+                onOpenChange={(next) => setOpenId(next ? e.id : null)}
+                onDeleteRequest={() => setPendingDelete(e)}
+              />
+            </li>
+          ))}
+        </ul>
+      </div>
 
       <AlertDialog
         open={pendingDelete !== null}

@@ -13,12 +13,9 @@ import { groups, members, settlements } from "@/db/schema";
 import { requireMember } from "@/lib/auth-guards";
 import { getGroupBalances } from "@/lib/balances";
 import { formatCents, formatMoney, suggestSettlements } from "@/lib/money";
-import { cn } from "@/lib/utils";
+import { cn, groupedListClass } from "@/lib/utils";
 import { RecordPaymentForm } from "./record-payment-form";
 import { recordSettlementAction } from "./actions";
-
-const groupCardClass =
-  "overflow-hidden rounded-2xl bg-card shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]";
 
 export default async function BalancesPage({
   params,
@@ -61,7 +58,7 @@ export default async function BalancesPage({
 
   return (
     <AppShell title="Balances" backHref={`/g/${id}`} withBottomNav>
-      <div className={cn(groupCardClass, "mb-6")}>
+      <div className={cn(groupedListClass, "mb-6")}>
         <ul className="divide-y divide-border">
           {rows.map((r) => (
             <li
@@ -104,7 +101,7 @@ export default async function BalancesPage({
           <h2 className="text-sm font-medium text-muted-foreground">
             Suggested settle-up
           </h2>
-          <div className={groupCardClass}>
+          <div className={groupedListClass}>
             <ul className="divide-y divide-border">
               {suggestions.map((s) => (
                 <li
@@ -169,7 +166,7 @@ export default async function BalancesPage({
           <h2 className="text-sm font-medium text-muted-foreground">
             Recent payments
           </h2>
-          <div className={groupCardClass}>
+          <div className={groupedListClass}>
             <ul className="divide-y divide-border text-sm text-muted-foreground">
               {recentSettlements.map((s) => (
                 <li key={s.id} className="truncate px-4 py-2.5">

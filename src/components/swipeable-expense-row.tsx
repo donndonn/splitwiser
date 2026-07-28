@@ -4,12 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { Trash2 } from "lucide-react";
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 const ACTION_WIDTH = 80;
@@ -173,7 +167,7 @@ export function SwipeableExpenseRow({
   }
 
   return (
-    <div className="relative overflow-hidden rounded-2xl">
+    <div className="relative overflow-hidden">
       <div
         className="absolute inset-y-0 right-0 flex w-20 items-stretch"
         aria-hidden={!open && displayedOffset === 0}
@@ -204,7 +198,7 @@ export function SwipeableExpenseRow({
       >
         <Link
           href={href}
-          className="block"
+          className="block transition-colors hover:bg-muted/40"
           onClick={(e) => {
             // Prefer pointerup navigation; block duplicate / accidental clicks.
             if (suppressClick.current || open || swiped.current) {
@@ -214,17 +208,15 @@ export function SwipeableExpenseRow({
             }
           }}
         >
-          <Card className="transition-colors hover:bg-muted/40">
-            <CardHeader className="flex-row items-center justify-between gap-3 space-y-0 py-3">
-              <div className="min-w-0">
-                <CardTitle className="truncate text-sm font-medium">
-                  {description}
-                </CardTitle>
-                <CardDescription className="text-xs">{subtitle}</CardDescription>
-              </div>
-              <p className="shrink-0 text-sm font-medium">{amountLabel}</p>
-            </CardHeader>
-          </Card>
+          <div className="flex items-center justify-between gap-3 px-4 py-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">{description}</p>
+              <p className="truncate text-xs text-muted-foreground">
+                {subtitle}
+              </p>
+            </div>
+            <p className="shrink-0 text-sm font-medium">{amountLabel}</p>
+          </div>
         </Link>
       </div>
     </div>

@@ -5,13 +5,10 @@ import { Input } from "@/components/ui/input";
 import { db } from "@/db";
 import { invites, members, type Invite } from "@/db/schema";
 import { requireMember } from "@/lib/auth-guards";
-import { cn } from "@/lib/utils";
+import { cn, groupedListClass } from "@/lib/utils";
 import { addPlaceholderAction, revokeInviteAction } from "./actions";
 import { CreateInviteForm } from "./create-invite-form";
 import { MemberRow } from "./member-row";
-
-const groupCardClass =
-  "overflow-hidden rounded-2xl bg-card shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]";
 
 export default async function MembersPage({
   params,
@@ -48,7 +45,7 @@ export default async function MembersPage({
 
   return (
     <AppShell title="Members" backHref={`/g/${id}`} withBottomNav>
-      <div className={cn(groupCardClass, "mb-6")}>
+      <div className={cn(groupedListClass, "mb-6")}>
         <ul className="divide-y divide-border">
           {roster.map((m) => (
             <MemberRow
