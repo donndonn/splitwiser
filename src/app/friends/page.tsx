@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { AppShell } from "@/components/app-shell";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -9,107 +9,149 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { db } from "@/db";
-import { friendInvites, type FriendInvite } from "@/db/schema";
+import { users } from "@/db/schema";
 import { requireUser } from "@/lib/auth-guards";
-import { listFriends } from "@/lib/friends";
 import {
+  listFriends,
+  listIncomingRequests,
+  listOutgoingRequests,
+} from "@/lib/friends";
+import {
+  acceptFriendRequestAction,
+  cancelFriendRequestAction,
+  declineFriendRequestAction,
   removeFriendAction,
-  revokeFriendInviteAction,
 } from "./actions";
-import { CreateFriendInviteForm } from "./create-friend-invite-form";
+import { FriendSearch } from "./friend-search";
 
 export default async function FriendsPage() {
-  const user = await requireUser("/friends");
-  const [friends, invites] = await Promise.all([
-    listFriends(user.id),
-    db
-      .select()
-      .from(friendInvites)
-      .where(eq(friendInvites.createdByUserId, user.id))
-      .orderBy(desc(friendInvites.createdAt)),
+  const sessionUser = await requireUser("/friends");
+  const [[dbUser], friends, incoming, outgoing] = await Promise.all([
+    db.select().from(users).where(eq(users.id, sessionUser.id)).limit(1),
+    listFriends(sessionUser.id),
+    listIncomingRequests(sessionUser.id),
+    listOutgoingRequests(sessionUser.id),
   ]);
 
-  const inviteRows = invites.map((inv: FriendInvite) => ({
-    ...inv,
-    inactive:
-      inv.revokedAt != null ||
-      (inv.expiresAt != null && inv.expiresAt.getTime() < Date.now()) ||
-      (inv.maxUses != null && inv.uses >= inv.maxUses),
-  }));
+  const hasUsername = Boolean(dbUser?.username);
 
   return (
     <AppShell title="Friends" backHref="/">
       <div className="space-y-6">
+        <FriendSearch hasUsername={hasUsername} />
+
+        {incoming.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="text-sm font-medium">Friend requests</h3>
+            <ul className="divide-y divide-border overflow-hidden rounded-2xl bg-card ring-1 ring-foreground/[0.07]">
+              {incoming.map((req) => (
+                <li
+                  key={req.id}
+                  className="flex items-center gap-3 px-4 py-3"
+                >
+                  <Avatar>
+                    <AvatarImage src={req.user.image ?? undefined} alt="" />
+                    <AvatarFallback>
+                      {req.user.displayName.slice(0, 1).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">
+                      {req.user.displayName}
+                    </p>
+                    <p className="truncate text-sm text-muted-foreground">
+                      {req.user.username
+                        ? `@${req.user.username}`
+                        : req.user.email}
+                    </p>
+                  </div>
+                  <form action={acceptFriendRequestAction.bind(null, req.id)}>
+                    <Button type="submit" size="sm">
+                      Accept
+                    </Button>
+                  </form>
+                  <form action={declineFriendRequestAction.bind(null, req.id)}>
+                    <Button type="submit" size="sm" variant="ghost">
+                      Decline
+                    </Button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {outgoing.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="text-sm font-medium">Sent requests</h3>
+            <ul className="divide-y divide-border overflow-hidden rounded-2xl bg-card ring-1 ring-foreground/[0.07]">
+              {outgoing.map((req) => (
+                <li
+                  key={req.id}
+                  className="flex items-center gap-3 px-4 py-3"
+                >
+                  <Avatar>
+                    <AvatarImage src={req.user.image ?? undefined} alt="" />
+                    <AvatarFallback>
+                      {req.user.displayName.slice(0, 1).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">
+                      {req.user.displayName}
+                    </p>
+                    <p className="truncate text-sm text-muted-foreground">
+                      Pending
+                    </p>
+                  </div>
+                  <form action={cancelFriendRequestAction.bind(null, req.id)}>
+                    <Button type="submit" size="sm" variant="ghost">
+                      Cancel
+                    </Button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {friends.length === 0 ? (
           <Card>
             <CardHeader>
               <CardTitle>No friends yet</CardTitle>
               <CardDescription>
-                Create a link below and share it so people can add you.
+                Search by email or @username to send a friend request.
               </CardDescription>
             </CardHeader>
           </Card>
         ) : (
-          <ul className="divide-y divide-border overflow-hidden rounded-2xl bg-card shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
-            {friends.map((friend) => (
-              <li
-                key={friend.id}
-                className="flex items-center gap-3 px-4 py-3"
-              >
-                <Avatar>
-                  <AvatarImage src={friend.image ?? undefined} alt="" />
-                  <AvatarFallback>
-                    {friend.displayName.slice(0, 1).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{friend.displayName}</p>
-                  <p className="truncate text-sm text-muted-foreground">
-                    {friend.email}
-                  </p>
-                </div>
-                <form action={removeFriendAction.bind(null, friend.id)}>
-                  <Button type="submit" size="sm" variant="ghost">
-                    Remove
-                  </Button>
-                </form>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <CreateFriendInviteForm />
-
-        {inviteRows.length > 0 && (
           <div className="space-y-2">
-            <h3 className="text-sm font-medium">Your invite links</h3>
-            <ul className="space-y-2">
-              {inviteRows.map((inv) => (
+            <h3 className="text-sm font-medium">Your friends</h3>
+            <ul className="divide-y divide-border overflow-hidden rounded-2xl bg-card shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
+              {friends.map((friend) => (
                 <li
-                  key={inv.id}
-                  className="rounded-lg border px-3 py-2 text-sm"
+                  key={friend.id}
+                  className="flex items-center gap-3 px-4 py-3"
                 >
-                  <p className="break-all font-mono text-xs">
-                    /friends/join/{inv.token}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Uses {inv.uses}
-                    {inv.maxUses != null ? ` / ${inv.maxUses}` : ""}
-                    {inv.expiresAt
-                      ? ` · expires ${inv.expiresAt.toLocaleDateString()}`
-                      : " · no expiry"}
-                    {inv.inactive ? " · inactive" : ""}
-                  </p>
-                  {!inv.revokedAt && (
-                    <form
-                      action={revokeFriendInviteAction.bind(null, inv.id)}
-                      className="mt-2"
-                    >
-                      <Button type="submit" size="sm" variant="ghost">
-                        Revoke
-                      </Button>
-                    </form>
-                  )}
+                  <Avatar>
+                    <AvatarImage src={friend.image ?? undefined} alt="" />
+                    <AvatarFallback>
+                      {friend.displayName.slice(0, 1).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{friend.displayName}</p>
+                    <p className="truncate text-sm text-muted-foreground">
+                      {friend.username
+                        ? `@${friend.username}`
+                        : friend.email}
+                    </p>
+                  </div>
+                  <form action={removeFriendAction.bind(null, friend.id)}>
+                    <Button type="submit" size="sm" variant="ghost">
+                      Remove
+                    </Button>
+                  </form>
                 </li>
               ))}
             </ul>

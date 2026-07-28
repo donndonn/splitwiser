@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { invites, members } from "@/db/schema";
+import { logGroupActivity } from "@/lib/activity";
 import { requireUser } from "@/lib/auth-guards";
 
 function isInviteLive(invite: {
@@ -52,22 +53,36 @@ export async function joinAsNewMemberAction(formData: FormData) {
       return invite.groupId;
     }
 
-    await tx.insert(members).values({
-      groupId: invite.groupId,
-      userId: user.id,
-      displayName,
-      isAdmin: false,
-    });
+    const [created] = await tx
+      .insert(members)
+      .values({
+        groupId: invite.groupId,
+        userId: user.id,
+        displayName,
+        isAdmin: false,
+      })
+      .returning({ id: members.id });
 
     await tx
       .update(invites)
       .set({ uses: sql`${invites.uses} + 1` })
       .where(eq(invites.id, invite.id));
 
+    await logGroupActivity(tx, {
+      groupId: invite.groupId,
+      type: "member_joined",
+      actorMemberId: created.id,
+      payload: {
+        actorName: displayName,
+        memberName: displayName,
+      },
+    });
+
     return invite.groupId;
   });
 
   revalidatePath("/");
+  revalidatePath(`/g/${groupId}/activity`);
   redirect(`/g/${groupId}`);
 }
 
@@ -127,9 +142,20 @@ export async function claimPlaceholderAction(formData: FormData) {
       .set({ uses: sql`${invites.uses} + 1` })
       .where(eq(invites.id, invite.id));
 
+    await logGroupActivity(tx, {
+      groupId: invite.groupId,
+      type: "member_joined",
+      actorMemberId: placeholder.id,
+      payload: {
+        actorName: placeholder.displayName,
+        memberName: placeholder.displayName,
+      },
+    });
+
     return invite.groupId;
   });
 
   revalidatePath("/");
+  revalidatePath(`/g/${groupId}/activity`);
   redirect(`/g/${groupId}`);
 }

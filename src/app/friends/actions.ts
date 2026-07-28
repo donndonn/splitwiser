@@ -1,56 +1,139 @@
 "use server";
 
-import { and, eq, sql } from "drizzle-orm";
-import { nanoid } from "nanoid";
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { db } from "@/db";
-import { friendInvites, friendships } from "@/db/schema";
+import { friendRequests, friendships } from "@/db/schema";
 import { requireUser } from "@/lib/auth-guards";
-import { isInviteLive, orderedPair } from "@/lib/friends";
+import { areFriends, orderedPair } from "@/lib/friends";
 
-export async function createFriendInviteAction(formData: FormData) {
+export async function sendFriendRequestAction(toUserId: string) {
   const user = await requireUser("/friends");
-
-  const expiresIn = String(formData.get("expiresIn") ?? "7d");
-  const maxUsesRaw = String(formData.get("maxUses") ?? "").trim();
-
-  let expiresAt: Date | null = null;
-  if (expiresIn === "1d") {
-    expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  } else if (expiresIn === "7d") {
-    expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  } else if (expiresIn === "30d") {
-    expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  if (toUserId === user.id) {
+    throw new Error("You cannot add yourself");
   }
 
-  const maxUses = maxUsesRaw === "" ? null : Number(maxUsesRaw);
-  if (maxUses != null && (!Number.isInteger(maxUses) || maxUses < 1)) {
-    throw new Error("Max uses must be a positive integer");
+  if (await areFriends(user.id, toUserId)) {
+    throw new Error("You are already friends");
   }
 
-  const token = nanoid(24);
+  const [incoming] = await db
+    .select()
+    .from(friendRequests)
+    .where(
+      and(
+        eq(friendRequests.fromUserId, toUserId),
+        eq(friendRequests.toUserId, user.id),
+      ),
+    )
+    .limit(1);
 
-  await db.insert(friendInvites).values({
-    token,
-    createdByUserId: user.id,
-    expiresAt,
-    maxUses,
+  if (incoming) {
+    // They already requested you — accept instead.
+    await acceptFriendRequestAction(incoming.id);
+    return;
+  }
+
+  const [outgoing] = await db
+    .select({ id: friendRequests.id })
+    .from(friendRequests)
+    .where(
+      and(
+        eq(friendRequests.fromUserId, user.id),
+        eq(friendRequests.toUserId, toUserId),
+      ),
+    )
+    .limit(1);
+
+  if (outgoing) {
+    throw new Error("Friend request already sent");
+  }
+
+  await db.insert(friendRequests).values({
+    fromUserId: user.id,
+    toUserId,
   });
 
   revalidatePath("/friends");
-  return token;
 }
 
-export async function revokeFriendInviteAction(inviteId: string) {
+export async function acceptFriendRequestAction(requestId: string) {
+  const user = await requireUser("/friends");
+
+  await db.transaction(async (tx) => {
+    const [request] = await tx
+      .select()
+      .from(friendRequests)
+      .where(
+        and(
+          eq(friendRequests.id, requestId),
+          eq(friendRequests.toUserId, user.id),
+        ),
+      )
+      .limit(1)
+      .for("update");
+
+    if (!request) {
+      throw new Error("Friend request not found");
+    }
+
+    const { userIdA, userIdB } = orderedPair(
+      request.fromUserId,
+      request.toUserId,
+    );
+
+    const [existing] = await tx
+      .select({ id: friendships.id })
+      .from(friendships)
+      .where(
+        and(eq(friendships.userIdA, userIdA), eq(friendships.userIdB, userIdB)),
+      )
+      .limit(1);
+
+    if (!existing) {
+      await tx.insert(friendships).values({ userIdA, userIdB });
+    }
+
+    await tx
+      .delete(friendRequests)
+      .where(eq(friendRequests.id, request.id));
+
+    // Clear any reverse pending request too.
+    await tx
+      .delete(friendRequests)
+      .where(
+        and(
+          eq(friendRequests.fromUserId, user.id),
+          eq(friendRequests.toUserId, request.fromUserId),
+        ),
+      );
+  });
+
+  revalidatePath("/friends");
+  revalidatePath("/");
+}
+
+export async function declineFriendRequestAction(requestId: string) {
   const user = await requireUser("/friends");
   await db
-    .update(friendInvites)
-    .set({ revokedAt: new Date() })
+    .delete(friendRequests)
     .where(
       and(
-        eq(friendInvites.id, inviteId),
-        eq(friendInvites.createdByUserId, user.id),
+        eq(friendRequests.id, requestId),
+        eq(friendRequests.toUserId, user.id),
+      ),
+    );
+  revalidatePath("/friends");
+}
+
+export async function cancelFriendRequestAction(requestId: string) {
+  const user = await requireUser("/friends");
+  await db
+    .delete(friendRequests)
+    .where(
+      and(
+        eq(friendRequests.id, requestId),
+        eq(friendRequests.fromUserId, user.id),
       ),
     );
   revalidatePath("/friends");
@@ -71,48 +154,4 @@ export async function removeFriendAction(friendUserId: string) {
 
   revalidatePath("/friends");
   revalidatePath("/");
-}
-
-export async function acceptFriendInviteAction(formData: FormData) {
-  const token = String(formData.get("token") ?? "");
-  const user = await requireUser(`/friends/join/${token}`);
-
-  await db.transaction(async (tx) => {
-    const [invite] = await tx
-      .select()
-      .from(friendInvites)
-      .where(eq(friendInvites.token, token))
-      .limit(1)
-      .for("update");
-
-    if (!invite || !isInviteLive(invite)) {
-      throw new Error("This invite is no longer valid");
-    }
-
-    if (invite.createdByUserId === user.id) {
-      throw new Error("You cannot accept your own invite");
-    }
-
-    const { userIdA, userIdB } = orderedPair(invite.createdByUserId, user.id);
-
-    const [existing] = await tx
-      .select({ id: friendships.id })
-      .from(friendships)
-      .where(
-        and(eq(friendships.userIdA, userIdA), eq(friendships.userIdB, userIdB)),
-      )
-      .limit(1);
-
-    if (!existing) {
-      await tx.insert(friendships).values({ userIdA, userIdB });
-      await tx
-        .update(friendInvites)
-        .set({ uses: sql`${friendInvites.uses} + 1` })
-        .where(eq(friendInvites.id, invite.id));
-    }
-  });
-
-  revalidatePath("/friends");
-  revalidatePath("/");
-  redirect("/friends");
 }

@@ -1,8 +1,10 @@
 "use server";
 
+import { inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
-import { settlements } from "@/db/schema";
+import { members, settlements } from "@/db/schema";
+import { logGroupActivity } from "@/lib/activity";
 import { requireMember } from "@/lib/auth-guards";
 import { parseAmountToCents } from "@/lib/money";
 
@@ -27,15 +29,37 @@ export async function recordSettlementAction(
   const amountCents = parseAmountToCents(amountRaw);
   if (amountCents <= 0) throw new Error("Amount must be greater than zero");
 
-  await db.insert(settlements).values({
-    groupId,
-    fromMemberId,
-    toMemberId,
-    amountCents,
-    note,
-    createdByMemberId: member.id,
+  const partyIds = [...new Set([fromMemberId, toMemberId])];
+  const partyMembers = await db
+    .select({ id: members.id, displayName: members.displayName })
+    .from(members)
+    .where(inArray(members.id, partyIds));
+  const nameById = new Map(partyMembers.map((m) => [m.id, m.displayName]));
+
+  await db.transaction(async (tx) => {
+    await tx.insert(settlements).values({
+      groupId,
+      fromMemberId,
+      toMemberId,
+      amountCents,
+      note,
+      createdByMemberId: member.id,
+    });
+
+    await logGroupActivity(tx, {
+      groupId,
+      type: "settlement_recorded",
+      actorMemberId: member.id,
+      payload: {
+        actorName: member.displayName,
+        fromName: nameById.get(fromMemberId) ?? "Someone",
+        toName: nameById.get(toMemberId) ?? "someone",
+        amountCents,
+      },
+    });
   });
 
   revalidatePath(`/g/${groupId}`);
   revalidatePath(`/g/${groupId}/balances`);
+  revalidatePath(`/g/${groupId}/activity`);
 }

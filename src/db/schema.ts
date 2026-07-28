@@ -4,6 +4,7 @@ import {
   boolean,
   index,
   integer,
+  jsonb,
   numeric,
   pgEnum,
   pgTable,
@@ -26,15 +27,33 @@ export const expenseEntryModeEnum = pgEnum("expense_entry_mode", [
   "itemized",
 ]);
 
-export const users = pgTable("users", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  name: text("name"),
-  email: text("email").unique(),
-  emailVerified: timestamp("emailVerified", { mode: "date" }),
-  image: text("image"),
-});
+export const groupActivityTypeEnum = pgEnum("group_activity_type", [
+  "expense_created",
+  "expense_updated",
+  "expense_deleted",
+  "group_renamed",
+  "settlement_recorded",
+  "member_joined",
+  "member_left",
+]);
+export const users = pgTable(
+  "users",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    name: text("name"),
+    username: text("username"),
+    email: text("email").unique(),
+    emailVerified: timestamp("emailVerified", { mode: "date" }),
+    image: text("image"),
+  },
+  (table) => [
+    uniqueIndex("users_username_unique")
+      .on(sql`lower(${table.username})`)
+      .where(sql`${table.username} is not null`),
+  ],
+);
 
 export const accounts = pgTable(
   "accounts",
@@ -241,6 +260,43 @@ export const settlements = pgTable(
   (table) => [index("settlements_group_id_idx").on(table.groupId)],
 );
 
+export type GroupActivityPayload = {
+  actorName: string;
+  description?: string;
+  amountCents?: number;
+  oldName?: string;
+  newName?: string;
+  fromName?: string;
+  toName?: string;
+  memberName?: string;
+};
+
+export const groupActivities = pgTable(
+  "group_activities",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    groupId: text("group_id")
+      .notNull()
+      .references(() => groups.id, { onDelete: "cascade" }),
+    type: groupActivityTypeEnum("type").notNull(),
+    actorMemberId: text("actor_member_id").references(() => members.id, {
+      onDelete: "set null",
+    }),
+    /** Soft reference — no FK so deleted expenses keep their log rows. */
+    expenseId: text("expense_id"),
+    payload: jsonb("payload").$type<GroupActivityPayload>().notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("group_activities_group_created_idx").on(
+      table.groupId,
+      table.createdAt,
+    ),
+  ],
+);
+
 /** Tracks Gemini expense-parse calls for per-user rate limiting. */
 export const aiParseRequests = pgTable(
   "ai_parse_requests",
@@ -283,24 +339,27 @@ export const friendships = pgTable(
   ],
 );
 
-export const friendInvites = pgTable(
-  "friend_invites",
+export const friendRequests = pgTable(
+  "friend_requests",
   {
     id: text("id")
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
-    token: text("token").notNull().unique(),
-    createdByUserId: text("created_by_user_id")
+    fromUserId: text("from_user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    expiresAt: timestamp("expires_at", { mode: "date" }),
-    maxUses: integer("max_uses"),
-    uses: integer("uses").notNull().default(0),
-    revokedAt: timestamp("revoked_at", { mode: "date" }),
+    toUserId: text("to_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   },
   (table) => [
-    index("friend_invites_created_by_user_id_idx").on(table.createdByUserId),
+    uniqueIndex("friend_requests_pair_unique").on(
+      table.fromUserId,
+      table.toUserId,
+    ),
+    index("friend_requests_to_user_id_idx").on(table.toUserId),
+    index("friend_requests_from_user_id_idx").on(table.fromUserId),
   ],
 );
 
@@ -308,7 +367,10 @@ export const usersRelations = relations(users, ({ many }) => ({
   accounts: many(accounts),
   members: many(members),
   aiParseRequests: many(aiParseRequests),
-  friendInvites: many(friendInvites),
+  friendRequestsSent: many(friendRequests, { relationName: "friendRequestFrom" }),
+  friendRequestsReceived: many(friendRequests, {
+    relationName: "friendRequestTo",
+  }),
 }));
 
 export const accountsRelations = relations(accounts, ({ one }) => ({
@@ -320,6 +382,7 @@ export const groupsRelations = relations(groups, ({ many }) => ({
   invites: many(invites),
   expenses: many(expenses),
   settlements: many(settlements),
+  activities: many(groupActivities),
 }));
 
 export const membersRelations = relations(members, ({ one, many }) => ({
@@ -328,6 +391,7 @@ export const membersRelations = relations(members, ({ one, many }) => ({
   paidExpenses: many(expenses, { relationName: "paidBy" }),
   splits: many(expenseSplits),
   itemAssignments: many(expenseItemAssignments),
+  activities: many(groupActivities),
 }));
 
 export const invitesRelations = relations(invites, ({ one }) => ({
@@ -403,6 +467,20 @@ export const settlementsRelations = relations(settlements, ({ one }) => ({
   }),
 }));
 
+export const groupActivitiesRelations = relations(
+  groupActivities,
+  ({ one }) => ({
+    group: one(groups, {
+      fields: [groupActivities.groupId],
+      references: [groups.id],
+    }),
+    actor: one(members, {
+      fields: [groupActivities.actorMemberId],
+      references: [members.id],
+    }),
+  }),
+);
+
 export const aiParseRequestsRelations = relations(
   aiParseRequests,
   ({ one }) => ({
@@ -426,10 +504,16 @@ export const friendshipsRelations = relations(friendships, ({ one }) => ({
   }),
 }));
 
-export const friendInvitesRelations = relations(friendInvites, ({ one }) => ({
-  createdBy: one(users, {
-    fields: [friendInvites.createdByUserId],
+export const friendRequestsRelations = relations(friendRequests, ({ one }) => ({
+  fromUser: one(users, {
+    fields: [friendRequests.fromUserId],
     references: [users.id],
+    relationName: "friendRequestFrom",
+  }),
+  toUser: one(users, {
+    fields: [friendRequests.toUserId],
+    references: [users.id],
+    relationName: "friendRequestTo",
   }),
 }));
 
@@ -438,12 +522,15 @@ export type Group = typeof groups.$inferSelect;
 export type Member = typeof members.$inferSelect;
 export type Invite = typeof invites.$inferSelect;
 export type Friendship = typeof friendships.$inferSelect;
-export type FriendInvite = typeof friendInvites.$inferSelect;
+export type FriendRequest = typeof friendRequests.$inferSelect;
 export type Expense = typeof expenses.$inferSelect;
 export type ExpenseItem = typeof expenseItems.$inferSelect;
 export type ExpenseItemAssignment = typeof expenseItemAssignments.$inferSelect;
 export type ExpenseSplit = typeof expenseSplits.$inferSelect;
 export type Settlement = typeof settlements.$inferSelect;
+export type GroupActivity = typeof groupActivities.$inferSelect;
 export type AiParseRequest = typeof aiParseRequests.$inferSelect;
 export type SplitMode = (typeof splitModeEnum.enumValues)[number];
 export type ExpenseEntryMode = (typeof expenseEntryModeEnum.enumValues)[number];
+export type GroupActivityType =
+  (typeof groupActivityTypeEnum.enumValues)[number];

@@ -13,6 +13,7 @@ import {
   type ExpenseEntryMode,
   type SplitMode,
 } from "@/db/schema";
+import { logGroupActivity } from "@/lib/activity";
 import { requireMember } from "@/lib/auth-guards";
 import {
   assertAllowedMemberIds,
@@ -202,7 +203,7 @@ export async function createExpenseAction(groupId: string, formData: FormData) {
     groupMemberIds,
   );
 
-  const expenseId = await db.transaction(async (tx) => {
+  await db.transaction(async (tx) => {
     const [expense] = await tx
       .insert(expenses)
       .values({
@@ -250,11 +251,22 @@ export async function createExpenseAction(groupId: string, formData: FormData) {
       );
     }
 
-    return expense.id;
+    await logGroupActivity(tx, {
+      groupId,
+      type: "expense_created",
+      actorMemberId: member.id,
+      expenseId: expense.id,
+      payload: {
+        actorName: member.displayName,
+        description: common.description,
+        amountCents: common.amountCents,
+      },
+    });
   });
 
   revalidatePath(`/g/${groupId}`);
   revalidatePath(`/g/${groupId}/balances`);
+  revalidatePath(`/g/${groupId}/activity`);
   redirect(`/g/${groupId}`);
 }
 
@@ -263,7 +275,7 @@ export async function updateExpenseAction(
   expenseId: string,
   formData: FormData,
 ) {
-  await requireMember(groupId);
+  const { member } = await requireMember(groupId);
   const common = parseCommonFields(formData);
   const details = parseExpenseDetails(
     formData,
@@ -335,24 +347,64 @@ export async function updateExpenseAction(
         })),
       );
     }
+
+    await logGroupActivity(tx, {
+      groupId,
+      type: "expense_updated",
+      actorMemberId: member.id,
+      expenseId,
+      payload: {
+        actorName: member.displayName,
+        description: common.description,
+        amountCents: common.amountCents,
+      },
+    });
   });
 
   revalidatePath(`/g/${groupId}`);
   revalidatePath(`/g/${groupId}/balances`);
+  revalidatePath(`/g/${groupId}/activity`);
   revalidatePath(`/g/${groupId}/expenses/${expenseId}`);
   redirect(`/g/${groupId}`);
 }
 
 /** Delete an expense and revalidate; does not redirect (for in-list deletes). */
 export async function removeExpenseAction(groupId: string, expenseId: string) {
-  await requireMember(groupId);
+  const { member } = await requireMember(groupId);
 
-  await db
-    .delete(expenses)
-    .where(and(eq(expenses.id, expenseId), eq(expenses.groupId, groupId)));
+  await db.transaction(async (tx) => {
+    const [existing] = await tx
+      .select({
+        id: expenses.id,
+        description: expenses.description,
+        amountCents: expenses.amountCents,
+      })
+      .from(expenses)
+      .where(and(eq(expenses.id, expenseId), eq(expenses.groupId, groupId)))
+      .limit(1);
+
+    if (!existing) return;
+
+    await logGroupActivity(tx, {
+      groupId,
+      type: "expense_deleted",
+      actorMemberId: member.id,
+      expenseId: existing.id,
+      payload: {
+        actorName: member.displayName,
+        description: existing.description,
+        amountCents: existing.amountCents,
+      },
+    });
+
+    await tx
+      .delete(expenses)
+      .where(and(eq(expenses.id, expenseId), eq(expenses.groupId, groupId)));
+  });
 
   revalidatePath(`/g/${groupId}`);
   revalidatePath(`/g/${groupId}/balances`);
+  revalidatePath(`/g/${groupId}/activity`);
   return { ok: true as const };
 }
 

@@ -36,6 +36,20 @@
       "when": 1785202765328,
       "tag": "0004_military_maestro",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785203659711,
+      "tag": "0005_friend_search",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785205819372,
+      "tag": "0006_group_activity",
+      "breakpoints": true
     }
   ]
 }

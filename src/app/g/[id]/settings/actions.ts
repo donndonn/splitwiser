@@ -5,13 +5,14 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { groups, members } from "@/db/schema";
+import { logGroupActivity } from "@/lib/activity";
 import { requireAdmin, requireMember } from "@/lib/auth-guards";
 
 export async function updateGroupSettingsAction(
   groupId: string,
   formData: FormData,
 ) {
-  await requireAdmin(groupId);
+  const { member } = await requireAdmin(groupId);
 
   const name = String(formData.get("name") ?? "").trim();
   const currency = String(formData.get("currency") ?? "USD")
@@ -20,13 +21,33 @@ export async function updateGroupSettingsAction(
 
   if (!name) throw new Error("Name is required");
 
+  const [existing] = await db
+    .select({ name: groups.name })
+    .from(groups)
+    .where(eq(groups.id, groupId))
+    .limit(1);
+
   await db
     .update(groups)
     .set({ name, currency })
     .where(eq(groups.id, groupId));
 
+  if (existing && existing.name !== name) {
+    await logGroupActivity(db, {
+      groupId,
+      type: "group_renamed",
+      actorMemberId: member.id,
+      payload: {
+        actorName: member.displayName,
+        oldName: existing.name,
+        newName: name,
+      },
+    });
+  }
+
   revalidatePath(`/g/${groupId}`);
   revalidatePath(`/g/${groupId}/settings`);
+  revalidatePath(`/g/${groupId}/activity`);
   revalidatePath("/");
 }
 
@@ -59,10 +80,22 @@ export async function leaveGroupAction(groupId: string) {
   }
 
   // Unlink account but keep the member row so expense history stays intact.
-  await db
-    .update(members)
-    .set({ userId: null, isAdmin: false })
-    .where(eq(members.id, member.id));
+  await db.transaction(async (tx) => {
+    await logGroupActivity(tx, {
+      groupId,
+      type: "member_left",
+      actorMemberId: member.id,
+      payload: {
+        actorName: member.displayName,
+        memberName: member.displayName,
+      },
+    });
+
+    await tx
+      .update(members)
+      .set({ userId: null, isAdmin: false })
+      .where(eq(members.id, member.id));
+  });
 
   revalidatePath("/");
   redirect("/");

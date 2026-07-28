@@ -5,6 +5,7 @@ import { nanoid } from "nanoid";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { invites, members, users } from "@/db/schema";
+import { logGroupActivity } from "@/lib/activity";
 import { requireAdmin, requireMember } from "@/lib/auth-guards";
 import { areFriends, displayNameForUser } from "@/lib/friends";
 
@@ -56,25 +57,38 @@ export async function addPlaceholderAction(
   groupId: string,
   formData: FormData,
 ) {
-  await requireAdmin(groupId);
+  const { member: actor } = await requireAdmin(groupId);
   const displayName = String(formData.get("displayName") ?? "").trim();
   if (!displayName) throw new Error("Name is required");
 
-  await db.insert(members).values({
-    groupId,
-    displayName,
-    userId: null,
-    isAdmin: false,
+  await db.transaction(async (tx) => {
+    await tx.insert(members).values({
+      groupId,
+      displayName,
+      userId: null,
+      isAdmin: false,
+    });
+
+    await logGroupActivity(tx, {
+      groupId,
+      type: "member_joined",
+      actorMemberId: actor.id,
+      payload: {
+        actorName: actor.displayName,
+        memberName: displayName,
+      },
+    });
   });
 
   revalidatePath(`/g/${groupId}/members`);
+  revalidatePath(`/g/${groupId}/activity`);
 }
 
 export async function addFriendAsMemberAction(
   groupId: string,
   friendUserId: string,
 ) {
-  const { user } = await requireAdmin(groupId);
+  const { user, member: actor } = await requireAdmin(groupId);
 
   if (!(await areFriends(user.id, friendUserId))) {
     throw new Error("That person is not your friend");
@@ -121,15 +135,28 @@ export async function addFriendAsMemberAction(
     );
   }
 
-  await db.insert(members).values({
-    groupId,
-    userId: friendUserId,
-    displayName,
-    isAdmin: false,
+  await db.transaction(async (tx) => {
+    await tx.insert(members).values({
+      groupId,
+      userId: friendUserId,
+      displayName,
+      isAdmin: false,
+    });
+
+    await logGroupActivity(tx, {
+      groupId,
+      type: "member_joined",
+      actorMemberId: actor.id,
+      payload: {
+        actorName: actor.displayName,
+        memberName: displayName,
+      },
+    });
   });
 
   revalidatePath(`/g/${groupId}/members`);
   revalidatePath(`/g/${groupId}`);
+  revalidatePath(`/g/${groupId}/activity`);
   revalidatePath("/");
 }
 
@@ -206,5 +233,16 @@ export async function removeMemberAction(groupId: string, memberId: string) {
     }
   }
 
+  await logGroupActivity(db, {
+    groupId,
+    type: "member_left",
+    actorMemberId: actor.id,
+    payload: {
+      actorName: actor.displayName,
+      memberName: target.displayName,
+    },
+  });
+
   revalidatePath(`/g/${groupId}/members`);
+  revalidatePath(`/g/${groupId}/activity`);
 }

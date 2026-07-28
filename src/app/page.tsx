@@ -99,6 +99,11 @@ export default async function HomePage() {
         </Avatar>
         <div className="min-w-0 flex-1">
           <p className="truncate font-medium">{profileName}</p>
+          {dbUser?.username ? (
+            <p className="truncate text-sm text-muted-foreground">
+              @{dbUser.username}
+            </p>
+          ) : null}
           <p className="truncate text-sm text-muted-foreground">
             {profileEmail}
           </p>
