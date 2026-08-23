@@ -33,6 +33,8 @@ fi
 
 # 3. Start the server if it is not already accepting connections.
 if ! "$PG_BIN/pg_isready" -h /tmp -p "$PGPORT" >/dev/null 2>&1; then
+  # Remove a stale pid file left over from a previous boot / snapshot.
+  rm -f "$PGDATA/postmaster.pid"
   "$PG_BIN/pg_ctl" -D "$PGDATA" -o "-p $PGPORT -k /tmp" \
     -l "$PGDATA/server.log" -w start
 fi
