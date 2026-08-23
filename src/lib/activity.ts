@@ -67,6 +67,13 @@ export function formatActivityMessage(
           : "";
       return `${payload.fromName ?? "Someone"} paid ${payload.toName ?? "someone"}${amount}`;
     }
+    case "settlement_deleted": {
+      const amount =
+        payload.amountCents != null
+          ? ` ${formatMoney(payload.amountCents, currency)}`
+          : "";
+      return `${actor} undid a${amount} payment from ${payload.fromName ?? "someone"} to ${payload.toName ?? "someone"}`;
+    }
     case "member_joined":
       return `${payload.memberName ?? actor} joined the group`;
     case "member_left":

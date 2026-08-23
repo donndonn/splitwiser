@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { AppBottomNav } from "@/components/app-bottom-nav";
 import { AppShell } from "@/components/app-shell";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -36,8 +37,9 @@ export default async function FriendsPage() {
   const hasUsername = Boolean(dbUser?.username);
 
   return (
-    <AppShell title="Friends" backHref="/">
-      <div className="space-y-6">
+    <>
+      <AppShell title="Friends" withBottomNav>
+        <div className="space-y-6">
         <FriendSearch hasUsername={hasUsername} />
 
         {incoming.length > 0 && (
@@ -157,7 +159,9 @@ export default async function FriendsPage() {
             </ul>
           </div>
         )}
-      </div>
-    </AppShell>
+        </div>
+      </AppShell>
+      <AppBottomNav />
+    </>
   );
 }

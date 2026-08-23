@@ -14,26 +14,33 @@ export function RecordPaymentForm({
   groupId,
   members,
   currency,
+  currentMemberId,
   defaults,
+  onSuccess,
 }: {
   groupId: string;
   members: MemberOption[];
   currency: string;
+  currentMemberId?: string;
   defaults?: { fromMemberId?: string; toMemberId?: string; amount?: string };
+  onSuccess?: () => void;
 }) {
   const [pending, startTransition] = useTransition();
+  const defaultFrom = defaults?.fromMemberId ?? currentMemberId;
 
   return (
     <form
-      className="space-y-3 rounded-xl border p-4"
+      className="space-y-3"
       onSubmit={(e) => {
         e.preventDefault();
-        const fd = new FormData(e.currentTarget);
+        const form = e.currentTarget;
+        const fd = new FormData(form);
         startTransition(async () => {
           try {
             await recordSettlementAction(groupId, fd);
             toast.success("Payment recorded");
-            e.currentTarget.reset();
+            form.reset();
+            onSuccess?.();
           } catch (err) {
             toast.error(
               err instanceof Error ? err.message : "Could not record payment",
@@ -42,20 +49,20 @@ export function RecordPaymentForm({
         });
       }}
     >
-      <h3 className="text-sm font-medium">Record a payment</h3>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label htmlFor="fromMemberId">From</Label>
           <NativeSelect
             id="fromMemberId"
             name="fromMemberId"
-            defaultValue={defaults?.fromMemberId}
+            defaultValue={defaultFrom}
             required
           >
             <option value="">Who paid</option>
             {members.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.displayName}
+                {m.id === currentMemberId ? " (you)" : ""}
               </option>
             ))}
           </NativeSelect>
@@ -72,6 +79,7 @@ export function RecordPaymentForm({
             {members.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.displayName}
+                {m.id === currentMemberId ? " (you)" : ""}
               </option>
             ))}
           </NativeSelect>

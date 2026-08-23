@@ -33,6 +33,7 @@ export const groupActivityTypeEnum = pgEnum("group_activity_type", [
   "expense_deleted",
   "group_renamed",
   "settlement_recorded",
+  "settlement_deleted",
   "member_joined",
   "member_left",
 ]);

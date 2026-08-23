@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Split expenses with friends and family",
     start_url: "/",
     display: "standalone",
-    background_color: "#ffffff",
-    theme_color: "#171717",
+    background_color: "#F8F5EE",
+    theme_color: "#17796F",
     orientation: "portrait-primary",
     icons: [
       {

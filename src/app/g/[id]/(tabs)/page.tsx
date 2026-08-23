@@ -65,9 +65,9 @@ export default async function GroupDashboardPage({
           <CardTitle
             className={
               net > 0
-                ? "text-2xl text-emerald-600"
+                ? "text-2xl text-balance-positive"
                 : net < 0
-                  ? "text-2xl text-rose-600"
+                  ? "text-2xl text-balance-negative"
                   : "text-2xl"
             }
           >
@@ -80,12 +80,19 @@ export default async function GroupDashboardPage({
         </CardHeader>
       </Card>
 
-      <Button asChild size="lg" className="mb-6 w-full">
-        <Link href={`/g/${id}/expenses/new`}>
-          <Plus className="size-4" />
-          Add expense
-        </Link>
-      </Button>
+      <div className="mb-6 flex flex-col gap-2">
+        <Button asChild size="lg" className="w-full">
+          <Link href={`/g/${id}/expenses/new`}>
+            <Plus className="size-4" />
+            Add expense
+          </Link>
+        </Button>
+        {net !== 0 && (
+          <Button asChild size="lg" variant="secondary" className="w-full">
+            <Link href={`/g/${id}/balances`}>Settle up</Link>
+          </Button>
+        )}
+      </div>
 
       <h2 className="mb-2 text-sm font-medium text-muted-foreground">
         Recent expenses
