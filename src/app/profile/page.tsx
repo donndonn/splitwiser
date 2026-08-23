@@ -4,6 +4,7 @@ import { AppBottomNav } from "@/components/app-bottom-nav";
 import { AppShell } from "@/components/app-shell";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { ThemeSelector } from "@/components/theme-selector";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { requireUser } from "@/lib/auth-guards";
@@ -59,6 +60,8 @@ export default async function ProfilePage() {
             <p className="truncate text-sm text-muted-foreground">{email}</p>
           </div>
         </div>
+
+        <ThemeSelector />
 
         <ProfileForm
           name={dbUser?.name?.trim() || name}

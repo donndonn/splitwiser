@@ -101,9 +101,9 @@ export default async function HomePage() {
                       className={cn(
                         "shrink-0 text-sm",
                         g.net > 0
-                          ? "font-medium text-emerald-600"
+                          ? "font-medium text-balance-positive"
                           : g.net < 0
-                            ? "font-medium text-rose-600"
+                            ? "font-medium text-balance-negative"
                             : "text-muted-foreground",
                       )}
                     >
