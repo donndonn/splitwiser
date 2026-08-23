@@ -80,12 +80,19 @@ export default async function GroupDashboardPage({
         </CardHeader>
       </Card>
 
-      <Button asChild size="lg" className="mb-6 w-full">
-        <Link href={`/g/${id}/expenses/new`}>
-          <Plus className="size-4" />
-          Add expense
-        </Link>
-      </Button>
+      <div className="mb-6 flex flex-col gap-2">
+        <Button asChild size="lg" className="w-full">
+          <Link href={`/g/${id}/expenses/new`}>
+            <Plus className="size-4" />
+            Add expense
+          </Link>
+        </Button>
+        {net !== 0 && (
+          <Button asChild size="lg" variant="secondary" className="w-full">
+            <Link href={`/g/${id}/balances`}>Settle up</Link>
+          </Button>
+        )}
+      </div>
 
       <h2 className="mb-2 text-sm font-medium text-muted-foreground">
         Recent expenses
