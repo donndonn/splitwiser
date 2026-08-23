@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -12,13 +12,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   Sheet,
   SheetContent,
@@ -27,15 +22,20 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { formatCents, formatMoney } from "@/lib/money";
-import { paymentActionLabel } from "@/lib/settlement-copy";
-import { groupedListClass } from "@/lib/utils";
+import {
+  paymentActionLabel,
+  rowIdForSuggestion,
+  type SettlementSuggestion,
+} from "@/lib/settlement-copy";
+import { cn, groupedListClass } from "@/lib/utils";
 import { recordSettlementAction, settleGroupAction } from "./actions";
 import { RecordPaymentForm } from "./record-payment-form";
 
-export type SettleSuggestion = {
-  fromMemberId: string;
-  toMemberId: string;
-  amountCents: number;
+export type BalanceRow = {
+  memberId: string;
+  displayName: string;
+  netCents: number;
+  isYou: boolean;
 };
 
 type MemberOption = { id: string; displayName: string };
@@ -45,23 +45,39 @@ export function SettleUpSection({
   currency,
   currentMemberId,
   members,
+  rows,
   suggestions,
 }: {
   groupId: string;
   currency: string;
   currentMemberId: string;
   members: MemberOption[];
-  suggestions: SettleSuggestion[];
+  rows: BalanceRow[];
+  suggestions: SettlementSuggestion[];
 }) {
   const [pending, startTransition] = useTransition();
   const [settleOpen, setSettleOpen] = useState(false);
   const [recordOpen, setRecordOpen] = useState(false);
   const [pendingSuggestion, setPendingSuggestion] =
-    useState<SettleSuggestion | null>(null);
+    useState<SettlementSuggestion | null>(null);
 
-  const nameById = new Map(members.map((m) => [m.id, m.displayName]));
+  const nameById = useMemo(
+    () => new Map(members.map((m) => [m.id, m.displayName])),
+    [members],
+  );
 
-  function labelFor(suggestion: SettleSuggestion) {
+  const suggestionsByRow = useMemo(() => {
+    const map = new Map<string, SettlementSuggestion[]>();
+    for (const suggestion of suggestions) {
+      const rowId = rowIdForSuggestion(suggestion, currentMemberId);
+      const list = map.get(rowId) ?? [];
+      list.push(suggestion);
+      map.set(rowId, list);
+    }
+    return map;
+  }, [suggestions, currentMemberId]);
+
+  function labelFor(suggestion: SettlementSuggestion) {
     return paymentActionLabel(
       suggestion.fromMemberId,
       suggestion.toMemberId,
@@ -107,26 +123,87 @@ export function SettleUpSection({
     });
   }
 
-  const recordSheet = (
-    <RecordPaymentSheet
-      open={recordOpen}
-      onOpenChange={setRecordOpen}
-      groupId={groupId}
-      members={members}
-      currency={currency}
-      currentMemberId={currentMemberId}
-    />
-  );
+  return (
+    <div className="mb-6 space-y-4">
+      <div className={groupedListClass}>
+        <ul className="divide-y divide-border">
+          {rows.map((row) => {
+            const rowSuggestions = suggestionsByRow.get(row.memberId) ?? [];
+            return (
+              <li
+                key={row.memberId}
+                className="flex items-center justify-between gap-3 px-4 py-3"
+              >
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <Avatar size="sm">
+                    <AvatarFallback>
+                      {row.displayName.slice(0, 1).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="truncate text-sm font-medium">
+                    {row.displayName}
+                    {row.isYou ? " (you)" : ""}
+                  </span>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span
+                    className={cn(
+                      "text-sm font-medium",
+                      row.netCents > 0
+                        ? "text-balance-positive"
+                        : row.netCents < 0
+                          ? "text-balance-negative"
+                          : "text-muted-foreground",
+                    )}
+                  >
+                    {row.netCents === 0
+                      ? "settled"
+                      : row.netCents > 0
+                        ? `owed ${formatMoney(row.netCents, currency)}`
+                        : `owes ${formatMoney(-row.netCents, currency)}`}
+                  </span>
+                  {rowSuggestions.map((suggestion) => (
+                    <Button
+                      key={`${suggestion.fromMemberId}-${suggestion.toMemberId}`}
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      disabled={pending}
+                      onClick={() => setPendingSuggestion(suggestion)}
+                    >
+                      {rowSuggestions.length > 1
+                        ? formatMoney(suggestion.amountCents, currency)
+                        : "Record"}
+                    </Button>
+                  ))}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
 
-  if (suggestions.length === 0) {
-    return (
-      <div className="mb-6 space-y-3">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">All settled</CardTitle>
-            <CardDescription>Everyone is even. Nice work.</CardDescription>
-          </CardHeader>
-        </Card>
+      {suggestions.length > 0 ? (
+        <>
+          <Button
+            type="button"
+            size="lg"
+            className="w-full"
+            disabled={pending}
+            onClick={() => setSettleOpen(true)}
+          >
+            Settle group
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={() => setRecordOpen(true)}
+          >
+            Record a different payment
+          </Button>
+        </>
+      ) : (
         <Button
           type="button"
           variant="outline"
@@ -135,68 +212,7 @@ export function SettleUpSection({
         >
           Record a payment
         </Button>
-        {recordSheet}
-      </div>
-    );
-  }
-
-  return (
-    <div className="mb-6 space-y-4">
-      <Button
-        type="button"
-        size="lg"
-        className="w-full"
-        disabled={pending}
-        onClick={() => setSettleOpen(true)}
-      >
-        Settle group
-      </Button>
-
-      <div className="space-y-2">
-        <h2 className="text-sm font-medium text-muted-foreground">
-          Suggested payments
-        </h2>
-        <p className="text-xs text-muted-foreground">
-          Record a payment after the money has actually moved, or settle
-          everyone at once.
-        </p>
-        <div className={groupedListClass}>
-          <ul className="divide-y divide-border">
-            {suggestions.map((suggestion) => (
-              <li
-                key={`${suggestion.fromMemberId}-${suggestion.toMemberId}`}
-                className="flex items-center justify-between gap-3 px-4 py-3"
-              >
-                <p className="min-w-0 truncate text-sm">
-                  {labelFor(suggestion)}{" "}
-                  <span className="font-medium">
-                    {formatMoney(suggestion.amountCents, currency)}
-                  </span>
-                </p>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  className="shrink-0"
-                  disabled={pending}
-                  onClick={() => setPendingSuggestion(suggestion)}
-                >
-                  Record
-                </Button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-
-      <Button
-        type="button"
-        variant="outline"
-        className="w-full"
-        onClick={() => setRecordOpen(true)}
-      >
-        Record a different payment
-      </Button>
+      )}
 
       <AlertDialog open={settleOpen} onOpenChange={setSettleOpen}>
         <AlertDialogContent>
@@ -268,45 +284,26 @@ export function SettleUpSection({
         </AlertDialogContent>
       </AlertDialog>
 
-      {recordSheet}
+      <Sheet open={recordOpen} onOpenChange={setRecordOpen}>
+        <SheetContent side="bottom" className="mx-auto max-w-lg">
+          <SheetHeader>
+            <SheetTitle>Record a payment</SheetTitle>
+            <SheetDescription>
+              Log money that already changed hands. This is not a bank
+              transfer.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="px-4 pb-8">
+            <RecordPaymentForm
+              groupId={groupId}
+              members={members}
+              currency={currency}
+              currentMemberId={currentMemberId}
+              onSuccess={() => setRecordOpen(false)}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
-  );
-}
-
-function RecordPaymentSheet({
-  open,
-  onOpenChange,
-  groupId,
-  members,
-  currency,
-  currentMemberId,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  groupId: string;
-  members: MemberOption[];
-  currency: string;
-  currentMemberId: string;
-}) {
-  return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="mx-auto max-w-lg">
-        <SheetHeader>
-          <SheetTitle>Record a payment</SheetTitle>
-          <SheetDescription>
-            Log money that already changed hands. This is not a bank transfer.
-          </SheetDescription>
-        </SheetHeader>
-        <div className="px-4 pb-8">
-          <RecordPaymentForm
-            groupId={groupId}
-            members={members}
-            currency={currency}
-            currentMemberId={currentMemberId}
-            onSuccess={() => onOpenChange(false)}
-          />
-        </div>
-      </SheetContent>
-    </Sheet>
   );
 }
