@@ -82,9 +82,9 @@ export default async function BalancesPage({
                 className={cn(
                   "shrink-0 text-sm font-medium",
                   r.netCents > 0
-                    ? "text-emerald-600"
+                    ? "text-balance-positive"
                     : r.netCents < 0
-                      ? "text-rose-600"
+                      ? "text-balance-negative"
                       : "text-muted-foreground",
                 )}
               >

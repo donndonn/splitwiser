@@ -65,9 +65,9 @@ export default async function GroupDashboardPage({
           <CardTitle
             className={
               net > 0
-                ? "text-2xl text-emerald-600"
+                ? "text-2xl text-balance-positive"
                 : net < 0
-                  ? "text-2xl text-rose-600"
+                  ? "text-2xl text-balance-negative"
                   : "text-2xl"
             }
           >
