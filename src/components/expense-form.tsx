@@ -1064,13 +1064,13 @@ export function ExpenseForm({
                         Item {index + 1} unit price
                       </Label>
                       <div className="relative min-w-0 flex-1">
-                        <span className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-xs text-muted-foreground">
+                        <span className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-[11px] text-muted-foreground">
                           {currencySymbol}
                         </span>
                         <Input
                           id={`item-amount-${item.key}`}
                           aria-label={`Item ${index + 1} unit price`}
-                          className="h-10 border-0 bg-secondary/70 px-2 pl-5 text-right font-semibold tabular-nums shadow-none focus-visible:bg-secondary focus-visible:ring-0"
+                          className="h-8 border-0 bg-secondary/70 px-2 pl-5 text-right text-sm font-semibold tabular-nums shadow-none focus-visible:bg-secondary focus-visible:ring-0"
                           inputMode="decimal"
                           value={item.amount}
                           onChange={(event) =>
@@ -1088,12 +1088,12 @@ export function ExpenseForm({
                         />
                       </div>
 
-                      <div className="flex h-10 shrink-0 items-center rounded-xl bg-secondary/70 px-0.5">
+                      <div className="flex h-8 shrink-0 items-center rounded-lg bg-secondary/70 px-0.5">
                         <Button
                           type="button"
                           variant="ghost"
-                          size="icon-sm"
-                          className="size-7 text-muted-foreground"
+                          size="icon-xs"
+                          className="size-6 text-muted-foreground"
                           aria-label={`Decrease quantity for item ${index + 1}`}
                           disabled={item.quantity <= 1}
                           onClick={() =>
@@ -1102,10 +1102,10 @@ export function ExpenseForm({
                             })
                           }
                         >
-                          <Minus className="size-3.5" />
+                          <Minus className="size-3" />
                         </Button>
                         <span
-                          className="min-w-7 text-center text-xs font-semibold tabular-nums"
+                          className="min-w-6 text-center text-[11px] font-semibold tabular-nums"
                           aria-label={`Quantity ${item.quantity}`}
                         >
                           ×{item.quantity}
@@ -1113,8 +1113,8 @@ export function ExpenseForm({
                         <Button
                           type="button"
                           variant="ghost"
-                          size="icon-sm"
-                          className="size-7 text-muted-foreground"
+                          size="icon-xs"
+                          className="size-6 text-muted-foreground"
                           aria-label={`Increase quantity for item ${index + 1}`}
                           onClick={() =>
                             updateItem(item.key, {
@@ -1122,15 +1122,15 @@ export function ExpenseForm({
                             })
                           }
                         >
-                          <Plus className="size-3.5" />
+                          <Plus className="size-3" />
                         </Button>
                       </div>
 
                       <Button
                         type="button"
                         variant="ghost"
-                        size="icon-sm"
-                        className="shrink-0 text-muted-foreground/70 hover:text-destructive"
+                        size="icon-xs"
+                        className="size-7 shrink-0 text-muted-foreground/70 hover:text-destructive"
                         aria-label={`Remove item ${index + 1}`}
                         onClick={() => {
                           setItems((current) =>
