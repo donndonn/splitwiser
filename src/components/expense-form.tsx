@@ -85,6 +85,7 @@ type Props = {
   submitLabel?: string;
   allowReceiptUpload?: boolean;
   receiptFile?: File | null;
+  children?: React.ReactNode;
 };
 
 type ItemDraft = {
@@ -113,6 +114,7 @@ export function ExpenseForm({
   submitLabel = "Save expense",
   allowReceiptUpload = false,
   receiptFile = null,
+  children,
 }: Props) {
   const [entryMode, setEntryMode] = useState<"simple" | "itemized">(
     defaultValues?.entryMode ?? "simple",
@@ -1345,6 +1347,8 @@ export function ExpenseForm({
           placeholder="Add a note for the group"
         />
       </section>
+
+      {children}
 
       {allowReceiptUpload && (
         <section className="space-y-3 rounded-2xl bg-card p-4 shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">

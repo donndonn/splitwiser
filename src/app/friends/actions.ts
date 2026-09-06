@@ -7,6 +7,12 @@ import { friendRequests, friendships } from "@/db/schema";
 import { requireUser } from "@/lib/auth-guards";
 import { areFriends, orderedPair } from "@/lib/friends";
 
+function revalidateFriendViews() {
+  revalidatePath("/friends");
+  revalidatePath("/");
+  revalidatePath("/g/[id]/members", "page");
+}
+
 export async function sendFriendRequestAction(toUserId: string) {
   const user = await requireUser("/friends");
   if (toUserId === user.id) {
@@ -54,7 +60,7 @@ export async function sendFriendRequestAction(toUserId: string) {
     toUserId,
   });
 
-  revalidatePath("/friends");
+  revalidateFriendViews();
 }
 
 export async function acceptFriendRequestAction(requestId: string) {
@@ -109,8 +115,7 @@ export async function acceptFriendRequestAction(requestId: string) {
       );
   });
 
-  revalidatePath("/friends");
-  revalidatePath("/");
+  revalidateFriendViews();
 }
 
 export async function declineFriendRequestAction(requestId: string) {
@@ -123,7 +128,7 @@ export async function declineFriendRequestAction(requestId: string) {
         eq(friendRequests.toUserId, user.id),
       ),
     );
-  revalidatePath("/friends");
+  revalidateFriendViews();
 }
 
 export async function cancelFriendRequestAction(requestId: string) {
@@ -136,7 +141,7 @@ export async function cancelFriendRequestAction(requestId: string) {
         eq(friendRequests.fromUserId, user.id),
       ),
     );
-  revalidatePath("/friends");
+  revalidateFriendViews();
 }
 
 export async function removeFriendAction(friendUserId: string) {
@@ -152,6 +157,5 @@ export async function removeFriendAction(friendUserId: string) {
       and(eq(friendships.userIdA, userIdA), eq(friendships.userIdB, userIdB)),
     );
 
-  revalidatePath("/friends");
-  revalidatePath("/");
+  revalidateFriendViews();
 }
