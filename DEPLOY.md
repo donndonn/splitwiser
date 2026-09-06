@@ -29,6 +29,14 @@ npx vercel --prod
 
 Generate secret: `openssl rand -base64 32`
 
+Optional — receipt scan and expense text parse ([Google AI Studio](https://aistudio.google.com/)):
+
+```bash
+npx vercel env add GOOGLE_API_KEY
+```
+
+The app runs without `GOOGLE_API_KEY`; scan/parse fail with a clear error if it is missing.
+
 Optional for preview deployments:
 
 ```bash
