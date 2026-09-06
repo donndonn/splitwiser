@@ -7,12 +7,14 @@ import {
   ChevronRight,
   CircleCheck,
   CircleDollarSign,
+  ImageIcon,
   Minus,
   Plus,
   ReceiptText,
   Scale,
   Trash2,
   Users,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +28,10 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  compressReceiptImage,
+  compressedReceiptToFile,
+} from "@/lib/ai/compress-receipt-image";
 import {
   calculateItemizedExpense,
   lineTotalCents,
@@ -77,6 +83,8 @@ type Props = {
   defaultValues?: SimpleExpenseDefaults | ItemizedExpenseDefaults;
   action: (formData: FormData) => Promise<void>;
   submitLabel?: string;
+  allowReceiptUpload?: boolean;
+  receiptFile?: File | null;
 };
 
 type ItemDraft = {
@@ -103,6 +111,8 @@ export function ExpenseForm({
   defaultValues,
   action,
   submitLabel = "Save expense",
+  allowReceiptUpload = false,
+  receiptFile = null,
 }: Props) {
   const [entryMode, setEntryMode] = useState<"simple" | "itemized">(
     defaultValues?.entryMode ?? "simple",
@@ -177,6 +187,24 @@ export function ExpenseForm({
   const [splitEditorOpen, setSplitEditorOpen] = useState(false);
   const [splitInteracted, setSplitInteracted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const receiptInputRef = useRef<HTMLInputElement>(null);
+  const [attachedReceipt, setAttachedReceipt] = useState<File | null>(
+    receiptFile,
+  );
+  const [receiptPreviewUrl, setReceiptPreviewUrl] = useState<string | null>(
+    null,
+  );
+  const [receiptBusy, setReceiptBusy] = useState(false);
+
+  useEffect(() => {
+    if (!attachedReceipt) {
+      setReceiptPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(attachedReceipt);
+    setReceiptPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [attachedReceipt]);
 
   useEffect(() => {
     const key = focusItemKeyRef.current;
@@ -450,6 +478,9 @@ export function ExpenseForm({
         }
 
         try {
+          if (attachedReceipt) {
+            formData.set("receiptImage", attachedReceipt);
+          }
           await action(formData);
         } catch (actionError) {
           if (
@@ -1315,6 +1346,79 @@ export function ExpenseForm({
         />
       </section>
 
+      {allowReceiptUpload && (
+        <section className="space-y-3 rounded-2xl bg-card p-4 shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
+          <div className="space-y-1">
+            <Label>Receipt photo (optional)</Label>
+            <p className="text-xs text-muted-foreground">
+              Compressed and stored privately. Only group members can view it.
+            </p>
+          </div>
+          <input
+            ref={receiptInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/*"
+            className="hidden"
+            disabled={receiptBusy}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (!file) return;
+              void (async () => {
+                setReceiptBusy(true);
+                setError(null);
+                try {
+                  const compressed = await compressReceiptImage(file);
+                  setAttachedReceipt(compressedReceiptToFile(compressed));
+                } catch (receiptError) {
+                  setError(
+                    receiptError instanceof Error
+                      ? receiptError.message
+                      : "Could not attach that photo.",
+                  );
+                } finally {
+                  setReceiptBusy(false);
+                }
+              })();
+            }}
+          />
+          {receiptPreviewUrl ? (
+            <div className="relative overflow-hidden rounded-xl bg-muted">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={receiptPreviewUrl}
+                alt="Receipt preview"
+                className="mx-auto max-h-56 w-full object-contain"
+              />
+              <Button
+                type="button"
+                size="icon"
+                variant="secondary"
+                className="absolute top-2 right-2"
+                aria-label="Remove receipt photo"
+                onClick={() => {
+                  setAttachedReceipt(null);
+                  if (receiptInputRef.current) receiptInputRef.current.value = "";
+                }}
+              >
+                <X className="size-4" />
+              </Button>
+            </div>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full gap-2"
+              disabled={receiptBusy}
+              onClick={() => receiptInputRef.current?.click()}
+            >
+              <ImageIcon className="size-4" />
+              {receiptBusy ? "Compressing photo…" : "Attach receipt photo"}
+            </Button>
+          )}
+        </section>
+      )}
+
       {error && (
         <p className="rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {error}
@@ -1325,7 +1429,7 @@ export function ExpenseForm({
         type="submit"
         size="lg"
         className="w-full"
-        disabled={!canSubmit}
+        disabled={!canSubmit || receiptBusy}
       >
         {submitLabel}
       </Button>

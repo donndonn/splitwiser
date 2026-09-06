@@ -57,6 +57,13 @@
       "when": 1787505000000,
       "tag": "0007_settlement_deleted",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788671222162,
+      "tag": "0008_lucky_cloak",
+      "breakpoints": true
     }
   ]
 }

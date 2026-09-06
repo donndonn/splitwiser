@@ -80,6 +80,7 @@ export function DescribeExpense({
           defaultValues={defaults}
           action={action}
           submitLabel="Add expense"
+          allowReceiptUpload
         />
       </div>
     );

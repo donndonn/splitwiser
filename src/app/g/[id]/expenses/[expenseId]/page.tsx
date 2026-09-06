@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { ExpenseForm } from "@/components/expense-form";
+import { ReceiptPhoto } from "@/components/receipt-photo";
 import { Button } from "@/components/ui/button";
 import { db } from "@/db";
 import {
@@ -84,6 +85,11 @@ export default async function ExpenseDetailPage({
 
   return (
     <AppShell title="Expense" backHref={`/g/${id}`}>
+      {expense.receiptBlobPathname ? (
+        <div className="mb-4">
+          <ReceiptPhoto expenseId={expense.id} />
+        </div>
+      ) : null}
       <ExpenseForm
         members={roster}
         currency={group.currency}
