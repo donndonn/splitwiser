@@ -35,6 +35,8 @@ type SplitPayload = {
 
 type ItemizedPayload = {
   items: ItemizedExpenseItemInput[];
+  taxCents: number;
+  tipCents: number;
 };
 
 const splitModes: SplitMode[] = ["equal", "exact", "percent", "shares"];
@@ -78,9 +80,18 @@ function parseItemizedPayload(raw: string): ItemizedPayload {
   if (!parsed || typeof parsed !== "object") {
     throw new Error("Invalid itemized expense");
   }
-  const itemsValue = (parsed as Record<string, unknown>).items;
+  const record = parsed as Record<string, unknown>;
+  const itemsValue = record.items;
   if (!Array.isArray(itemsValue)) {
     throw new Error("Invalid receipt items");
+  }
+
+  function parseAdjustmentCents(value: unknown, label: string): number {
+    if (value == null) return 0;
+    if (!Number.isInteger(value) || Number(value) < 0) {
+      throw new Error(`Invalid ${label}`);
+    }
+    return Number(value);
   }
 
   return {
@@ -105,6 +116,8 @@ function parseItemizedPayload(raw: string): ItemizedPayload {
         memberIds: item.memberIds,
       };
     }),
+    taxCents: parseAdjustmentCents(record.taxCents, "tax"),
+    tipCents: parseAdjustmentCents(record.tipCents, "tip"),
   };
 }
 
@@ -151,14 +164,16 @@ function parseExpenseDetails(
       String(formData.get("itemizedPayload") ?? "{}"),
     );
     const calculation = calculateItemizedExpense({
-      amountCents,
       items: payload.items,
+      taxCents: payload.taxCents,
+      tipCents: payload.tipCents,
     });
     return {
       entryMode,
       splitMode: "exact" as const,
-      taxCents: calculation.taxAndTipCents,
-      tipCents: 0,
+      amountCents: calculation.calculatedTotalCents,
+      taxCents: calculation.taxCents,
+      tipCents: calculation.tipCents,
       feeCents: 0,
       discountCents: 0,
       items: payload.items,
@@ -181,6 +196,7 @@ function parseExpenseDetails(
   return {
     entryMode,
     splitMode: splitModeValue as SplitMode,
+    amountCents,
     taxCents: 0,
     tipCents: 0,
     feeCents: 0,
@@ -234,7 +250,7 @@ export async function createExpenseAction(groupId: string, formData: FormData) {
           id: expenseId,
           groupId,
           description: common.description,
-          amountCents: common.amountCents,
+          amountCents: details.amountCents,
           paidByMemberId: common.paidByMemberId,
           spentAt: common.spentAt,
           entryMode: details.entryMode,
@@ -286,7 +302,7 @@ export async function createExpenseAction(groupId: string, formData: FormData) {
         payload: {
           actorName: member.displayName,
           description: common.description,
-          amountCents: common.amountCents,
+          amountCents: details.amountCents,
         },
       });
     });
@@ -330,7 +346,7 @@ export async function updateExpenseAction(
       .update(expenses)
       .set({
         description: common.description,
-        amountCents: common.amountCents,
+        amountCents: details.amountCents,
         paidByMemberId: common.paidByMemberId,
         spentAt: common.spentAt,
         entryMode: details.entryMode,
@@ -389,7 +405,7 @@ export async function updateExpenseAction(
       payload: {
         actorName: member.displayName,
         description: common.description,
-        amountCents: common.amountCents,
+        amountCents: details.amountCents,
       },
     });
   });
