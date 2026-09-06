@@ -3,9 +3,9 @@ import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { db } from "@/db";
-import { invites, members, type Invite } from "@/db/schema";
+import { invites, members, users, type Invite } from "@/db/schema";
 import { requireMember } from "@/lib/auth-guards";
-import { listFriends } from "@/lib/friends";
+import { listFriends, listFriendStatuses } from "@/lib/friends";
 import { cn, groupedListClass } from "@/lib/utils";
 import { AddFriendsToGroup } from "./add-friends-to-group";
 import { addPlaceholderAction, revokeInviteAction } from "./actions";
@@ -22,8 +22,17 @@ export default async function MembersPage({
 
   const [roster, activeInvites, friends] = await Promise.all([
     db
-      .select()
+      .select({
+        id: members.id,
+        displayName: members.displayName,
+        userId: members.userId,
+        isAdmin: members.isAdmin,
+        createdAt: members.createdAt,
+        username: users.username,
+        image: users.image,
+      })
       .from(members)
+      .leftJoin(users, eq(members.userId, users.id))
       .where(eq(members.groupId, id))
       .orderBy(members.createdAt),
     me.isAdmin
@@ -35,6 +44,11 @@ export default async function MembersPage({
       : Promise.resolve([] as Invite[]),
     me.isAdmin ? listFriends(user.id) : Promise.resolve([]),
   ]);
+
+  const friendStatuses = await listFriendStatuses(
+    user.id,
+    roster.flatMap((member) => (member.userId ? [member.userId] : [])),
+  );
 
   const linkedUserIds = new Set(
     roster.map((m) => m.userId).filter((uid): uid is string => uid != null),
@@ -64,6 +78,12 @@ export default async function MembersPage({
                 displayName: m.displayName,
                 isAdmin: m.isAdmin,
                 isPlaceholder: m.userId == null,
+                userId: m.userId,
+                username: m.username,
+                image: m.image,
+                friendStatus: m.userId
+                  ? (friendStatuses.get(m.userId) ?? "none")
+                  : null,
               }}
               isSelf={m.id === me.id}
               canRename={me.isAdmin || me.id === m.id}
