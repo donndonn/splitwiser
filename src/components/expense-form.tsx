@@ -501,9 +501,9 @@ export function ExpenseForm({
           );
         }
       }}
-      className="space-y-5"
+      className="min-w-0 space-y-5"
     >
-      <section className="space-y-4 rounded-2xl bg-card p-4 shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
+      <section className="min-w-0 space-y-4 overflow-hidden rounded-2xl bg-card p-4 shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
         <div className="space-y-2">
           <Label htmlFor="description">What was it for?</Label>
           <Input
@@ -516,12 +516,12 @@ export function ExpenseForm({
           />
         </div>
 
-        <div className="rounded-2xl bg-accent/55 px-4 py-4">
+        <div className="min-w-0 rounded-2xl bg-accent/55 px-3 py-2.5">
           <Label htmlFor="amount" className="text-accent-foreground/75">
             {entryMode === "itemized" ? "Receipt total" : "Amount"} · {currency}
           </Label>
-          <div className="mt-1 flex items-center gap-2">
-            <span className="text-3xl font-semibold tracking-tight text-accent-foreground">
+          <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
+            <span className="shrink-0 text-2xl font-semibold tracking-tight text-accent-foreground">
               {currencySymbol}
             </span>
             <Input
@@ -532,30 +532,30 @@ export function ExpenseForm({
               value={amount}
               onChange={(event) => setAmount(event.target.value)}
               placeholder="0.00"
-              className="h-auto border-0 bg-transparent px-0 py-0 text-3xl font-semibold tracking-tight text-accent-foreground shadow-none placeholder:text-accent-foreground/35 focus-visible:ring-0 md:text-3xl"
+              className="h-auto min-w-0 flex-1 border-0 bg-transparent px-0 py-0 text-2xl font-semibold tracking-tight text-accent-foreground shadow-none placeholder:text-accent-foreground/35 focus-visible:ring-0 md:text-2xl"
             />
           </div>
         </div>
       </section>
 
-      <section className="space-y-4 rounded-2xl bg-card p-4 shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
-        <div className="flex flex-wrap items-center justify-center gap-2 py-1 text-sm">
+      <section className="min-w-0 space-y-4 overflow-hidden rounded-2xl bg-card p-4 shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 py-0.5 text-sm">
           <span className="text-muted-foreground">Paid by</span>
           <button
             type="button"
-            className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-primary/20 bg-accent px-3 font-semibold text-accent-foreground transition-colors hover:bg-accent/75 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/20"
+            className="inline-flex h-7 max-w-full min-w-0 items-center gap-1.5 rounded-lg border border-primary/20 bg-accent px-2 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent/75 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/20"
             onClick={() => setPayerPickerOpen(true)}
           >
-            <span className="flex size-6 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+            <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
               {paidByName.slice(0, 1).toUpperCase()}
             </span>
-            {paidByName}
+            <span className="min-w-0 truncate">{paidByName}</span>
           </button>
           <span className="text-muted-foreground">and split</span>
           <button
             type="button"
             className={cn(
-              "inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 font-semibold transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/20",
+              "inline-flex h-7 max-w-full min-w-0 items-center gap-1.5 rounded-lg border px-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/20",
               splitStatus === "invalid"
                 ? "border-destructive/20 bg-destructive/10 text-destructive"
                 : splitStatus === "balanced"
@@ -564,7 +564,7 @@ export function ExpenseForm({
             )}
             onClick={() => setSplitEditorOpen(true)}
           >
-            <Scale className="size-4" />
+            <Scale className="size-3.5 shrink-0" />
             {entryMode === "itemized"
               ? "by item"
               : mode === "equal"
@@ -592,7 +592,7 @@ export function ExpenseForm({
           </button>
         )}
 
-        <div className="space-y-2">
+        <div className="min-w-0 space-y-2">
           <Label htmlFor="spentAt">Date</Label>
           <Input
             id="spentAt"
@@ -602,6 +602,7 @@ export function ExpenseForm({
             defaultValue={
               defaultValues?.spentAt ?? new Date().toISOString().slice(0, 10)
             }
+            className="max-w-full"
           />
         </div>
       </section>
@@ -1337,7 +1338,7 @@ export function ExpenseForm({
         </div>
       )}
 
-      <section className="space-y-2 rounded-2xl bg-card p-4 shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
+      <section className="min-w-0 space-y-2 overflow-hidden rounded-2xl bg-card p-4 shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
         <Label htmlFor="notes">Notes (optional)</Label>
         <Textarea
           id="notes"
@@ -1351,7 +1352,7 @@ export function ExpenseForm({
       {children}
 
       {allowReceiptUpload && (
-        <section className="space-y-3 rounded-2xl bg-card p-4 shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
+        <section className="min-w-0 space-y-3 overflow-hidden rounded-2xl bg-card p-4 shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
           <div className="space-y-1">
             <Label>Receipt photo (optional)</Label>
             <p className="text-xs text-muted-foreground">
