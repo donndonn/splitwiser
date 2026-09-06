@@ -34,7 +34,9 @@ import {
 } from "@/lib/ai/compress-receipt-image";
 import {
   calculateItemizedExpense,
+  inferItemizedAdjustments,
   lineTotalCents,
+  tipCentsFromPercent,
   type ItemizedExpenseItemInput,
 } from "@/lib/itemized-expense";
 import {
@@ -68,6 +70,8 @@ export type SimpleExpenseDefaults = CommonDefaults & {
 
 export type ItemizedExpenseDefaults = CommonDefaults & {
   entryMode: "itemized";
+  tax?: string;
+  tip?: string;
   items: {
     description: string;
     amount: string;
@@ -98,11 +102,51 @@ type ItemDraft = {
 
 type SplitStatus = "idle" | "incomplete" | "invalid" | "balanced";
 
+const TIP_PERCENT_PRESETS = [15, 18, 20] as const;
+
 function memberInitials(displayName: string) {
   const parts = displayName.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "?";
   if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
   return `${parts[0].slice(0, 1)}${parts[1].slice(0, 1)}`.toUpperCase();
+}
+
+function parseMoneyField(value: string): number {
+  if (!value.trim()) return 0;
+  const cents = parseAmountToCents(value);
+  if (cents < 0) throw new Error("Amount cannot be negative");
+  return cents;
+}
+
+function initialItemizedAdjustments(defaults?: ItemizedExpenseDefaults): {
+  tax: string;
+  tip: string;
+} {
+  if (!defaults) return { tax: "", tip: "0.00" };
+  if (defaults.tax != null || defaults.tip != null) {
+    return {
+      tax: defaults.tax ?? "0.00",
+      tip: defaults.tip ?? "0.00",
+    };
+  }
+  try {
+    const printedTotalCents = defaults.amount
+      ? parseAmountToCents(defaults.amount)
+      : 0;
+    const itemSubtotalCents = defaults.items.reduce((sum, item) => {
+      if (!item.amount.trim()) return sum;
+      return (
+        sum + lineTotalCents(parseAmountToCents(item.amount), item.quantity)
+      );
+    }, 0);
+    const { taxCents, tipCents } = inferItemizedAdjustments({
+      itemSubtotalCents,
+      printedTotalCents,
+    });
+    return { tax: formatCents(taxCents), tip: formatCents(tipCents) };
+  } catch {
+    return { tax: "", tip: "0.00" };
+  }
 }
 
 export function ExpenseForm({
@@ -159,7 +203,7 @@ export function ExpenseForm({
 
   const nextItemKey = useRef((itemizedDefaults?.items.length ?? 0) + 1);
   const focusItemKeyRef = useRef<string | null>(null);
-  const itemNameInputRefs = useRef(new Map<string, HTMLInputElement>());
+  const itemNameInputRefs = useRef(new Map<string, HTMLTextAreaElement>());
   const [items, setItems] = useState<ItemDraft[]>(() =>
     itemizedDefaults
       ? itemizedDefaults.items.map((item, index) => ({
@@ -179,6 +223,10 @@ export function ExpenseForm({
           },
         ],
   );
+  const initialAdjustments = initialItemizedAdjustments(itemizedDefaults);
+  const [taxAmount, setTaxAmount] = useState(initialAdjustments.tax);
+  const [tipAmount, setTipAmount] = useState(initialAdjustments.tip);
+  const [customTipPercent, setCustomTipPercent] = useState("");
   const [paidByMemberId, setPaidByMemberId] = useState(
     defaultValues?.paidByMemberId ?? defaultPaidById,
   );
@@ -247,10 +295,9 @@ export function ExpenseForm({
 
   const itemizedPreview = useMemo(() => {
     let itemSubtotalCents = 0;
-    let taxAndTipCents: number | null = null;
-    let printedTotalCents: number | null = null;
+    let taxCents: number | null = null;
+    let tipCents: number | null = null;
     try {
-      printedTotalCents = parseAmountToCents(amount);
       const parsedItems: ItemizedExpenseItemInput[] = items.map((item, index) => {
         if (!item.amount.trim()) {
           throw new Error(
@@ -266,18 +313,21 @@ export function ExpenseForm({
           memberIds: item.memberIds,
         };
       });
-      taxAndTipCents = printedTotalCents - itemSubtotalCents;
+      taxCents = parseMoneyField(taxAmount);
+      tipCents = parseMoneyField(tipAmount);
       const calculation = calculateItemizedExpense({
-        amountCents: printedTotalCents,
         items: parsedItems,
+        taxCents,
+        tipCents,
       });
       return {
         ok: true as const,
         parsedItems,
         calculation,
         itemSubtotalCents,
-        taxAndTipCents: calculation.taxAndTipCents,
-        printedTotalCents,
+        taxCents: calculation.taxCents,
+        tipCents: calculation.tipCents,
+        printedTotalCents: calculation.calculatedTotalCents,
       };
     } catch (previewError) {
       return {
@@ -287,11 +337,37 @@ export function ExpenseForm({
             ? previewError.message
             : "Invalid itemized expense",
         itemSubtotalCents,
-        taxAndTipCents,
-        printedTotalCents,
+        taxCents,
+        tipCents,
+        printedTotalCents:
+          taxCents != null && tipCents != null
+            ? itemSubtotalCents + taxCents + tipCents
+            : null,
       };
     }
-  }, [amount, items]);
+  }, [items, taxAmount, tipAmount]);
+
+  useEffect(() => {
+    if (entryMode !== "itemized") return;
+    try {
+      const tax = parseMoneyField(taxAmount);
+      const tip = parseMoneyField(tipAmount);
+      if (itemizedPreview.itemSubtotalCents <= 0 && tax === 0 && tip === 0) {
+        return;
+      }
+      const next = formatCents(
+        itemizedPreview.itemSubtotalCents + tax + tip,
+      );
+      setAmount((current) => (current === next ? current : next));
+    } catch {
+      // Ignore invalid tax/tip while the user is still typing.
+    }
+  }, [
+    entryMode,
+    taxAmount,
+    tipAmount,
+    itemizedPreview.itemSubtotalCents,
+  ]);
 
   const remainder =
     simplePreview?.ok && mode === "exact"
@@ -324,10 +400,25 @@ export function ExpenseForm({
   const activeAssignmentItem = items.find(
     (item) => item.key === assignmentItemKey,
   );
-  const taxAndTipCents =
-    itemizedPreview.printedTotalCents == null
-      ? null
-      : itemizedPreview.printedTotalCents - itemizedPreview.itemSubtotalCents;
+  const taxCents =
+    itemizedPreview.taxCents ??
+    (() => {
+      try {
+        return parseMoneyField(taxAmount);
+      } catch {
+        return null;
+      }
+    })();
+  const tipCents =
+    itemizedPreview.tipCents ??
+    (() => {
+      try {
+        return parseMoneyField(tipAmount);
+      } catch {
+        return null;
+      }
+    })();
+  const hasUnassignedItems = items.some((item) => item.memberIds.length === 0);
   const splitStatus: SplitStatus = (() => {
     if (entryMode === "simple") {
       if (!amount.trim()) {
@@ -358,11 +449,12 @@ export function ExpenseForm({
     const hasItemContent = items.some(
       (item) => item.description.trim() || item.amount.trim(),
     );
-    if (!amount.trim()) return hasItemContent ? "incomplete" : "idle";
+    if (!hasItemContent) return "idle";
     if (itemizedPreview.ok) return "balanced";
 
     try {
-      parseAmountToCents(amount);
+      parseMoneyField(taxAmount);
+      parseMoneyField(tipAmount);
       for (const item of items) {
         if (item.amount.trim()) parseAmountToCents(item.amount);
       }
@@ -376,14 +468,8 @@ export function ExpenseForm({
         (item) => !item.description.trim() || !item.amount.trim(),
       );
     if (hasIncompleteItem) return "incomplete";
-    if (
-      splitInteracted &&
-      items.some((item) => item.memberIds.length === 0)
-    ) {
-      return "invalid";
-    }
-    if (taxAndTipCents != null && taxAndTipCents < 0) {
-      return "invalid";
+    if (hasUnassignedItems) {
+      return splitInteracted ? "invalid" : "incomplete";
     }
     return "invalid";
   })();
@@ -411,11 +497,14 @@ export function ExpenseForm({
 
   function friendlyItemizedError(message: string) {
     if (message === "Invalid amount") return "Enter a valid receipt total.";
-    if (message.includes("assigned to at least one member")) {
+    if (message.includes("assigned to at least one member") || message.includes("Assign \"")) {
       return "Choose who shared each receipt item.";
     }
-    if (message.includes("cannot exceed the total")) {
-      return "Item amounts add up to more than the receipt total.";
+    if (message.includes("Tax") || message.toLowerCase().includes("tax")) {
+      return "Enter a valid tax amount.";
+    }
+    if (message.toLowerCase().includes("tip")) {
+      return "Enter a valid tip amount.";
     }
     if (message.includes("description") || message.includes("name")) {
       return "Add a name for each item.";
@@ -475,7 +564,11 @@ export function ExpenseForm({
           }
           formData.set(
             "itemizedPayload",
-            JSON.stringify({ items: itemizedPreview.parsedItems }),
+            JSON.stringify({
+              items: itemizedPreview.parsedItems,
+              taxCents: itemizedPreview.taxCents,
+              tipCents: itemizedPreview.tipCents,
+            }),
           );
         }
 
@@ -529,12 +622,18 @@ export function ExpenseForm({
               name="amount"
               inputMode="decimal"
               required
+              readOnly={entryMode === "itemized"}
               value={amount}
               onChange={(event) => setAmount(event.target.value)}
               placeholder="0.00"
               className="h-auto min-w-0 flex-1 border-0 bg-transparent px-0 py-0 text-2xl font-semibold tracking-tight text-accent-foreground shadow-none placeholder:text-accent-foreground/35 focus-visible:ring-0 md:text-2xl"
             />
           </div>
+          {entryMode === "itemized" && (
+            <p className="mt-1.5 text-xs text-accent-foreground/75">
+              Items + tax + tip. Adjust tax and tip in split options.
+            </p>
+          )}
         </div>
       </section>
 
@@ -720,6 +819,37 @@ export function ExpenseForm({
                           setSplitInteracted(true);
                           if (value === "itemized") {
                             setEntryMode("itemized");
+                            setTaxAmount((current) => {
+                              if (current.trim()) return current;
+                              try {
+                                const printedTotalCents = amount.trim()
+                                  ? parseAmountToCents(amount)
+                                  : 0;
+                                const itemSubtotalCents = items.reduce(
+                                  (sum, item) => {
+                                    if (!item.amount.trim()) return sum;
+                                    return (
+                                      sum +
+                                      lineTotalCents(
+                                        parseAmountToCents(item.amount),
+                                        item.quantity,
+                                      )
+                                    );
+                                  },
+                                  0,
+                                );
+                                if (itemSubtotalCents <= 0) return current;
+                                const tip = parseMoneyField(tipAmount);
+                                return formatCents(
+                                  Math.max(
+                                    0,
+                                    printedTotalCents - itemSubtotalCents - tip,
+                                  ),
+                                );
+                              } catch {
+                                return current;
+                              }
+                            });
                           } else {
                             setEntryMode("simple");
                             setMode(value as SplitMode);
@@ -847,21 +977,15 @@ export function ExpenseForm({
               <CircleDollarSign className="size-4" />
               Receipt total · {currency}
             </div>
-            <div className="mt-1.5 flex items-center gap-2">
-              <span className="text-2xl font-semibold tracking-tight">
-                {currencySymbol}
-              </span>
-              <Input
-                aria-label={`Receipt total in ${currency}`}
-                className="h-auto border-0 bg-transparent px-0 py-0 text-2xl font-semibold tracking-tight text-accent-foreground shadow-none placeholder:text-accent-foreground/35 focus-visible:ring-0 md:text-2xl"
-                inputMode="decimal"
-                value={amount}
-                onChange={(event) => setAmount(event.target.value)}
-                placeholder="0.00"
-              />
-            </div>
+            <p className="mt-1.5 text-2xl font-semibold tracking-tight tabular-nums">
+              {formatMoney(
+                itemizedPreview.printedTotalCents ??
+                  itemizedPreview.itemSubtotalCents,
+                currency,
+              )}
+            </p>
             <p className="mt-1.5 text-xs text-accent-foreground/75">
-              Enter the final total printed on the receipt.
+              Items + tax + tip. Edit tax and tip below.
             </p>
           </section>
 
@@ -905,47 +1029,48 @@ export function ExpenseForm({
                       index > 0 && "border-t border-border/65",
                     )}
                   >
-                    <div className="flex min-w-0 items-center gap-1">
-                      <Label
-                        htmlFor={`item-name-${item.key}`}
-                        className="sr-only"
-                      >
-                        Item {index + 1} name
-                      </Label>
-                      <Input
-                        id={`item-name-${item.key}`}
-                        aria-label={`Item ${index + 1} name`}
-                        className="h-10 min-w-0 flex-1 border-0 bg-transparent px-1 text-base font-medium shadow-none placeholder:text-muted-foreground focus-visible:bg-secondary/70 focus-visible:ring-0"
-                        value={item.description}
-                        ref={(element) => {
-                          if (element) {
-                            itemNameInputRefs.current.set(item.key, element);
-                          } else {
-                            itemNameInputRefs.current.delete(item.key);
-                          }
-                        }}
-                        onChange={(event) =>
-                          updateItem(item.key, {
-                            description: event.target.value,
-                          })
+                    <Label
+                      htmlFor={`item-name-${item.key}`}
+                      className="sr-only"
+                    >
+                      Item {index + 1} name
+                    </Label>
+                    <Textarea
+                      id={`item-name-${item.key}`}
+                      aria-label={`Item ${index + 1} name`}
+                      rows={1}
+                      className="min-h-10 w-full resize-none break-words whitespace-normal border-0 bg-transparent px-1 py-2 text-base font-medium shadow-none placeholder:text-muted-foreground focus-visible:bg-secondary/70 focus-visible:ring-0 dark:bg-transparent"
+                      value={item.description}
+                      ref={(element) => {
+                        if (element) {
+                          itemNameInputRefs.current.set(item.key, element);
+                        } else {
+                          itemNameInputRefs.current.delete(item.key);
                         }
-                        placeholder={`Item ${index + 1}`}
-                      />
+                      }}
+                      onChange={(event) =>
+                        updateItem(item.key, {
+                          description: event.target.value,
+                        })
+                      }
+                      placeholder={`Item ${index + 1}`}
+                    />
 
+                    <div className="mt-1 flex min-w-0 items-center gap-1">
                       <Label
                         htmlFor={`item-amount-${item.key}`}
                         className="sr-only"
                       >
                         Item {index + 1} unit price
                       </Label>
-                      <div className="relative w-[5.25rem] shrink-0">
-                        <span className="pointer-events-none absolute inset-y-0 left-1 flex items-center text-xs text-muted-foreground">
+                      <div className="relative min-w-0 flex-1">
+                        <span className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-xs text-muted-foreground">
                           {currencySymbol}
                         </span>
                         <Input
                           id={`item-amount-${item.key}`}
                           aria-label={`Item ${index + 1} unit price`}
-                          className="h-10 border-0 bg-transparent px-1 pl-4 text-right font-semibold tabular-nums shadow-none focus-visible:bg-secondary/70 focus-visible:ring-0"
+                          className="h-10 border-0 bg-secondary/70 px-2 pl-5 text-right font-semibold tabular-nums shadow-none focus-visible:bg-secondary focus-visible:ring-0"
                           inputMode="decimal"
                           value={item.amount}
                           onChange={(event) =>
@@ -963,7 +1088,7 @@ export function ExpenseForm({
                         />
                       </div>
 
-                      <div className="flex h-9 shrink-0 items-center rounded-xl bg-secondary/70 px-0.5">
+                      <div className="flex h-10 shrink-0 items-center rounded-xl bg-secondary/70 px-0.5">
                         <Button
                           type="button"
                           variant="ghost"
@@ -1023,7 +1148,7 @@ export function ExpenseForm({
                     </div>
 
                     {showLineTotal && unitCents != null && (
-                      <p className="mt-0.5 pr-[4.75rem] text-right text-xs tabular-nums text-muted-foreground">
+                      <p className="mt-0.5 text-right text-xs tabular-nums text-muted-foreground">
                         = {formatMoney(lineTotalCents(unitCents, item.quantity), currency)}
                       </p>
                     )}
@@ -1081,6 +1206,125 @@ export function ExpenseForm({
             </Button>
           </section>
 
+          <section className="space-y-3">
+            <div className="px-1">
+              <Label>Adjustments</Label>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Tax and tip are shared in proportion to each person’s items.
+              </p>
+            </div>
+            <div className="overflow-hidden rounded-2xl bg-card shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
+              <div className="flex min-h-14 items-center gap-3 border-b border-border/65 px-4">
+                <Label htmlFor="itemized-tax" className="min-w-0 flex-1">
+                  Tax
+                </Label>
+                <div className="relative w-[7.5rem] shrink-0">
+                  <span className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-xs text-muted-foreground">
+                    {currencySymbol}
+                  </span>
+                  <Input
+                    id="itemized-tax"
+                    aria-label="Tax amount"
+                    className="h-10 border-0 bg-secondary/70 px-2 pl-5 text-right font-semibold tabular-nums shadow-none focus-visible:bg-secondary focus-visible:ring-0"
+                    inputMode="decimal"
+                    value={taxAmount}
+                    onChange={(event) => setTaxAmount(event.target.value)}
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+              <div className="space-y-3 px-4 py-3">
+                <div className="flex min-h-10 items-center gap-3">
+                  <Label htmlFor="itemized-tip" className="min-w-0 flex-1">
+                    Tip
+                  </Label>
+                  <div className="relative w-[7.5rem] shrink-0">
+                    <span className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-xs text-muted-foreground">
+                      {currencySymbol}
+                    </span>
+                    <Input
+                      id="itemized-tip"
+                      aria-label="Tip amount"
+                      className="h-10 border-0 bg-secondary/70 px-2 pl-5 text-right font-semibold tabular-nums shadow-none focus-visible:bg-secondary focus-visible:ring-0"
+                      inputMode="decimal"
+                      value={tipAmount}
+                      onChange={(event) => {
+                        setTipAmount(event.target.value);
+                        setCustomTipPercent("");
+                      }}
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {TIP_PERCENT_PRESETS.map((percent) => {
+                    const selected =
+                      itemizedPreview.itemSubtotalCents > 0 &&
+                      tipCents ===
+                        tipCentsFromPercent(
+                          itemizedPreview.itemSubtotalCents,
+                          percent,
+                        );
+                    return (
+                      <button
+                        key={percent}
+                        type="button"
+                        className={cn(
+                          "inline-flex h-8 items-center rounded-lg border px-2.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/20",
+                          selected
+                            ? "border-primary/25 bg-accent text-accent-foreground"
+                            : "border-border bg-secondary text-secondary-foreground hover:bg-muted",
+                        )}
+                        onClick={() => {
+                          setCustomTipPercent(String(percent));
+                          setTipAmount(
+                            formatCents(
+                              tipCentsFromPercent(
+                                itemizedPreview.itemSubtotalCents,
+                                percent,
+                              ),
+                            ),
+                          );
+                        }}
+                      >
+                        {percent}%
+                      </button>
+                    );
+                  })}
+                  <div className="relative w-[4.75rem]">
+                    <Input
+                      aria-label="Custom tip percent"
+                      className="h-8 border-0 bg-secondary/70 pr-6 text-right text-xs font-semibold tabular-nums shadow-none focus-visible:bg-secondary focus-visible:ring-0"
+                      inputMode="decimal"
+                      value={customTipPercent}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        setCustomTipPercent(value);
+                        const percent = Number(value);
+                        if (!Number.isFinite(percent) || percent < 0) return;
+                        setTipAmount(
+                          formatCents(
+                            tipCentsFromPercent(
+                              itemizedPreview.itemSubtotalCents,
+                              percent,
+                            ),
+                          ),
+                        );
+                      }}
+                      placeholder="%"
+                    />
+                    <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] text-muted-foreground">
+                      %
+                    </span>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Percents apply to the items subtotal.
+                </p>
+              </div>
+            </div>
+          </section>
+
           <section
             className={cn(
               "rounded-2xl p-4 ring-1",
@@ -1111,18 +1355,22 @@ export function ExpenseForm({
               <div className="min-w-0">
                 <h3 className="font-semibold">
                   {splitStatus === "invalid"
-                    ? taxAndTipCents != null && taxAndTipCents < 0
-                      ? "Items exceed the total"
+                    ? hasUnassignedItems
+                      ? "Choose who shared each item"
                       : "Check the receipt details"
                     : splitStatus === "balanced"
-                      ? "Tax & tip included"
+                      ? taxCents || tipCents
+                        ? "Tax & tip included"
+                        : "Ready to split"
                       : "Finish the receipt"}
                 </h3>
                 <p className="mt-0.5 text-xs opacity-70">
                   {splitStatus === "balanced"
-                    ? "Tax & tip is what’s left after your items."
+                    ? "Tax and tip are split in proportion to each person’s items."
                     : splitStatus === "invalid"
-                      ? "Fix the highlighted value before finishing."
+                      ? hasUnassignedItems
+                        ? "Every item needs at least one person before you can finish."
+                        : "Fix item names, amounts, tax, or tip before finishing."
                       : "Add item names, amounts, and who shared each one."}
                 </p>
               </div>
@@ -1135,11 +1383,15 @@ export function ExpenseForm({
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="opacity-65">Tax & tip</span>
+                <span className="opacity-65">Tax</span>
                 <span>
-                  {taxAndTipCents == null
-                    ? "—"
-                    : formatMoney(taxAndTipCents, currency)}
+                  {taxCents == null ? "—" : formatMoney(taxCents, currency)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="opacity-65">Tip</span>
+                <span>
+                  {tipCents == null ? "—" : formatMoney(tipCents, currency)}
                 </span>
               </div>
               <div className="flex justify-between border-t border-current/10 pt-2.5 font-semibold">
@@ -1204,7 +1456,7 @@ export function ExpenseForm({
                 <SheetTitle className="text-xl font-semibold tracking-tight">
                   Who shared this?
                 </SheetTitle>
-                <SheetDescription className="truncate">
+                <SheetDescription className="break-words whitespace-normal">
                   {activeAssignmentItem?.description || "Receipt item"}
                 </SheetDescription>
               </SheetHeader>

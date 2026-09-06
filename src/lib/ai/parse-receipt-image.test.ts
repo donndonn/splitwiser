@@ -62,6 +62,8 @@ describe("receiptToExpenseDefaults", () => {
     expect(defaults.entryMode).toBe("itemized");
     if (defaults.entryMode !== "itemized") return;
     expect(defaults.paidByMemberId).toBe("m2");
+    expect(defaults.tax).toBe("27.25");
+    expect(defaults.tip).toBe("0.00");
     expect(defaults.items).toEqual([
       {
         description: "Latte",
@@ -126,5 +128,32 @@ describe("receiptToExpenseDefaults", () => {
     if (defaults.entryMode !== "itemized") return;
     expect(defaults.items).toHaveLength(1);
     expect(defaults.items[0].description).toBe("Soup");
+  });
+
+  it("prefills tax from leftover printed total and leaves unpaid tip at 0", () => {
+    const defaults = receiptToExpenseDefaults(
+      {
+        merchant: "Wonton Guy",
+        amount: 69.05,
+        spentAt: "2026-09-06",
+        tax: 4.29,
+        items: [
+          { description: "Two Toppings w. Noodle in Soup", amount: 13.75, quantity: 1 },
+          { description: "Two Toppings in Soup", amount: 14.75, quantity: 1 },
+          { description: "Two Toppings w. Noodle in Soup", amount: 13.75, quantity: 1 },
+          { description: "Three Toppings w. Noodle in Soup", amount: 15.5, quantity: 1 },
+          { description: "Choy Sum", amount: 7, quantity: 1 },
+        ],
+      },
+      "assign",
+      roster,
+      "m1",
+    );
+    expect(defaults.entryMode).toBe("itemized");
+    if (defaults.entryMode !== "itemized") return;
+    expect(defaults.amount).toBe("69.05");
+    expect(defaults.tax).toBe("4.30");
+    expect(defaults.tip).toBe("0.00");
+    expect(defaults.items).toHaveLength(5);
   });
 });

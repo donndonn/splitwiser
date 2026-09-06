@@ -8,17 +8,75 @@ export type ItemizedExpenseItemInput = {
 };
 
 export type ItemizedExpenseInput = {
-  amountCents: number;
   items: ItemizedExpenseItemInput[];
+  taxCents: number;
+  tipCents: number;
 };
 
 export type ItemizedExpenseCalculation = {
   itemSubtotalCents: number;
+  taxCents: number;
+  tipCents: number;
   taxAndTipCents: number;
   calculatedTotalCents: number;
   memberItemSubtotals: SplitResult[];
   splits: SplitResult[];
 };
+
+export type ItemizedAdjustmentsInput = {
+  itemSubtotalCents: number;
+  printedTotalCents: number;
+  parsedTaxCents?: number | null;
+  parsedTipCents?: number | null;
+};
+
+/**
+ * Prefill tax/tip after a receipt parse (or when opening a scanned draft).
+ *
+ * Tip stays 0 unless Gemini (or a saved expense) provided one. Suggested
+ * gratuities that are not part of the paid total must not be copied in.
+ *
+ * Tax prefers an explicit parsed tax line. Otherwise it is the leftover
+ * printed total − items − tip — the usual post-scan gap when Gemini put
+ * tax into the grand total but did not emit a tax field.
+ *
+ * When tip is still 0 and the printed total is a few cents above
+ * items + tax, fold that remainder into tax so rounding does not look
+ * like a broken receipt.
+ */
+export function inferItemizedAdjustments(
+  input: ItemizedAdjustmentsInput,
+): { taxCents: number; tipCents: number } {
+  const tipCents = Math.max(0, Math.round(input.parsedTipCents ?? 0));
+  let taxCents =
+    input.parsedTaxCents != null
+      ? Math.max(0, Math.round(input.parsedTaxCents))
+      : Math.max(
+          0,
+          input.printedTotalCents - input.itemSubtotalCents - tipCents,
+        );
+
+  if (tipCents === 0) {
+    const remainder =
+      input.printedTotalCents - input.itemSubtotalCents - taxCents;
+    if (remainder > 0) {
+      taxCents += remainder;
+    }
+  }
+
+  return { taxCents, tipCents };
+}
+
+/** Tip dollars from a percent of the items subtotal, rounded to cents. */
+export function tipCentsFromPercent(
+  itemSubtotalCents: number,
+  percent: number,
+): number {
+  if (!Number.isFinite(percent) || percent < 0) {
+    throw new Error("Tip percent must be zero or greater");
+  }
+  return Math.round((itemSubtotalCents * percent) / 100);
+}
 
 export function assertAllowedMemberIds(
   memberIds: Iterable<string>,
@@ -38,10 +96,13 @@ export function lineTotalCents(amountCents: number, quantity: number) {
 export function calculateItemizedExpense(
   input: ItemizedExpenseInput,
 ): ItemizedExpenseCalculation {
-  const { amountCents, items } = input;
+  const { items, taxCents, tipCents } = input;
 
-  if (!Number.isInteger(amountCents) || amountCents <= 0) {
-    throw new Error("Amount must be greater than zero");
+  if (!Number.isInteger(taxCents) || taxCents < 0) {
+    throw new Error("Tax must be zero or greater");
+  }
+  if (!Number.isInteger(tipCents) || tipCents < 0) {
+    throw new Error("Tip must be zero or greater");
   }
 
   if (items.length === 0) {
@@ -85,9 +146,9 @@ export function calculateItemizedExpense(
     }
   }
 
-  const taxAndTipCents = amountCents - itemSubtotalCents;
-  if (taxAndTipCents < 0) {
-    throw new Error("Receipt items cannot exceed the total");
+  const calculatedTotalCents = itemSubtotalCents + taxCents + tipCents;
+  if (calculatedTotalCents <= 0) {
+    throw new Error("Amount must be greater than zero");
   }
 
   const memberItemSubtotals = [...memberItemCents.entries()].map(
@@ -97,8 +158,12 @@ export function calculateItemizedExpense(
       weight: amountCents,
     }),
   );
+
+  // Shared tax and tip ride on the same weights as the food: allocate the
+  // grand total (items + tax + tip) pro-rata by each person's assigned item
+  // share. A person with 60% of the items owes 60% of tax and 60% of tip.
   const splits = allocateSplits(
-    amountCents,
+    calculatedTotalCents,
     "shares",
     memberItemSubtotals.map(({ memberId, amountCents }) => ({
       memberId,
@@ -108,8 +173,10 @@ export function calculateItemizedExpense(
 
   return {
     itemSubtotalCents,
-    taxAndTipCents,
-    calculatedTotalCents: amountCents,
+    taxCents,
+    tipCents,
+    taxAndTipCents: taxCents + tipCents,
+    calculatedTotalCents,
     memberItemSubtotals,
     splits,
   };

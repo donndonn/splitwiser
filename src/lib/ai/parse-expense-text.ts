@@ -1,6 +1,10 @@
 import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
-import { formatCents, type SplitMode } from "@/lib/money";
+import {
+  inferItemizedAdjustments,
+  lineTotalCents,
+} from "@/lib/itemized-expense";
+import { formatCents, parseAmountToCents, type SplitMode } from "@/lib/money";
 
 export const MAX_EXPENSE_TEXT_LENGTH = 2000;
 
@@ -26,6 +30,8 @@ export type ParsedItemizedExpenseDefaults = {
   paidByMemberId: string;
   spentAt: string;
   notes?: string;
+  tax?: string;
+  tip?: string;
   items: {
     description: string;
     amount: string;
@@ -44,6 +50,8 @@ export const expenseDraftSchema = z.object({
   amount: z.number().positive(),
   spentAt: z.string().nullable(),
   notes: z.string().nullable(),
+  tax: z.number().nonnegative().nullable().optional(),
+  tip: z.number().nonnegative().nullable().optional(),
   splitMode: z.enum(splitModes),
   paidByName: z.string().nullable(),
   participants: z.array(
@@ -81,7 +89,7 @@ export const expenseDraftJsonSchema = {
     amount: {
       type: "number",
       description:
-        "Grand total / receipt total as a positive decimal (not cents). Includes tax and tip.",
+        "Grand total / receipt total as a positive decimal (not cents). Includes tax and already-paid tip.",
     },
     spentAt: {
       type: ["string", "null"],
@@ -90,6 +98,16 @@ export const expenseDraftJsonSchema = {
     notes: {
       type: ["string", "null"],
       description: "Optional extra notes, or null",
+    },
+    tax: {
+      type: ["number", "null"],
+      description:
+        "Tax amount if stated separately, otherwise null. Do not invent tax or create a tax line item.",
+    },
+    tip: {
+      type: ["number", "null"],
+      description:
+        "Tip/gratuity if already included in the grand total, otherwise null. Do not copy suggested unpaid tips.",
     },
     splitMode: {
       type: "string",
@@ -268,9 +286,24 @@ export function draftToExpenseDefaults(
       );
     }
 
+    const itemSubtotalCents = items.reduce((sum, item) => {
+      return (
+        sum + lineTotalCents(parseAmountToCents(item.amount), item.quantity)
+      );
+    }, 0);
+    const { taxCents, tipCents } = inferItemizedAdjustments({
+      itemSubtotalCents,
+      printedTotalCents: Math.round(draft.amount * 100),
+      parsedTaxCents: draft.tax != null ? Math.round(draft.tax * 100) : null,
+      parsedTipCents: draft.tip != null ? Math.round(draft.tip * 100) : null,
+    });
+
     return {
       entryMode: "itemized",
       ...common,
+      amount: formatCents(itemSubtotalCents + taxCents + tipCents),
+      tax: formatCents(taxCents),
+      tip: formatCents(tipCents),
       items,
     };
   }
@@ -330,8 +363,8 @@ Rules:
 Choose entryMode carefully:
 1) itemized — when the text lists individual dishes, drinks, or other line items with people who had them (even if a grand total is also given).
    - Put each dish/drink as an items[] entry with assigneeNames for who ordered/shared it.
-   - amount = the grand/receipt total (includes tax + tip).
-   - Do NOT create a line item or participant for tax, tip, fees, or "the rest". Tax/tip = grand total − sum of item line totals; leave that gap alone.
+   - amount = the grand/receipt total (includes tax + already-paid tip).
+   - tax/tip: separate amounts if stated, otherwise null. Do NOT create a line item or participant for tax, tip, fees, or "the rest".
    - Do NOT include roster members who are never named as assignees.
    - participants must be [].
    - splitMode can be "equal".
@@ -341,7 +374,7 @@ Choose entryMode carefully:
    - items must be [].
 
 Example (itemized): "Lunch paid by me. Grand total 100. I had a cheeseburger 25. Alex had a caesar salad 26. Bob had scallop pasta 27."
-→ entryMode itemized, amount 100, items for the three dishes assigned to me/Alex/Bob, do not add other roster members, NO tax line item (tax/tip is the leftover 22).
+→ entryMode itemized, amount 100, items for the three dishes assigned to me/Alex/Bob, do not add other roster members, tax/tip null (leftover 22 is tax).
 
 User text:
 ${input.text}`;

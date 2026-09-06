@@ -136,6 +136,8 @@ describe("draftToExpenseDefaults", () => {
       paidByMemberId: "m1",
       spentAt: expect.any(String),
       notes: undefined,
+      tax: "22.00",
+      tip: "0.00",
       items: [
         {
           description: "Cheeseburger",
