@@ -15,6 +15,7 @@
 
 # next.js
 /.next/
+/.next-verify/
 /out/
 
 # production
@@ -40,3 +41,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Track the verification skill even if a global gitignore excludes .cursor/
+!.cursor/
+!.cursor/skills/
+!.cursor/skills/verify-splitwiser/
+!.cursor/skills/verify-splitwiser/**
+.cursor/skills/verify-splitwiser/.run/
+.cursor/skills/verify-splitwiser/artifacts/
