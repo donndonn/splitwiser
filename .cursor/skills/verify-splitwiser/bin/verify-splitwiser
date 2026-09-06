@@ -1,0 +1,304 @@
+#!/usr/bin/env bash
+# Splitwiser verification control: launch, doctor, seed, show, cleanup.
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+ROOT="$(cd "$SKILL_DIR/../../.." && pwd)"
+RUN_ROOT="$SKILL_DIR/.run"
+ARTIFACT_ROOT="$SKILL_DIR/artifacts"
+DEFAULT_PORT=3017
+DEFAULT_HOST="127.0.0.1"
+
+die() {
+  echo "verify-splitwiser: $*" >&2
+  exit 1
+}
+
+need_root() {
+  [[ -f "$ROOT/package.json" ]] || die "Could not find splitwiser package.json at $ROOT"
+  local name
+  name="$(node -e "console.log(require('$ROOT/package.json').name)")"
+  [[ "$name" == "splitwiser" ]] || die "Unexpected package name '$name' at $ROOT"
+}
+
+load_dotenv_keys() {
+  [[ -f "$ROOT/.env.local" ]] || die "Missing $ROOT/.env.local — copy .env.example and fill DATABASE_URL plus AUTH_*"
+  node -e '
+    const fs = require("fs");
+    const t = fs.readFileSync(process.argv[1], "utf8");
+    const keys = new Set([...t.matchAll(/^([A-Z0-9_]+)=/gm)].map((m) => m[1]));
+    const required = ["DATABASE_URL", "AUTH_SECRET"];
+    const missing = required.filter((k) => !keys.has(k));
+    if (missing.length) {
+      console.error("Missing required keys in .env.local: " + missing.join(", "));
+      process.exit(1);
+    }
+  ' "$ROOT/.env.local"
+}
+
+resolve_run_id() {
+  local requested="${1:-}"
+  if [[ -n "$requested" ]]; then
+    echo "$requested"
+    return
+  fi
+  [[ -f "$RUN_ROOT/current" ]] || die "No current run. Pass RUN_ID or run: verify-splitwiser launch"
+  cat "$RUN_ROOT/current"
+}
+
+run_dir() {
+  echo "$RUN_ROOT/$1"
+}
+
+killtree() {
+  local pid="$1"
+  [[ -n "$pid" ]] || return 0
+  if ! kill -0 "$pid" 2>/dev/null; then
+    return 0
+  fi
+  local child
+  while read -r child; do
+    [[ -n "$child" ]] && killtree "$child"
+  done < <(pgrep -P "$pid" || true)
+  kill "$pid" 2>/dev/null || true
+}
+
+port_pids() {
+  local port="$1"
+  lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null || true
+}
+
+cmd_launch() {
+  need_root
+  load_dotenv_keys
+  mkdir -p "$RUN_ROOT" "$ARTIFACT_ROOT"
+
+  if [[ -f "$RUN_ROOT/current" ]]; then
+    local existing
+    existing="$(cat "$RUN_ROOT/current")"
+    local existing_pid=""
+    if [[ -f "$RUN_ROOT/$existing/pid" ]]; then
+      existing_pid="$(cat "$RUN_ROOT/$existing/pid")"
+    fi
+    if [[ -n "$existing_pid" ]] && kill -0 "$existing_pid" 2>/dev/null; then
+      die "Run $existing is already live (pid $existing_pid). Cleanup that run before launching another. Never attach to a shared Next.js instance."
+    fi
+  fi
+
+  local busy
+  busy="$(port_pids "$DEFAULT_PORT")"
+  if [[ -n "$busy" ]]; then
+    die "Port $DEFAULT_PORT is already in use by pid(s): $busy. Do not reuse someone else's server. Free the port or stop that process first."
+  fi
+
+  local run_id
+  run_id="$(openssl rand -hex 4)"
+  local secret
+  secret="$(openssl rand -hex 16)"
+  local url="http://${DEFAULT_HOST}:${DEFAULT_PORT}"
+  local dir
+  dir="$(run_dir "$run_id")"
+  mkdir -p "$dir" "$ARTIFACT_ROOT/$run_id"
+
+  cat >"$dir/meta.env" <<EOF
+RUN_ID=$run_id
+PORT=$DEFAULT_PORT
+HOST=$DEFAULT_HOST
+URL=$url
+SPLITWISER_VERIFY_SECRET=$secret
+AUTH_URL=$url
+EOF
+
+  echo "$run_id" >"$RUN_ROOT/current"
+
+  # Detached spawn so exiting the helper does not kill Next.js.
+  node "$SKILL_DIR/lib/start-server.mjs" \
+    "$url" "$secret" "$DEFAULT_PORT" "$DEFAULT_HOST" \
+    "$dir/server.log" "$dir/pid" >/dev/null
+  local pid
+  pid="$(tr -d '[:space:]' <"$dir/pid")"
+  [[ -n "$pid" ]] || die "start-server.mjs did not write a pid"
+
+  local ready=0
+  local i
+  for i in $(seq 1 60); do
+    if ! kill -0 "$pid" 2>/dev/null; then
+      echo "Server process exited. Last log lines:" >&2
+      tail -n 40 "$dir/server.log" >&2 || true
+      rm -f "$RUN_ROOT/current"
+      die "Launch failed for run $run_id"
+    fi
+    if curl -fsS -o /dev/null --max-time 2 "$url" 2>/dev/null; then
+      ready=1
+      break
+    fi
+    if grep -q "Another next dev server is already running" "$dir/server.log" 2>/dev/null; then
+      killtree "$pid" || true
+      rm -f "$RUN_ROOT/current"
+      die "Next.js refused a second dev server in this distDir. Launch must set SPLITWISER_VERIFY_DISTDIR=.next-verify. Do not kill the developer's next dev. Do not drive their port."
+    fi
+    sleep 1
+  done
+
+  if [[ "$ready" -ne 1 ]]; then
+    killtree "$pid"
+    rm -f "$RUN_ROOT/current"
+    echo "Timed out waiting for $url. Last log lines:" >&2
+    tail -n 40 "$dir/server.log" >&2 || true
+    die "Launch failed for run $run_id"
+  fi
+
+  port_pids "$DEFAULT_PORT" | awk 'NF{print; exit}' >"$dir/listen.pid"
+
+  echo "RUN_ID=$run_id"
+  echo "URL=$url"
+  echo "STATE=$dir"
+  echo "ARTIFACTS=$ARTIFACT_ROOT/$run_id"
+  echo "Ready. Next: $SCRIPT_DIR/verify-splitwiser seed $run_id && $SCRIPT_DIR/verify-splitwiser doctor $run_id"
+}
+
+cmd_doctor() {
+  need_root
+  local run_id
+  run_id="$(resolve_run_id "${1:-}")"
+  local dir
+  dir="$(run_dir "$run_id")"
+  [[ -f "$dir/meta.env" ]] || die "No meta.env for run $run_id"
+  # shellcheck disable=SC1090
+  source "$dir/meta.env"
+
+  local pid="" listen_pid=""
+  [[ -f "$dir/pid" ]] && pid="$(cat "$dir/pid")"
+  [[ -f "$dir/listen.pid" ]] && listen_pid="$(cat "$dir/listen.pid")"
+  [[ -n "$pid" || -n "$listen_pid" ]] || die "No pid file for run $run_id"
+
+  local listeners
+  listeners="$(port_pids "$PORT")"
+  [[ -n "$listeners" ]] || die "Nothing is listening on port $PORT"
+
+  local owned=0
+  local listener
+  for listener in $listeners; do
+    if [[ "$listener" == "$pid" || "$listener" == "$listen_pid" ]]; then
+      owned=1
+      break
+    fi
+    local walk="$listener"
+    while [[ -n "$walk" && "$walk" != "1" ]]; do
+      if [[ "$walk" == "$pid" || "$walk" == "$listen_pid" ]]; then
+        owned=1
+        break
+      fi
+      walk="$(ps -o ppid= -p "$walk" 2>/dev/null | tr -d ' ' || true)"
+    done
+    [[ "$owned" -eq 1 ]] && break
+  done
+  [[ "$owned" -eq 1 ]] || die "Port $PORT is listening, but not under this run's pid ($pid / listen $listen_pid). Refuse to drive a shared instance."
+
+  local html
+  html="$(curl -fsS --max-time 5 "$URL/")" || die "GET $URL/ failed"
+  echo "$html" | grep -q "Splitwiser" || die "GET $URL/ did not contain Splitwiser"
+
+  local signin
+  signin="$(curl -fsS --max-time 5 "$URL/signin")" || die "GET $URL/signin failed"
+  echo "$signin" | grep -q "Continue with Google" || die "/signin is missing Continue with Google"
+  echo "$signin" | grep -q "Verify sign-in" || die "/signin is missing Verify sign-in — this instance was not launched with SPLITWISER_VERIFY_SECRET"
+
+  [[ -f "$dir/fixtures.json" ]] || die "No fixtures.json — run: verify-splitwiser seed $run_id"
+
+  echo "ok run=$run_id url=$URL pid=$pid port=$PORT"
+  echo "alice=$(node -e "const f=require('$dir/fixtures.json'); console.log(f.users.find(u=>u.role==='alice').email)")"
+}
+
+cmd_seed() {
+  need_root
+  load_dotenv_keys
+  local run_id
+  run_id="$(resolve_run_id "${1:-}")"
+  [[ -f "$(run_dir "$run_id")/meta.env" ]] || die "Unknown run $run_id — launch first"
+  node "$SKILL_DIR/lib/fixtures.mjs" seed "$run_id"
+}
+
+cmd_show() {
+  local run_id
+  run_id="$(resolve_run_id "${1:-}")"
+  local dir
+  dir="$(run_dir "$run_id")"
+  [[ -f "$dir/meta.env" ]] || die "Unknown run $run_id"
+  # shellcheck disable=SC1090
+  source "$dir/meta.env"
+  echo "RUN_ID=$RUN_ID"
+  echo "URL=$URL"
+  echo "SPLITWISER_VERIFY_SECRET=$SPLITWISER_VERIFY_SECRET"
+  echo "STATE=$dir"
+  echo "ARTIFACTS=$ARTIFACT_ROOT/$run_id"
+  if [[ -f "$dir/fixtures.json" ]]; then
+    node -e '
+      const f = require(process.argv[1]);
+      for (const u of f.users) {
+        console.log("VERIFY_" + u.role.toUpperCase() + "_EMAIL=" + u.email);
+        console.log("VERIFY_" + u.role.toUpperCase() + "_NAME=" + u.name);
+        console.log("VERIFY_" + u.role.toUpperCase() + "_USERNAME=" + u.username);
+      }
+      console.log("GROUP_NAME_PREFIX=" + f.groupNamePrefix);
+    ' "$dir/fixtures.json"
+  fi
+}
+
+cmd_cleanup() {
+  need_root
+  local run_id
+  run_id="$(resolve_run_id "${1:-}")"
+  local dir
+  dir="$(run_dir "$run_id")"
+  if [[ -f "$dir/listen.pid" ]]; then
+    killtree "$(cat "$dir/listen.pid")"
+  fi
+  if [[ -f "$dir/pid" ]]; then
+    killtree "$(cat "$dir/pid")"
+  fi
+  local waited=0
+  while [[ $waited -lt 10 ]]; do
+    if [[ -z "$(port_pids "$DEFAULT_PORT")" ]]; then
+      break
+    fi
+    # Only wait if we owned this port via the saved pid tree.
+    sleep 1
+    waited=$((waited + 1))
+  done
+  if [[ -f "$ROOT/.env.local" ]]; then
+    node "$SKILL_DIR/lib/fixtures.mjs" cleanup "$run_id" || true
+  fi
+  if [[ -f "$RUN_ROOT/current" ]] && [[ "$(cat "$RUN_ROOT/current")" == "$run_id" ]]; then
+    rm -f "$RUN_ROOT/current"
+  fi
+  rm -rf "$dir"
+  echo "cleaned run=$run_id (artifacts kept at $ARTIFACT_ROOT/$run_id)"
+}
+
+usage() {
+  cat <<EOF
+Usage: verify-splitwiser <launch|doctor|seed|show|cleanup> [RUN_ID]
+
+  launch    Start Next.js on http://127.0.0.1:3017 with verify auth. Prints RUN_ID.
+  seed      Insert Alice/Bob verify users for this run into the database.
+  doctor    Read-only health check: our pid, our port, verify sign-in page, fixtures.
+  show      Print URL, secret, and seeded emails for driving the browser.
+  cleanup   Kill the process tree we started and delete this run's DB rows.
+            Keeps $ARTIFACT_ROOT/<RUN_ID>.
+
+Never drive http://localhost:3000 or any instance you did not launch.
+EOF
+}
+
+cmd="${1:-}"
+shift || true
+case "$cmd" in
+  launch) cmd_launch "$@" ;;
+  doctor) cmd_doctor "$@" ;;
+  seed) cmd_seed "$@" ;;
+  show) cmd_show "$@" ;;
+  cleanup) cmd_cleanup "$@" ;;
+  *) usage; exit 1 ;;
+esac
