@@ -21,6 +21,11 @@ import {
   type ItemizedExpenseItemInput,
 } from "@/lib/itemized-expense";
 import { allocateSplits, parseAmountToCents } from "@/lib/money";
+import { readReceiptImageFromFormData } from "@/lib/receipt-blob";
+import {
+  deleteReceiptBlob,
+  putReceiptBlob,
+} from "@/lib/receipt-blob-store";
 
 type SplitPayload = {
   memberId: string;
@@ -203,66 +208,94 @@ export async function createExpenseAction(groupId: string, formData: FormData) {
     groupMemberIds,
   );
 
-  await db.transaction(async (tx) => {
-    const [expense] = await tx
-      .insert(expenses)
-      .values({
+  const receiptImage = readReceiptImageFromFormData(formData);
+  const expenseId = crypto.randomUUID();
+  let uploadedPathname: string | null = null;
+
+  if (receiptImage) {
+    try {
+      const uploaded = await putReceiptBlob({
         groupId,
-        description: common.description,
-        amountCents: common.amountCents,
-        paidByMemberId: common.paidByMemberId,
-        spentAt: common.spentAt,
-        entryMode: details.entryMode,
-        splitMode: details.splitMode,
-        taxCents: details.taxCents,
-        tipCents: details.tipCents,
-        feeCents: details.feeCents,
-        discountCents: details.discountCents,
-        notes: common.notes,
-        createdByMemberId: member.id,
-      })
-      .returning();
+        expenseId,
+        body: receiptImage.file,
+        contentType: receiptImage.contentType,
+      });
+      uploadedPathname = uploaded.pathname;
+    } catch {
+      throw new Error("Could not store the receipt photo. Try again.");
+    }
+  }
 
-    await tx.insert(expenseSplits).values(
-      details.splits.map((split) => ({
-        expenseId: expense.id,
-        memberId: split.memberId,
-        amountCents: split.amountCents,
-        weight: String(split.weight),
-      })),
-    );
-
-    for (const [sortOrder, item] of details.items.entries()) {
-      const [createdItem] = await tx
-        .insert(expenseItems)
+  try {
+    await db.transaction(async (tx) => {
+      const [expense] = await tx
+        .insert(expenses)
         .values({
-          expenseId: expense.id,
-          description: item.description,
-          amountCents: item.amountCents,
-          quantity: item.quantity,
-          sortOrder,
+          id: expenseId,
+          groupId,
+          description: common.description,
+          amountCents: common.amountCents,
+          paidByMemberId: common.paidByMemberId,
+          spentAt: common.spentAt,
+          entryMode: details.entryMode,
+          splitMode: details.splitMode,
+          taxCents: details.taxCents,
+          tipCents: details.tipCents,
+          feeCents: details.feeCents,
+          discountCents: details.discountCents,
+          notes: common.notes,
+          receiptBlobPathname: uploadedPathname,
+          receiptContentType: receiptImage?.contentType ?? null,
+          createdByMemberId: member.id,
         })
-        .returning({ id: expenseItems.id });
-      await tx.insert(expenseItemAssignments).values(
-        item.memberIds.map((memberId) => ({
-          expenseItemId: createdItem.id,
-          memberId,
+        .returning();
+
+      await tx.insert(expenseSplits).values(
+        details.splits.map((split) => ({
+          expenseId: expense.id,
+          memberId: split.memberId,
+          amountCents: split.amountCents,
+          weight: String(split.weight),
         })),
       );
-    }
 
-    await logGroupActivity(tx, {
-      groupId,
-      type: "expense_created",
-      actorMemberId: member.id,
-      expenseId: expense.id,
-      payload: {
-        actorName: member.displayName,
-        description: common.description,
-        amountCents: common.amountCents,
-      },
+      for (const [sortOrder, item] of details.items.entries()) {
+        const [createdItem] = await tx
+          .insert(expenseItems)
+          .values({
+            expenseId: expense.id,
+            description: item.description,
+            amountCents: item.amountCents,
+            quantity: item.quantity,
+            sortOrder,
+          })
+          .returning({ id: expenseItems.id });
+        await tx.insert(expenseItemAssignments).values(
+          item.memberIds.map((memberId) => ({
+            expenseItemId: createdItem.id,
+            memberId,
+          })),
+        );
+      }
+
+      await logGroupActivity(tx, {
+        groupId,
+        type: "expense_created",
+        actorMemberId: member.id,
+        expenseId: expense.id,
+        payload: {
+          actorName: member.displayName,
+          description: common.description,
+          amountCents: common.amountCents,
+        },
+      });
     });
-  });
+  } catch (err) {
+    if (uploadedPathname) {
+      await deleteReceiptBlob(uploadedPathname).catch(() => {});
+    }
+    throw err;
+  }
 
   revalidatePath(`/g/${groupId}`);
   revalidatePath(`/g/${groupId}/balances`);
@@ -372,18 +405,19 @@ export async function updateExpenseAction(
 export async function removeExpenseAction(groupId: string, expenseId: string) {
   const { member } = await requireMember(groupId);
 
-  await db.transaction(async (tx) => {
+  const deletedPathname = await db.transaction(async (tx) => {
     const [existing] = await tx
       .select({
         id: expenses.id,
         description: expenses.description,
         amountCents: expenses.amountCents,
+        receiptBlobPathname: expenses.receiptBlobPathname,
       })
       .from(expenses)
       .where(and(eq(expenses.id, expenseId), eq(expenses.groupId, groupId)))
       .limit(1);
 
-    if (!existing) return;
+    if (!existing) return null;
 
     await logGroupActivity(tx, {
       groupId,
@@ -400,7 +434,17 @@ export async function removeExpenseAction(groupId: string, expenseId: string) {
     await tx
       .delete(expenses)
       .where(and(eq(expenses.id, expenseId), eq(expenses.groupId, groupId)));
+
+    return existing.receiptBlobPathname;
   });
+
+  if (deletedPathname) {
+    try {
+      await deleteReceiptBlob(deletedPathname);
+    } catch (err) {
+      console.error("Failed to delete receipt blob", deletedPathname, err);
+    }
+  }
 
   revalidatePath(`/g/${groupId}`);
   revalidatePath(`/g/${groupId}/balances`);

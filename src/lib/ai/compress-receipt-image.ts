@@ -131,3 +131,12 @@ export function dataUrlToBase64(dataUrl: string): string {
   }
   return dataUrl.slice(comma + 1);
 }
+
+/** Wrap the compressed JPEG blob as a File for FormData upload. */
+export function compressedReceiptToFile(
+  compressed: CompressedReceiptImage,
+): File {
+  return new File([compressed.blob], "receipt.jpg", {
+    type: compressed.mimeType,
+  });
+}

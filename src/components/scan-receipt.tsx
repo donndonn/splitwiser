@@ -21,6 +21,7 @@ import {
 } from "@/app/g/[id]/expenses/parse-receipt-action";
 import {
   compressReceiptImage,
+  compressedReceiptToFile,
   dataUrlToBase64,
 } from "@/lib/ai/compress-receipt-image";
 import type { ParsedExpenseDefaults } from "@/lib/ai/parse-expense-text";
@@ -48,6 +49,7 @@ export function ScanReceipt({
 }: Props) {
   const [step, setStep] = useState<Step>("capture");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [receipt, setReceipt] = useState<ReceiptDraft | null>(null);
   const [defaults, setDefaults] = useState<ParsedExpenseDefaults | undefined>();
   const [formKey, setFormKey] = useState(0);
@@ -57,6 +59,7 @@ export function ScanReceipt({
 
   function clearPhoto() {
     setPreviewUrl(null);
+    setReceiptFile(null);
     setReceipt(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (cameraInputRef.current) cameraInputRef.current.value = "";
@@ -68,6 +71,7 @@ export function ScanReceipt({
       try {
         const compressed = await compressReceiptImage(file);
         setPreviewUrl(compressed.dataUrl);
+        setReceiptFile(compressedReceiptToFile(compressed));
 
         const result = await parseReceiptImageAction(groupId, {
           imageBase64: dataUrlToBase64(compressed.dataUrl),
@@ -77,6 +81,7 @@ export function ScanReceipt({
         if (!result.ok) {
           toast.error(result.error);
           setPreviewUrl(null);
+          setReceiptFile(null);
           return;
         }
 
@@ -87,6 +92,7 @@ export function ScanReceipt({
           err instanceof Error ? err.message : "Could not process that photo.",
         );
         setPreviewUrl(null);
+        setReceiptFile(null);
       }
     });
   }
@@ -102,8 +108,6 @@ export function ScanReceipt({
       setDefaults(result.defaults);
       setFormKey((key) => key + 1);
       setStep("form");
-      // Drop image from memory once we have structured data.
-      setPreviewUrl(null);
     });
   }
 
@@ -131,6 +135,8 @@ export function ScanReceipt({
           defaultValues={defaults}
           action={action}
           submitLabel="Add expense"
+          allowReceiptUpload
+          receiptFile={receiptFile}
         />
       </div>
     );
@@ -211,7 +217,7 @@ export function ScanReceipt({
         <h2 className="text-lg font-semibold tracking-tight">Scan a receipt</h2>
         <p className="text-sm text-muted-foreground">
           We&apos;ll read the total and line items, then you choose how to
-          split. Photos are compressed and not stored.
+          split. Photos are compressed and stored privately with the expense.
         </p>
       </div>
 

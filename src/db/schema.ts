@@ -173,6 +173,9 @@ export const expenses = pgTable(
       .notNull()
       .default(0),
     notes: text("notes"),
+    /** Private Blob pathname, e.g. receipts/{groupId}/{expenseId}.jpg */
+    receiptBlobPathname: text("receipt_blob_pathname"),
+    receiptContentType: text("receipt_content_type"),
     createdByMemberId: text("created_by_member_id")
       .notNull()
       .references(() => members.id, { onDelete: "restrict" }),

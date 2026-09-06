@@ -24,6 +24,7 @@ npx vercel env add AUTH_SECRET
 npx vercel env add AUTH_GOOGLE_ID
 npx vercel env add AUTH_GOOGLE_SECRET
 # DATABASE_URL vars come from Neon marketplace integration
+# BLOB_READ_WRITE_TOKEN / OIDC come from connecting a private Blob store
 npx vercel --prod
 ```
 
@@ -44,14 +45,23 @@ npx vercel env add AUTH_REDIRECT_PROXY_URL
 # value = https://your-production-domain.com
 ```
 
-## 4. Run migrations
+## 4. Private Vercel Blob (receipt photos)
+
+1. Vercel dashboard → project → **Storage** → **Create** → **Blob**.
+2. Set access to **Private** (do not use a public store).
+3. Connect the store to this project. On Vercel, the SDK authenticates with OIDC (`BLOB_STORE_ID`).
+4. For local development, copy `BLOB_READ_WRITE_TOKEN` from the store into `.env.local`.
+
+Receipt images are never served from public Blob URLs. Group members view them through `/api/receipts/[expenseId]`.
+
+## 5. Run migrations
 
 ```bash
 # with production unpooled URL in .env.local or exported:
 npm run db:migrate
 ```
 
-## 5. Install as PWA
+## 6. Install as PWA
 
 - **iOS Safari**: Share → Add to Home Screen
 - **Android Chrome**: menu → Install app / Add to Home screen
