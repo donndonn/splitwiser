@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { MoreVertical } from "lucide-react";
+import { Check, Clock, MoreVertical, UserPlus } from "lucide-react";
 import { toast } from "sonner";
+import { sendFriendRequestAction } from "@/app/friends/actions";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,7 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +30,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import type { FriendStatus } from "@/lib/friends";
 import { removeMemberAction, renameMemberAction } from "./actions";
 
 type MemberInfo = {
@@ -36,6 +38,10 @@ type MemberInfo = {
   displayName: string;
   isAdmin: boolean;
   isPlaceholder: boolean;
+  userId: string | null;
+  username: string | null;
+  image: string | null;
+  friendStatus: FriendStatus | null;
 };
 
 export function MemberRow({
@@ -54,11 +60,34 @@ export function MemberRow({
   const [renameOpen, setRenameOpen] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
   const [pending, startTransition] = useTransition();
+  const [friendPending, startFriendTransition] = useTransition();
+
+  function handleFriendAction() {
+    if (!member.userId || !member.friendStatus) return;
+    const targetUserId = member.userId;
+    const accepted = member.friendStatus === "incoming";
+
+    startFriendTransition(async () => {
+      try {
+        await sendFriendRequestAction(targetUserId);
+        toast.success(
+          accepted ? "Friend request accepted" : "Friend request sent",
+        );
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : "Could not update friendship",
+        );
+      }
+    });
+  }
 
   return (
     <li className="flex items-center justify-between gap-3 px-4 py-3">
       <div className="flex min-w-0 items-center gap-2.5">
         <Avatar size="sm">
+          {member.image && (
+            <AvatarImage src={member.image} alt={member.displayName} />
+          )}
           <AvatarFallback>
             {member.displayName.slice(0, 1).toUpperCase()}
           </AvatarFallback>
@@ -68,6 +97,11 @@ export function MemberRow({
             {member.displayName}
             {isSelf ? " (you)" : ""}
           </p>
+          {member.username && (
+            <p className="truncate text-xs text-muted-foreground">
+              @{member.username}
+            </p>
+          )}
           {(member.isAdmin || member.isPlaceholder) && (
             <div className="mt-0.5 flex gap-1">
               {member.isAdmin && (
@@ -85,44 +119,81 @@ export function MemberRow({
         </div>
       </div>
 
-      {(canRename || canRemove) && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="shrink-0"
-              aria-label={`Actions for ${member.displayName}`}
-            >
-              <MoreVertical />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {canRename && (
-              <DropdownMenuItem
-                onSelect={(e) => {
-                  e.preventDefault();
-                  setRenameOpen(true);
-                }}
+      <div className="flex shrink-0 items-center gap-1">
+        {!isSelf && member.userId && member.friendStatus === "none" && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={friendPending}
+            onClick={handleFriendAction}
+          >
+            <UserPlus />
+            Add friend
+          </Button>
+        )}
+        {!isSelf && member.userId && member.friendStatus === "incoming" && (
+          <Button
+            type="button"
+            size="sm"
+            disabled={friendPending}
+            onClick={handleFriendAction}
+          >
+            <UserPlus />
+            Accept
+          </Button>
+        )}
+        {!isSelf && member.userId && member.friendStatus === "outgoing" && (
+          <Button type="button" size="sm" variant="ghost" disabled>
+            <Clock />
+            Requested
+          </Button>
+        )}
+        {!isSelf && member.userId && member.friendStatus === "friends" && (
+          <Button type="button" size="sm" variant="ghost" disabled>
+            <Check />
+            Friends
+          </Button>
+        )}
+
+        {(canRename || canRemove) && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label={`Actions for ${member.displayName}`}
               >
-                Rename
-              </DropdownMenuItem>
-            )}
-            {canRemove && (
-              <DropdownMenuItem
-                variant="destructive"
-                onSelect={(e) => {
-                  e.preventDefault();
-                  setRemoveOpen(true);
-                }}
-              >
-                Remove
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
+                <MoreVertical />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {canRename && (
+                <DropdownMenuItem
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    setRenameOpen(true);
+                  }}
+                >
+                  Rename
+                </DropdownMenuItem>
+              )}
+              {canRemove && (
+                <DropdownMenuItem
+                  variant="destructive"
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    setRemoveOpen(true);
+                  }}
+                >
+                  Remove
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
 
       {canRename && (
         <Dialog open={renameOpen} onOpenChange={setRenameOpen}>

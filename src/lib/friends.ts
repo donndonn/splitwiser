@@ -109,8 +109,113 @@ export async function areFriends(
 }
 
 export type SearchHit = FriendUser & {
-  status: "none" | "friends" | "outgoing" | "incoming";
+  status: FriendStatus;
 };
+
+export type FriendStatus = "none" | "friends" | "outgoing" | "incoming";
+
+type FriendshipPair = Pick<
+  typeof friendships.$inferSelect,
+  "userIdA" | "userIdB"
+>;
+type FriendRequestPair = Pick<
+  typeof friendRequests.$inferSelect,
+  "fromUserId" | "toUserId"
+>;
+
+export function deriveFriendStatuses(
+  viewerId: string,
+  targetUserIds: string[],
+  friendshipPairs: FriendshipPair[],
+  requestPairs: FriendRequestPair[],
+): Map<string, FriendStatus> {
+  const targetIds = new Set(targetUserIds.filter((id) => id !== viewerId));
+  const statuses = new Map<string, FriendStatus>(
+    [...targetIds].map((id) => [id, "none"]),
+  );
+
+  for (const pair of friendshipPairs) {
+    const otherId = pair.userIdA === viewerId ? pair.userIdB : pair.userIdA;
+    if (targetIds.has(otherId)) statuses.set(otherId, "friends");
+  }
+
+  for (const request of requestPairs) {
+    const isOutgoing =
+      request.fromUserId === viewerId && targetIds.has(request.toUserId);
+    const isIncoming =
+      request.toUserId === viewerId && targetIds.has(request.fromUserId);
+    const otherId = isOutgoing
+      ? request.toUserId
+      : isIncoming
+        ? request.fromUserId
+        : null;
+
+    if (otherId && statuses.get(otherId) !== "friends") {
+      const currentStatus = statuses.get(otherId);
+      if (isOutgoing || currentStatus === "none") {
+        statuses.set(otherId, isOutgoing ? "outgoing" : "incoming");
+      }
+    }
+  }
+
+  return statuses;
+}
+
+export async function listFriendStatuses(
+  viewerId: string,
+  targetUserIds: string[],
+): Promise<Map<string, FriendStatus>> {
+  const targetIds = [...new Set(targetUserIds)].filter(
+    (id) => id !== viewerId,
+  );
+  if (targetIds.length === 0) return new Map();
+
+  const [friendshipPairs, requestPairs] = await Promise.all([
+    db
+      .select({
+        userIdA: friendships.userIdA,
+        userIdB: friendships.userIdB,
+      })
+      .from(friendships)
+      .where(
+        or(
+          and(
+            eq(friendships.userIdA, viewerId),
+            inArray(friendships.userIdB, targetIds),
+          ),
+          and(
+            eq(friendships.userIdB, viewerId),
+            inArray(friendships.userIdA, targetIds),
+          ),
+        ),
+      ),
+    db
+      .select({
+        fromUserId: friendRequests.fromUserId,
+        toUserId: friendRequests.toUserId,
+      })
+      .from(friendRequests)
+      .where(
+        or(
+          and(
+            eq(friendRequests.fromUserId, viewerId),
+            inArray(friendRequests.toUserId, targetIds),
+          ),
+          and(
+            eq(friendRequests.toUserId, viewerId),
+            inArray(friendRequests.fromUserId, targetIds),
+          ),
+        ),
+      ),
+  ]);
+
+  return deriveFriendStatuses(
+    viewerId,
+    targetIds,
+    friendshipPairs,
+    requestPairs,
+  );
+}
 
 /** Exact match on email or @username (case-insensitive). */
 export async function findUserByEmailOrUsername(
