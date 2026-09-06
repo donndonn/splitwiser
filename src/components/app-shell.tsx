@@ -18,7 +18,7 @@ export function AppShell({
   withBottomNav?: boolean;
 }) {
   return (
-    <div className="mx-auto flex min-h-full w-full max-w-lg flex-col">
+    <div className="mx-auto flex min-h-full w-full min-w-0 max-w-lg flex-col">
       {(title || backHref || actions) && (
         <header className="sticky top-0 z-30 flex min-h-16 items-center gap-2 border-b border-border/60 bg-background/90 px-4 py-2 backdrop-blur-xl supports-[backdrop-filter]:bg-background/75">
           {backHref ? (
@@ -42,7 +42,7 @@ export function AppShell({
       )}
       <main
         className={cn(
-          "flex-1 px-4 py-5",
+          "min-w-0 flex-1 px-4 py-5",
           withBottomNav && "pb-24",
           className,
         )}

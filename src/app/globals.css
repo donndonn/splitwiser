@@ -142,4 +142,9 @@
   html {
     @apply font-sans;
   }
+  /* Native date controls have a large UA min-width that overflows narrow cards. */
+  input[type="date"] {
+    min-width: 0;
+    max-width: 100%;
+  }
 }
