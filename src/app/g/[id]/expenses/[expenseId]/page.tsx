@@ -85,11 +85,6 @@ export default async function ExpenseDetailPage({
 
   return (
     <AppShell title="Expense" backHref={`/g/${id}`}>
-      {expense.receiptBlobPathname ? (
-        <div className="mb-4">
-          <ReceiptPhoto expenseId={expense.id} />
-        </div>
-      ) : null}
       <ExpenseForm
         members={roster}
         currency={group.currency}
@@ -124,7 +119,11 @@ export default async function ExpenseDetailPage({
                 included: splits.map((split) => split.memberId),
               }
         }
-      />
+      >
+        {expense.receiptBlobPathname ? (
+          <ReceiptPhoto expenseId={expense.id} />
+        ) : null}
+      </ExpenseForm>
 
       <form
         action={deleteExpenseAction.bind(null, id, expenseId)}
