@@ -1311,7 +1311,7 @@ export function ExpenseForm({
                           ),
                         );
                       }}
-                      placeholder="%"
+                      placeholder=""
                     />
                     <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] text-muted-foreground">
                       %
