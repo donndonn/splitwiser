@@ -103,6 +103,7 @@ type ItemDraft = {
 type SplitStatus = "idle" | "incomplete" | "invalid" | "balanced";
 
 const TIP_PERCENT_PRESETS = [15, 18, 20] as const;
+const fieldLabelClassName = "text-xs font-medium text-muted-foreground";
 
 function memberInitials(displayName: string) {
   const parts = displayName.trim().split(/\s+/).filter(Boolean);
@@ -598,7 +599,9 @@ export function ExpenseForm({
     >
       <section className="min-w-0 space-y-4 overflow-hidden rounded-2xl bg-card p-4 shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
         <div className="space-y-2">
-          <Label htmlFor="description">What was it for?</Label>
+          <Label htmlFor="description" className={fieldLabelClassName}>
+            What was it for?
+          </Label>
           <Input
             id="description"
             name="description"
@@ -606,6 +609,22 @@ export function ExpenseForm({
             defaultValue={defaultValues?.description}
             placeholder="Dinner, groceries, tickets..."
             className="border-0 bg-transparent px-0 text-lg font-semibold shadow-none focus-visible:ring-0 md:text-lg"
+          />
+        </div>
+
+        <div className="min-w-0 space-y-1.5">
+          <Label htmlFor="spentAt" className={fieldLabelClassName}>
+            Date
+          </Label>
+          <Input
+            id="spentAt"
+            name="spentAt"
+            type="date"
+            required
+            defaultValue={
+              defaultValues?.spentAt ?? new Date().toISOString().slice(0, 10)
+            }
+            className="h-10 w-full max-w-full min-w-0 px-3 py-1 text-base leading-tight md:text-sm"
           />
         </div>
 
@@ -690,20 +709,6 @@ export function ExpenseForm({
             <ChevronRight className="size-4" />
           </button>
         )}
-
-        <div className="min-w-0 space-y-2">
-          <Label htmlFor="spentAt">Date</Label>
-          <Input
-            id="spentAt"
-            name="spentAt"
-            type="date"
-            required
-            defaultValue={
-              defaultValues?.spentAt ?? new Date().toISOString().slice(0, 10)
-            }
-            className="max-w-full"
-          />
-        </div>
       </section>
 
       <input type="hidden" name="paidByMemberId" value={paidByMemberId} />
@@ -1496,36 +1501,17 @@ export function ExpenseForm({
 
                   <div className="mb-2 flex items-center justify-between px-1">
                     <Label>Choose individually</Label>
-                    <div className="flex gap-1">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          {
-                            setSplitInteracted(true);
-                          updateItem(activeAssignmentItem.key, {
-                            memberIds: members.map((member) => member.id),
-                          })
-                          }
-                        }
-                      >
-                        Select all
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          {
-                            setSplitInteracted(true);
-                          updateItem(activeAssignmentItem.key, { memberIds: [] })
-                          }
-                        }
-                      >
-                        Clear
-                      </Button>
-                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setSplitInteracted(true);
+                        updateItem(activeAssignmentItem.key, { memberIds: [] });
+                      }}
+                    >
+                      Clear
+                    </Button>
                   </div>
                   <div className="overflow-hidden rounded-2xl border border-border/80 bg-card">
                     {members.map((member) => {
@@ -1591,7 +1577,9 @@ export function ExpenseForm({
       )}
 
       <section className="min-w-0 space-y-2 overflow-hidden rounded-2xl bg-card p-4 shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
-        <Label htmlFor="notes">Notes (optional)</Label>
+        <Label htmlFor="notes" className={fieldLabelClassName}>
+          Notes (optional)
+        </Label>
         <Textarea
           id="notes"
           name="notes"
@@ -1606,7 +1594,7 @@ export function ExpenseForm({
       {allowReceiptUpload && (
         <section className="min-w-0 space-y-3 overflow-hidden rounded-2xl bg-card p-4 shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
           <div className="space-y-1">
-            <Label>Receipt photo (optional)</Label>
+            <Label className={fieldLabelClassName}>Receipt photo (optional)</Label>
             <p className="text-xs text-muted-foreground">
               Compressed and stored privately. Only group members can view it.
             </p>

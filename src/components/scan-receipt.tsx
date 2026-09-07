@@ -242,12 +242,7 @@ export function ScanReceipt({
             </Button>
           )}
         </div>
-      ) : (
-        <div className="flex min-h-48 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border/80 bg-muted/40 px-4 text-center text-sm text-muted-foreground">
-          <ImageIcon className="size-8 opacity-50" />
-          <p>Take a photo or choose one from your library</p>
-        </div>
-      )}
+      ) : null}
 
       <input
         ref={cameraInputRef}
@@ -261,7 +256,7 @@ export function ScanReceipt({
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp,image/*"
+        accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
         className="hidden"
         disabled={pending}
         onChange={(e) => onFileSelected(e.target.files?.[0])}
@@ -285,7 +280,7 @@ export function ScanReceipt({
           onClick={() => fileInputRef.current?.click()}
         >
           <ImageIcon className="size-4" />
-          Choose photo
+          Choose from library
         </Button>
       </div>
     </div>
