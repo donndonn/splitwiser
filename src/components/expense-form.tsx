@@ -616,16 +616,18 @@ export function ExpenseForm({
           <Label htmlFor="spentAt" className={fieldLabelClassName}>
             Date
           </Label>
-          <Input
-            id="spentAt"
-            name="spentAt"
-            type="date"
-            required
-            defaultValue={
-              defaultValues?.spentAt ?? new Date().toISOString().slice(0, 10)
-            }
-            className="h-10 w-full max-w-full min-w-0 px-3 py-1 text-base leading-tight md:text-sm"
-          />
+          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)]">
+            <Input
+              id="spentAt"
+              name="spentAt"
+              type="date"
+              required
+              defaultValue={
+                defaultValues?.spentAt ?? new Date().toISOString().slice(0, 10)
+              }
+              className="box-border h-10 w-full max-w-full min-w-0 appearance-none overflow-hidden px-3 py-1 text-base leading-tight md:text-sm"
+            />
+          </div>
         </div>
 
         <div className="min-w-0 rounded-2xl bg-accent/55 px-3 py-2.5">

@@ -142,9 +142,22 @@
   html {
     @apply font-sans;
   }
-  /* Native date controls have a large UA min-width that overflows narrow cards. */
+  /* Native date controls ignore width/padding unless the UA appearance is reset. */
   input[type="date"] {
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+    width: 100%;
     min-width: 0;
     max-width: 100%;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  input[type="date"]::-webkit-date-and-time-value,
+  input[type="date"]::-webkit-datetime-edit,
+  input[type="date"]::-webkit-datetime-edit-fields-wrapper {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
   }
 }
