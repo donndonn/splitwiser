@@ -14,6 +14,10 @@ import {
 import { db } from "@/db";
 import { groups } from "@/db/schema";
 import { requireMember } from "@/lib/auth-guards";
+import {
+  formatBalanceContext,
+  viewerBalanceContext,
+} from "@/lib/balance-context";
 import { formatMoney } from "@/lib/money";
 import { formatExpenseDateLabel } from "@/lib/settle-marker";
 import { getGroupSettleView } from "@/lib/settle-marker-store";
@@ -54,6 +58,9 @@ export default async function GroupDashboardPage({
   const net =
     settleView.balances.find((row) => row.memberId === member.id)?.netCents ??
     0;
+  const balanceContext = formatBalanceContext(
+    viewerBalanceContext(member.id, settleView.balances),
+  );
   const settleMarkerLabel = settleView.archived[0]
     ? formatExpenseDateLabel(settleView.archived[0].spentAt)
     : null;
@@ -89,6 +96,7 @@ export default async function GroupDashboardPage({
                 ? `You're owed ${formatMoney(net, group.currency)}`
                 : `You owe ${formatMoney(-net, group.currency)}`}
           </CardTitle>
+          <p className="text-sm text-muted-foreground">{balanceContext}</p>
         </CardHeader>
       </Card>
 
@@ -102,7 +110,12 @@ export default async function GroupDashboardPage({
           </Link>
         </Button>
         {net !== 0 && (
-          <Button asChild size="lg" variant="secondary" className="w-full">
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="mt-1 self-center text-muted-foreground"
+          >
             <Link href={`/g/${id}/balances`}>Settle up</Link>
           </Button>
         )}
