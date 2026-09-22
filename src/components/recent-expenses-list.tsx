@@ -21,7 +21,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { expenseIconKind, viewerExpenseShare } from "@/lib/expense-row";
+import { viewerExpenseShare } from "@/lib/expense-row";
 import { formatMoney } from "@/lib/money";
 import { cn, groupedListClass } from "@/lib/utils";
 
@@ -80,7 +80,6 @@ export function RecentExpensesList({
       paidLabel: `${payer} paid ${formatMoney(expense.amountCents, currency)}`,
       month: expense.month,
       day: expense.day,
-      icon: expenseIconKind(expense.description),
       share:
         share.kind === "borrowed" || share.kind === "lent"
           ? {

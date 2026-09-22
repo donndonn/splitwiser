@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { expenseIconKind, viewerExpenseShare } from "./expense-row";
+import { viewerExpenseShare } from "./expense-row";
 
 describe("viewerExpenseShare", () => {
   it("shows the viewer's split as borrowed when someone else paid", () => {
@@ -50,13 +50,5 @@ describe("viewerExpenseShare", () => {
         viewerShareCents: 0,
       }),
     ).toEqual({ kind: "lent", amountCents: 5000 });
-  });
-});
-
-describe("expenseIconKind", () => {
-  it("uses utensils for a meal and a receipt otherwise", () => {
-    expect(expenseIconKind("Christmas eve dinner")).toBe("food");
-    expect(expenseIconKind("The Pullman")).toBe("receipt");
-    expect(expenseIconKind("coffee with Sam")).toBe("food");
   });
 });

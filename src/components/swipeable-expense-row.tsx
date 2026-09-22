@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import { Receipt, Trash2, UtensilsCrossed } from "lucide-react";
-import type { ExpenseIconKind } from "@/lib/expense-row";
+import { Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ACTION_WIDTH = 80;
@@ -24,7 +23,6 @@ type SwipeableExpenseRowProps = {
   paidLabel: string;
   month: string;
   day: string;
-  icon: ExpenseIconKind;
   share: ExpenseShareDisplay;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -47,7 +45,6 @@ export function SwipeableExpenseRow({
   paidLabel,
   month,
   day,
-  icon,
   share,
   open,
   onOpenChange,
@@ -235,20 +232,6 @@ export function SwipeableExpenseRow({
               <span className="mt-1 text-base font-medium tabular-nums">
                 {day}
               </span>
-            </div>
-            <div
-              className={cn(
-                "flex size-10 shrink-0 items-center justify-center rounded-lg",
-                icon === "food"
-                  ? "bg-accent text-accent-foreground"
-                  : "bg-secondary text-secondary-foreground",
-              )}
-            >
-              {icon === "food" ? (
-                <UtensilsCrossed className="size-5" strokeWidth={1.75} aria-hidden />
-              ) : (
-                <Receipt className="size-5" strokeWidth={1.75} aria-hidden />
-              )}
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold">{description}</p>
