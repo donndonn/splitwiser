@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Check,
   ChevronDown,
@@ -787,7 +788,10 @@ export function ExpenseForm({
         </SheetContent>
       </Sheet>
 
-      {splitEditorOpen && (
+      {splitEditorOpen &&
+        createPortal(
+        // The group shell scrolls in an overflow pane. A fixed sheet inside
+        // that pane is sized short of the viewport, so the tab bar peeks out.
         <div className="fixed inset-0 z-50 overflow-y-auto bg-background">
           <div className="mx-auto flex min-h-full w-full max-w-lg flex-col">
             <header className="sticky top-0 z-10 flex min-h-16 items-center gap-2 border-b border-border/60 bg-background/90 px-3 py-2 backdrop-blur-xl">
@@ -1566,8 +1570,9 @@ export function ExpenseForm({
               )}
             </main>
           </div>
-        </div>
-      )}
+        </div>,
+          document.body,
+        )}
 
       <section className="min-w-0 space-y-2 overflow-hidden rounded-2xl bg-card p-4 shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
         <Label htmlFor="notes" className={fieldLabelClassName}>

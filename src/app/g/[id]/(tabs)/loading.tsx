@@ -6,7 +6,7 @@ export default function GroupTabsLoading() {
         <div className="mx-auto h-4 w-28 animate-pulse rounded-md bg-muted" />
         <div className="size-9" />
       </header>
-      <main className="flex-1 space-y-4 px-4 py-5 pb-24">
+      <main className="flex-1 space-y-4 px-4 py-5">
         <div className="h-24 animate-pulse rounded-xl bg-muted" />
         <div className="h-12 animate-pulse rounded-xl bg-muted" />
         <div className="space-y-2">

@@ -71,7 +71,7 @@ export default async function ActivityPage({
   const linkableExpenseIds = new Set(existingExpenses.map((e) => e.id));
 
   return (
-    <AppShell title="Activity" backHref={`/g/${id}`} withBottomNav>
+    <AppShell title="Activity" backHref={`/g/${id}`}>
       {activities.length === 0 ? (
         <Card>
           <CardHeader>

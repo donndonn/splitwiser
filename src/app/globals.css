@@ -161,3 +161,17 @@
     overflow: hidden;
   }
 }
+
+/*
+ * Group tabs lock the document to the dynamic viewport. Unlayered so this
+ * beats `h-full` / `min-h-full` on html and body. The shell is a column of
+ * that height; scrolling the document is what lets iOS Safari detach a
+ * fixed bottom bar.
+ */
+html:has([data-group-tabs]),
+body:has([data-group-tabs]) {
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
