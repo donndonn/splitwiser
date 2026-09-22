@@ -1,4 +1,7 @@
+import type { ReactNode } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ExpenseSplitDetails } from "@/components/expense-split-details";
+import type { ExpenseReceiptBreakdown } from "@/lib/expense-receipt-breakdown";
 
 export type ExpensePerson = {
   displayName: string;
@@ -42,7 +45,7 @@ export function ExpenseReadView({
   payer,
   shares,
   notes,
-  splitCaption,
+  receiptBreakdown,
   hasReceipt,
   receipt,
 }: {
@@ -52,9 +55,9 @@ export function ExpenseReadView({
   payer: ExpensePerson;
   shares: ExpenseShareRow[];
   notes?: string | null;
-  splitCaption?: string | null;
+  receiptBreakdown: ExpenseReceiptBreakdown;
   hasReceipt: boolean;
-  receipt?: React.ReactNode;
+  receipt?: ReactNode;
 }) {
   return (
     <div className="space-y-5">
@@ -81,11 +84,7 @@ export function ExpenseReadView({
             {payer.displayName} paid {amountLabel}
           </p>
         </div>
-        {splitCaption ? (
-          <p className="mt-2 ml-14 text-xs text-muted-foreground">
-            {splitCaption}
-          </p>
-        ) : null}
+        <ExpenseSplitDetails breakdown={receiptBreakdown} />
         <ul className="mt-2 ml-5 border-l border-border">
           {shares.map((share) => (
             <li
