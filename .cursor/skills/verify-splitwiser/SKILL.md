@@ -81,11 +81,12 @@ Stable handles in this repo:
 | Submit verify session | button `Verify sign-in` |
 | Signed-in home heading | `Your groups` |
 | App tabs | navigation `App navigation` → `Groups`, `Friends`, `Profile` |
-| Create group | link `Create group` → heading `New group` |
+| Create group | header link `Create group` on `Your groups` → heading `New group` |
+| Groups list Add expense | `Add expense` on `Your groups` (direct, group sheet, or create-group nudge) |
 | Group name | textbox `Group name` |
 | Display name in group | textbox `Your name in this group` |
 | Submit group | button `Create group` |
-| Group home Add | link `Add expense` or tab `Add` |
+| Group home Add | floating link `Add expense` above the group tab bar, or tab `Add` |
 | Skip Gemini prefill | button `Enter manually` |
 | Expense description | textbox `What was it for?` |
 | Expense amount | textbox whose name starts with `Amount` |

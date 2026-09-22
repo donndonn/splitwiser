@@ -11,7 +11,7 @@ Create a group lets a signed-in user name a group, pick their display name and c
 
 ## How to get to it (user POV)
 
-- On `Your groups`, choose `Create group`.
+- On `Your groups`, choose the header link `Create group` (people-plus icon, upper right).
 - Go to `http://127.0.0.1:3017/new` while signed in.
 
 ## Driving it with Cursor browser
@@ -34,7 +34,7 @@ Preconditions:
 ## Gotchas
 
 - A group name without the `swv-<RUN_ID>` prefix survives cleanup and pollutes the shared database. Always prefix.
-- `Create group` appears twice: the home link and the form submit button. The form submit is the button on `New group`.
+- `Create group` appears twice: the header icon link on `Your groups`, and the form submit button on `New group`. The groups list has no full-width create button.
 - A click on `Create group` or `Back` can lag before the next snapshot. Wait and snapshot again, or open `/new` and `/` directly — both are mapped entry points.
 - Creating a group with an empty name is blocked by the required `Group name` field. Do not treat a stay-on-form as a save.
 - Friends checkboxes only appear if Alice already has friends. Baseline create-group does not require them; adding friends belongs to the friends feature.

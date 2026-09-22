@@ -26,7 +26,7 @@ Preconditions:
 - Complete the balances recipe through recording the suggested payment so both people are `settled` and Home reads `All settled up`.
 
 - **Prompt on Balances.** After the payment that zeros the group, heading `Balances` includes card title `Everyone's settled up` and buttons `Not now` and `Mark as settled`. Screenshot `mark-as-settled-prompt.png`.
-- **Prompt on Home.** Choose tab `Home`. The same card is visible above `Add expense`. Groceries is still under `Recent expenses`.
+- **Prompt on Home.** Choose tab `Home`. The same card is visible above `Recent expenses`. `Add expense` is the floating pill, not a button above the card. Groceries is still under `Recent expenses`.
 - **Dismiss.** Choose `Not now`. The card disappears. Reload Home (tab `Home` again or tab away and back). The prompt does not return. Groceries remains in Recent.
 - **Re-prompt after a new streak.** Add expense `Coffee` for `$4.00` (manual, equal split). Home is no longer `All settled up`. On Balances, record the new suggested payment. The `Everyone's settled up` card returns.
 - **Confirm.** Choose `Mark as settled`. Toast `Marked as settled` (or equivalent). The prompt is gone. Recent no longer lists `Groceries` or `Coffee` as open rows. A control `Earlier expenses settled` is visible (date suffix allowed). Screenshot `mark-as-settled-archived.png`.

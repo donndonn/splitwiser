@@ -30,12 +30,12 @@ export function AppShell({
               <ChevronLeft className="size-5" />
             </Link>
           ) : (
-            <div className="size-9" />
+            <div className="size-11 shrink-0" />
           )}
           <h1 className="flex-1 truncate text-center text-base font-semibold tracking-tight">
             {title}
           </h1>
-          <div className="flex min-w-9 items-center justify-end gap-1">
+          <div className="flex min-w-11 shrink-0 items-center justify-end gap-1">
             {actions}
           </div>
         </header>
