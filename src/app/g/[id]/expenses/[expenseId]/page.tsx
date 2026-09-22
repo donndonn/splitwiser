@@ -201,7 +201,9 @@ export default async function ExpenseDetailPage({
             }
       }
     >
-      {hasReceipt ? <ReceiptPhoto expenseId={expense.id} /> : null}
+      {hasReceipt ? (
+        <ReceiptPhoto expenseId={expense.id} collapsible={false} />
+      ) : null}
     </ExpenseForm>
   );
 
@@ -246,14 +248,16 @@ export default async function ExpenseDetailPage({
             })}
           notes={expense.notes}
           receiptBreakdown={receiptBreakdown}
-          hasReceipt={hasReceipt}
           receipt={
             hasReceipt ? (
               <ReceiptPhoto expenseId={expense.id} />
             ) : (
-              <ReceiptAttach
-                action={attachReceiptAction.bind(null, id, expenseId)}
-              />
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Receipt photo</p>
+                <ReceiptAttach
+                  action={attachReceiptAction.bind(null, id, expenseId)}
+                />
+              </div>
             )
           }
         />

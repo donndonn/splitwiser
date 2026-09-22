@@ -46,7 +46,6 @@ export function ExpenseReadView({
   shares,
   notes,
   receiptBreakdown,
-  hasReceipt,
   receipt,
 }: {
   description: string;
@@ -56,26 +55,20 @@ export function ExpenseReadView({
   shares: ExpenseShareRow[];
   notes?: string | null;
   receiptBreakdown: ExpenseReceiptBreakdown;
-  hasReceipt: boolean;
   receipt?: ReactNode;
 }) {
   return (
     <div className="space-y-5">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-xl font-semibold tracking-tight break-words">
-            {description}
-          </h2>
-          <p className="mt-1 text-3xl font-semibold tracking-tight tabular-nums">
-            {amountLabel}
-          </p>
-        </div>
-        {!hasReceipt ? receipt : null}
+      <header>
+        <h2 className="text-xl font-semibold tracking-tight break-words">
+          {description}
+        </h2>
+        <p className="mt-1 text-3xl font-semibold tracking-tight tabular-nums">
+          {amountLabel}
+        </p>
       </header>
 
       <p className="text-sm text-muted-foreground">{addedByLine}</p>
-
-      {hasReceipt ? receipt : null}
 
       <section className="pt-1">
         <div className="flex items-center gap-3">
@@ -111,6 +104,8 @@ export function ExpenseReadView({
       {notes ? (
         <p className="text-sm break-words text-muted-foreground">{notes}</p>
       ) : null}
+
+      {receipt ?? null}
     </div>
   );
 }

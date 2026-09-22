@@ -1,8 +1,16 @@
+import { ReceiptPhotoDisclosure } from "@/components/receipt-photo-disclosure";
 import { receiptImageApiPath } from "@/lib/receipt-blob";
+import { cn, groupedListClass } from "@/lib/utils";
 
-export function ReceiptPhoto({ expenseId }: { expenseId: string }) {
+function ReceiptFigure({
+  expenseId,
+  className,
+}: {
+  expenseId: string;
+  className?: string;
+}) {
   return (
-    <figure className="min-w-0 overflow-hidden rounded-2xl bg-card p-4 shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
+    <figure className={className}>
       {/* Auth'd same-origin route — next/image remote config is not needed. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
@@ -14,5 +22,28 @@ export function ReceiptPhoto({ expenseId }: { expenseId: string }) {
         Receipt photo · visible to group members only
       </figcaption>
     </figure>
+  );
+}
+
+export function ReceiptPhoto({
+  expenseId,
+  collapsible = true,
+}: {
+  expenseId: string;
+  collapsible?: boolean;
+}) {
+  if (!collapsible) {
+    return (
+      <ReceiptFigure
+        expenseId={expenseId}
+        className={cn(groupedListClass, "min-w-0 p-4")}
+      />
+    );
+  }
+
+  return (
+    <ReceiptPhotoDisclosure>
+      <ReceiptFigure expenseId={expenseId} />
+    </ReceiptPhotoDisclosure>
   );
 }
