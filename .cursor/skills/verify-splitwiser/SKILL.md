@@ -86,7 +86,7 @@ Stable handles in this repo:
 | Group name | textbox `Group name` |
 | Display name in group | textbox `Your name in this group` |
 | Submit group | button `Create group` |
-| Group home Add | link `Add expense` or tab `Add` |
+| Group home Add | floating link `Add expense` above the group tab bar, or tab `Add` |
 | Skip Gemini prefill | button `Enter manually` |
 | Expense description | textbox `What was it for?` |
 | Expense amount | textbox whose name starts with `Amount` |

@@ -2,6 +2,11 @@
 
 import Link from "next/link";
 import { Receipt } from "lucide-react";
+import {
+  AddExpensePill,
+  addExpenseFabButtonClass,
+  addExpenseFabOffsetClass,
+} from "@/components/add-expense-pill";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -17,23 +22,16 @@ import {
 } from "@/lib/add-expense-entry";
 import { cn } from "@/lib/utils";
 
-/** Sits above the root tab bar and the home-indicator inset. */
-const fabSlotClass =
-  "pointer-events-none fixed inset-x-0 z-[41] mx-auto flex w-full max-w-lg justify-end px-4 bottom-[calc(5.75rem+env(safe-area-inset-bottom))]";
-
-const fabButtonClass =
-  "pointer-events-auto h-12 rounded-full px-5 shadow-lg shadow-primary/25";
-
 function FabSlot({ children }: { children: React.ReactNode }) {
-  return <div className={fabSlotClass}>{children}</div>;
-}
-
-function FabLabel() {
   return (
-    <>
-      <Receipt />
-      Add expense
-    </>
+    <div
+      className={cn(
+        "pointer-events-none fixed inset-x-0 z-[41] mx-auto flex w-full max-w-lg justify-end px-4",
+        addExpenseFabOffsetClass,
+      )}
+    >
+      {children}
+    </div>
   );
 }
 
@@ -43,11 +41,7 @@ export function AddExpenseFab({ groups }: { groups: AddExpenseGroup[] }) {
   if (entry.type === "direct") {
     return (
       <FabSlot>
-        <Button asChild size="lg" className={fabButtonClass}>
-          <Link href={`/g/${entry.groupId}/expenses/new`}>
-            <FabLabel />
-          </Link>
-        </Button>
+        <AddExpensePill href={`/g/${entry.groupId}/expenses/new`} />
       </FabSlot>
     );
   }
@@ -58,8 +52,9 @@ export function AddExpenseFab({ groups }: { groups: AddExpenseGroup[] }) {
     <FabSlot>
       <Sheet>
         <SheetTrigger asChild>
-          <Button type="button" size="lg" className={fabButtonClass}>
-            <FabLabel />
+          <Button type="button" size="lg" className={addExpenseFabButtonClass}>
+            <Receipt />
+            Add expense
           </Button>
         </SheetTrigger>
         <SheetContent

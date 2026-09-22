@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { eq } from "drizzle-orm";
-import { Plus, Settings } from "lucide-react";
+import { Settings } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { MarkAsSettledPrompt } from "@/components/mark-as-settled-prompt";
 import {
@@ -76,6 +76,7 @@ export default async function GroupDashboardPage({
     <AppShell
       title={group.name}
       backHref="/"
+      className="pb-28"
       actions={
         <Button asChild variant="ghost" size="icon">
           <Link href={`/g/${id}/settings`} aria-label="Settings">
@@ -108,24 +109,18 @@ export default async function GroupDashboardPage({
 
       {settleView.showPrompt ? <MarkAsSettledPrompt groupId={id} /> : null}
 
-      <div className="mb-6 flex flex-col gap-2">
-        <Button asChild size="lg" className="w-full">
-          <Link href={`/g/${id}/expenses/new`}>
-            <Plus className="size-4" />
-            Add expense
-          </Link>
-        </Button>
-        {net !== 0 && (
+      {net !== 0 && (
+        <div className="mb-6 flex justify-center">
           <Button
             asChild
             variant="outline"
             size="sm"
-            className="mt-1 self-center text-muted-foreground"
+            className="text-muted-foreground"
           >
             <Link href={`/g/${id}/balances`}>Settle up</Link>
           </Button>
-        )}
-      </div>
+        </div>
+      )}
 
       <h2 className="mb-2 text-sm font-medium text-muted-foreground">
         Recent expenses

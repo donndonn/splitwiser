@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
+import { GroupHomeExpenseFab } from "@/components/add-expense-pill";
 import { GroupBottomNav } from "@/components/group-bottom-nav";
 
 /**
@@ -61,10 +62,13 @@ export function GroupTabsShell({
     return () => scroller.removeEventListener("focusin", onFocusIn);
   }, []);
 
+  const base = `/g/${groupId}`;
+  const isHome = pathname === base || pathname === `${base}/`;
+
   return (
     <div
       data-group-tabs=""
-      className="flex h-dvh max-h-dvh w-full min-w-0 flex-col overflow-hidden"
+      className="relative flex h-dvh max-h-dvh w-full min-w-0 flex-col overflow-hidden"
     >
       <div
         ref={scrollerRef}
@@ -72,6 +76,7 @@ export function GroupTabsShell({
       >
         {children}
       </div>
+      {isHome ? <GroupHomeExpenseFab groupId={groupId} /> : null}
       <GroupBottomNav groupId={groupId} />
     </div>
   );

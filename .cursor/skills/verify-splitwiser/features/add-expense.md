@@ -31,7 +31,7 @@ Preconditions:
 - **Groups list, one group.** On heading `Your groups` with exactly one group, choose `Add expense`. Heading becomes `Add expense` for that group without visiting group home first. Textbox `Describe the expense` is visible.
 - **Groups list, several groups.** With two or more groups, choose `Add expense`. A sheet titled `Which group?` lists those groups. Choose `<GROUP_NAME_PREFIX> Cabin`. Heading becomes `Add expense`.
 - **Groups list, no groups.** With an account that has no groups, choose `Add expense`. The sheet title is `Create a group first` and includes link `Create group`, which opens heading `New group`.
-- **Home entry.** On group home `<GROUP_NAME_PREFIX> Cabin`, choose link `Add expense`. Heading is `Add expense`. Textbox `Describe the expense` is visible with buttons `Fill form`, `Enter manually`, and `Scan receipt`.
+- **Home entry.** On group home `<GROUP_NAME_PREFIX> Cabin`, choose the floating link `Add expense` (pill, bottom-right, above the group tab bar). There is no full-width Add expense button and no group picker. Heading is `Add expense`. Textbox `Describe the expense` is visible with buttons `Fill form`, `Enter manually`, and `Scan receipt`.
 - **Tab entry.** From group home, choose tab `Add`. The same describe step appears.
 - **Manual form.** Choose `Enter manually`. Heading stays `Add expense`. Textbox `What was it for?` and an amount field whose name starts with `Amount` are visible. Default split copy includes `split` `equally`. Default payer is Alice's display name.
 - **Fill.** Fill `What was it for?` with `Groceries`. Fill the amount textbox with `12.34`. Leave date as today.
@@ -42,7 +42,7 @@ Preconditions:
 ## Gotchas
 
 - The first Add expense screen is a describe step, not the money form. `Add expense` on that step does not exist until after `Enter manually`.
-- On `Your groups`, `Add expense` is the floating button above the tab bar. With one group it is a link straight to the form. With zero or many groups it is a button that opens a sheet. Do not confuse it with the group-home link or the form submit button.
+- On `Your groups` and on group home, `Add expense` is the floating pill above the tab bar. Group home links straight to that group's form. On `Your groups`, one group skips the picker, and zero or many groups open a sheet. Do not confuse either pill with the form submit button.
 - `Fill form` needs `GOOGLE_API_KEY` and hits Gemini rate limits. A toast error is not a product-regression by itself if the key is missing.
 - Equal split among Alice and Sam makes Alice owed and Sam owe. `All settled up` is wrong after this expense; expect a non-zero `Your balance` on home (`You're owed $6.17` with two members).
 - Equal split with only Alice (no Sam) stays settled because she paid her own share. If you skipped the Sam placeholder, assert `All settled up` and still assert the Groceries row exists.
