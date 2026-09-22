@@ -18,6 +18,11 @@ import {
   users,
 } from "@/db/schema";
 import { requireMember } from "@/lib/auth-guards";
+import {
+  buildItemizedReceiptBreakdown,
+  buildSimpleReceiptBreakdown,
+  type ExpenseReceiptBreakdown,
+} from "@/lib/expense-receipt-breakdown";
 import { formatCents, formatMoney } from "@/lib/money";
 import {
   attachReceiptAction,
@@ -108,12 +113,50 @@ export default async function ExpenseDetailPage({
   const creator = personById.get(expense.createdByMemberId);
   const hasReceipt = Boolean(expense.receiptBlobPathname);
   const amountLabel = formatMoney(expense.amountCents, group.currency);
-  const splitCaption =
-    expense.entryMode === "itemized"
-      ? expense.taxCents > 0 || expense.tipCents > 0
-        ? "Split by item, with tax and tip shared by item totals"
-        : "Split by item"
-      : null;
+
+  const memberNames = new Map(
+    roster.map((member) => [member.id, member.displayName]),
+  );
+
+  let receiptBreakdown: ExpenseReceiptBreakdown;
+  if (expense.entryMode === "itemized" && itemRows.length > 0) {
+    receiptBreakdown = buildItemizedReceiptBreakdown({
+      currency: group.currency,
+      taxCents: expense.taxCents,
+      tipCents: expense.tipCents,
+      items: itemRows.map((item) => {
+        const memberIds = assignedMembers.get(item.id) ?? [];
+        return {
+          description: item.description,
+          amountCents: item.amountCents,
+          quantity: item.quantity,
+          memberIds,
+          sharedByNames: memberIds.map(
+            (memberId) => memberNames.get(memberId) ?? "Someone",
+          ),
+        };
+      }),
+      memberNames,
+    });
+  } else {
+    receiptBreakdown = buildSimpleReceiptBreakdown({
+      currency: group.currency,
+      amountCents: expense.amountCents,
+      splitMode: expense.splitMode,
+      shares: [...splits]
+        .sort(
+          (a, b) =>
+            roster.findIndex((member) => member.id === a.memberId) -
+            roster.findIndex((member) => member.id === b.memberId),
+        )
+        .map((split) => ({
+          memberId: split.memberId,
+          displayName: personById.get(split.memberId)?.displayName ?? "Someone",
+          amountCents: split.amountCents,
+          weight: Number(split.weight ?? split.amountCents),
+        })),
+    });
+  }
 
   const form = (
     <ExpenseForm
@@ -198,7 +241,7 @@ export default async function ExpenseDetailPage({
               };
             })}
           notes={expense.notes}
-          splitCaption={splitCaption}
+          receiptBreakdown={receiptBreakdown}
           hasReceipt={hasReceipt}
           receipt={
             hasReceipt ? (
