@@ -341,6 +341,32 @@ export async function updateExpenseAction(
     groupMemberIds,
   );
 
+  const [existing] = await db
+    .select({
+      receiptBlobPathname: expenses.receiptBlobPathname,
+    })
+    .from(expenses)
+    .where(and(eq(expenses.id, expenseId), eq(expenses.groupId, groupId)))
+    .limit(1);
+  if (!existing) throw new Error("Expense not found");
+
+  const receiptImage = readReceiptImageFromFormData(formData);
+  let uploadedPathname: string | null = null;
+  if (receiptImage) {
+    try {
+      const uploaded = await putReceiptBlob({
+        groupId,
+        expenseId,
+        body: receiptImage.file,
+        contentType: receiptImage.contentType,
+      });
+      uploadedPathname = uploaded.pathname;
+    } catch {
+      throw new Error("Could not store the receipt photo. Try again.");
+    }
+  }
+
+  try {
   await db.transaction(async (tx) => {
     const updated = await tx
       .update(expenses)
@@ -356,6 +382,12 @@ export async function updateExpenseAction(
         feeCents: details.feeCents,
         discountCents: details.discountCents,
         notes: common.notes,
+        ...(uploadedPathname
+          ? {
+              receiptBlobPathname: uploadedPathname,
+              receiptContentType: receiptImage?.contentType ?? null,
+            }
+          : {}),
       })
       .where(and(eq(expenses.id, expenseId), eq(expenses.groupId, groupId)))
       .returning({ id: expenses.id });
@@ -409,12 +441,87 @@ export async function updateExpenseAction(
       },
     });
   });
+  } catch (err) {
+    if (
+      uploadedPathname &&
+      uploadedPathname !== existing.receiptBlobPathname
+    ) {
+      await deleteReceiptBlob(uploadedPathname).catch(() => {});
+    }
+    throw err;
+  }
+
+  if (
+    uploadedPathname &&
+    existing.receiptBlobPathname &&
+    existing.receiptBlobPathname !== uploadedPathname
+  ) {
+    await deleteReceiptBlob(existing.receiptBlobPathname).catch(() => {});
+  }
 
   revalidatePath(`/g/${groupId}`);
   revalidatePath(`/g/${groupId}/balances`);
   revalidatePath(`/g/${groupId}/activity`);
   revalidatePath(`/g/${groupId}/expenses/${expenseId}`);
   redirect(`/g/${groupId}`);
+}
+
+/** Attach the single private receipt photo on an existing expense. */
+export async function attachReceiptAction(
+  groupId: string,
+  expenseId: string,
+  formData: FormData,
+) {
+  await requireMember(groupId);
+  const receiptImage = readReceiptImageFromFormData(formData);
+  if (!receiptImage) throw new Error("Choose a receipt photo");
+
+  const [existing] = await db
+    .select({
+      id: expenses.id,
+      receiptBlobPathname: expenses.receiptBlobPathname,
+    })
+    .from(expenses)
+    .where(and(eq(expenses.id, expenseId), eq(expenses.groupId, groupId)))
+    .limit(1);
+  if (!existing) throw new Error("Expense not found");
+  if (existing.receiptBlobPathname) {
+    throw new Error("This expense already has a receipt");
+  }
+
+  let uploadedPathname: string | null = null;
+  try {
+    const uploaded = await putReceiptBlob({
+      groupId,
+      expenseId,
+      body: receiptImage.file,
+      contentType: receiptImage.contentType,
+    });
+    uploadedPathname = uploaded.pathname;
+    await db
+      .update(expenses)
+      .set({
+        receiptBlobPathname: uploaded.pathname,
+        receiptContentType: receiptImage.contentType,
+      })
+      .where(and(eq(expenses.id, expenseId), eq(expenses.groupId, groupId)));
+  } catch (err) {
+    if (uploadedPathname) {
+      await deleteReceiptBlob(uploadedPathname).catch(() => {});
+    }
+    if (
+      err instanceof Error &&
+      (err.message.includes("photo") ||
+        err.message.includes("JPEG") ||
+        err.message.includes("WebP") ||
+        err.message.includes("receipt"))
+    ) {
+      throw err;
+    }
+    throw new Error("Could not store the receipt photo. Try again.");
+  }
+
+  revalidatePath(`/g/${groupId}/expenses/${expenseId}`);
 }
 
 /** Delete an expense and revalidate; does not redirect (for in-list deletes). */

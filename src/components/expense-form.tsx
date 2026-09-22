@@ -3,10 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CircleCheck,
-  CircleDollarSign,
   ImageIcon,
   Minus,
   Plus,
@@ -17,6 +17,12 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -487,9 +493,9 @@ export function ExpenseForm({
     if (assigned.length === 0) return "Choose people";
     if (assigned.length === 1) return assigned[0].displayName;
     if (assigned.length === 2) {
-      return `${assigned[0].displayName}, ${assigned[1].displayName}`;
+      return `${assigned[0].displayName} + ${assigned[1].displayName}`;
     }
-    return `${assigned[0].displayName} +${assigned.length - 1}`;
+    return `${assigned[0].displayName} + ${assigned.length - 1} others`;
   }
 
   function assignedMembersFor(item: ItemDraft) {
@@ -518,6 +524,18 @@ export function ExpenseForm({
     setItems((current) =>
       current.map((item) => (item.key === key ? { ...item, ...update } : item)),
     );
+  }
+
+  function assignAllItems(memberIds: string[]) {
+    setSplitInteracted(true);
+    setItems((current) =>
+      current.map((item) => ({ ...item, memberIds: [...memberIds] })),
+    );
+  }
+
+  function resizeItemName(element: HTMLTextAreaElement) {
+    element.style.height = "auto";
+    element.style.height = `${element.scrollHeight}px`;
   }
 
   function addItem() {
@@ -978,30 +996,77 @@ export function ExpenseForm({
           )}
         </div>
               ) : (
-        <div className="space-y-5">
-          <section className="rounded-2xl bg-accent/65 p-3.5 text-accent-foreground">
-            <div className="flex items-center gap-2 text-sm font-medium">
-              <CircleDollarSign className="size-4" />
-              Receipt total · {currency}
-            </div>
-            <p className="mt-1.5 text-2xl font-semibold tracking-tight tabular-nums">
-              {formatMoney(
-                itemizedPreview.printedTotalCents ??
-                  itemizedPreview.itemSubtotalCents,
-                currency,
+        <div className="space-y-4">
+          <section className="rounded-2xl bg-accent/65 px-3.5 py-3 text-accent-foreground">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-accent-foreground/80">
+                  Receipt total · {currency}
+                </p>
+                <p className="mt-0.5 text-2xl font-semibold tracking-tight tabular-nums">
+                  {formatMoney(
+                    itemizedPreview.printedTotalCents ??
+                      itemizedPreview.itemSubtotalCents,
+                    currency,
+                  )}
+                </p>
+              </div>
+              {splitStatus === "balanced" && (
+                <p className="flex items-center gap-1 pt-0.5 text-xs font-medium">
+                  <CircleCheck className="size-3.5" />
+                  Ready
+                </p>
               )}
-            </p>
+            </div>
             <p className="mt-1.5 text-xs text-accent-foreground/75">
-              Items + tax + tip. Edit tax and tip below.
+              Items {formatMoney(itemizedPreview.itemSubtotalCents, currency)}
+              {" · "}
+              Tax{" "}
+              {taxCents == null ? "—" : formatMoney(taxCents, currency)}
+              {" · "}
+              Tip {tipCents == null ? "—" : formatMoney(tipCents, currency)}
             </p>
           </section>
 
-          <section className="space-y-3">
-            <div className="flex items-center justify-between px-1">
-              <Label>Receipt items</Label>
-              <span className="text-xs text-muted-foreground">
-                {items.length} {items.length === 1 ? "item" : "items"}
-              </span>
+          <section className="space-y-2">
+            <div className="flex items-center gap-2 px-0.5">
+              <Label className="shrink-0">Receipt items</Label>
+              <div className="ml-auto flex items-center gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={items.length === 0 || members.length === 0}
+                    >
+                      <Users className="size-3.5" />
+                      Assign all
+                      <ChevronDown className="size-3.5 opacity-70" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="z-[70]">
+                    <DropdownMenuItem
+                      onSelect={() =>
+                        assignAllItems(members.map((member) => member.id))
+                      }
+                    >
+                      Everyone
+                    </DropdownMenuItem>
+                    {members.map((member) => (
+                      <DropdownMenuItem
+                        key={member.id}
+                        onSelect={() => assignAllItems([member.id])}
+                      >
+                        {member.displayName}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <span className="text-xs whitespace-nowrap text-muted-foreground tabular-nums">
+                  {items.length} {items.length === 1 ? "item" : "items"}
+                </span>
+              </div>
             </div>
 
             {items.length === 0 ? (
@@ -1032,141 +1097,138 @@ export function ExpenseForm({
                   <article
                     key={item.key}
                     className={cn(
-                      "min-w-0 px-3 py-3",
+                      "min-w-0 px-3 py-2",
                       index > 0 && "border-t border-border/65",
                     )}
                   >
-                    <Label
-                      htmlFor={`item-name-${item.key}`}
-                      className="sr-only"
-                    >
-                      Item {index + 1} name
-                    </Label>
-                    <Textarea
-                      id={`item-name-${item.key}`}
-                      aria-label={`Item ${index + 1} name`}
-                      rows={1}
-                      className="min-h-10 w-full resize-none break-words whitespace-normal border-0 bg-transparent px-1 py-2 text-base font-medium shadow-none placeholder:text-muted-foreground focus-visible:bg-secondary/70 focus-visible:ring-0 dark:bg-transparent"
-                      value={item.description}
-                      ref={(element) => {
-                        if (element) {
-                          itemNameInputRefs.current.set(item.key, element);
-                        } else {
-                          itemNameInputRefs.current.delete(item.key);
-                        }
-                      }}
-                      onChange={(event) =>
-                        updateItem(item.key, {
-                          description: event.target.value,
-                        })
-                      }
-                      placeholder={`Item ${index + 1}`}
-                    />
-
-                    <div className="mt-1 flex min-w-0 items-center gap-1">
-                      <Label
-                        htmlFor={`item-amount-${item.key}`}
-                        className="sr-only"
-                      >
-                        Item {index + 1} unit price
-                      </Label>
-                      <div className="relative min-w-0 flex-1">
-                        <span className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-[11px] text-muted-foreground">
-                          {currencySymbol}
-                        </span>
-                        <Input
-                          id={`item-amount-${item.key}`}
-                          aria-label={`Item ${index + 1} unit price`}
-                          className="h-8 border-0 bg-secondary/70 px-2 pl-5 text-right text-sm font-semibold tabular-nums shadow-none focus-visible:bg-secondary focus-visible:ring-0"
-                          inputMode="decimal"
-                          value={item.amount}
-                          onChange={(event) =>
-                            updateItem(item.key, {
-                              amount: event.target.value,
-                            })
-                          }
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter") {
-                              event.preventDefault();
-                              addItem();
+                    <div className="flex items-start gap-1.5">
+                      <div className="min-w-0 flex-1">
+                        <Label
+                          htmlFor={`item-name-${item.key}`}
+                          className="sr-only"
+                        >
+                          Item {index + 1} name
+                        </Label>
+                        <Textarea
+                          id={`item-name-${item.key}`}
+                          aria-label={`Item ${index + 1} name`}
+                          rows={1}
+                          className="field-sizing-fixed min-h-8 w-full resize-none overflow-hidden border-0 bg-transparent px-0 py-1 text-sm font-medium break-words whitespace-pre-wrap shadow-none placeholder:text-muted-foreground focus-visible:bg-secondary/70 focus-visible:ring-0 dark:bg-transparent"
+                          value={item.description}
+                          ref={(element) => {
+                            if (element) {
+                              itemNameInputRefs.current.set(item.key, element);
+                              resizeItemName(element);
+                            } else {
+                              itemNameInputRefs.current.delete(item.key);
                             }
                           }}
-                          placeholder="0.00"
+                          onChange={(event) => {
+                            resizeItemName(event.currentTarget);
+                            updateItem(item.key, {
+                              description: event.target.value,
+                            });
+                          }}
+                          placeholder={`Item ${index + 1}`}
                         />
                       </div>
 
-                      <div className="flex h-8 shrink-0 items-center rounded-lg bg-secondary/70 px-0.5">
-                        <Button
+                      <div className="flex shrink-0 items-center gap-0.5 pt-0.5">
+                        <Label
+                          htmlFor={`item-amount-${item.key}`}
+                          className="sr-only"
+                        >
+                          Item {index + 1} unit price
+                        </Label>
+                        <div className="relative w-[4.6rem]">
+                          <span className="pointer-events-none absolute inset-y-0 left-1.5 flex items-center text-[11px] text-muted-foreground">
+                            {currencySymbol}
+                          </span>
+                          <Input
+                            id={`item-amount-${item.key}`}
+                            aria-label={`Item ${index + 1} unit price`}
+                            className="h-8 border-0 bg-secondary/70 px-1 pl-4 text-right text-sm font-semibold tabular-nums shadow-none focus-visible:bg-secondary focus-visible:ring-0"
+                            inputMode="decimal"
+                            value={item.amount}
+                            onChange={(event) =>
+                              updateItem(item.key, {
+                                amount: event.target.value,
+                              })
+                            }
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                addItem();
+                              }
+                            }}
+                            placeholder="0.00"
+                          />
+                        </div>
+                        <div className="flex h-7 items-center">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-xs"
+                            className="size-5 text-muted-foreground"
+                            aria-label={`Decrease quantity for item ${index + 1}`}
+                            disabled={item.quantity <= 1}
+                            onClick={() =>
+                              updateItem(item.key, {
+                                quantity: Math.max(1, item.quantity - 1),
+                              })
+                            }
+                          >
+                            <Minus className="size-3" />
+                          </Button>
+                          <span
+                            className="min-w-5 text-center text-[11px] font-semibold tabular-nums text-muted-foreground"
+                            aria-label={`Quantity ${item.quantity}`}
+                          >
+                            ×{item.quantity}
+                          </span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-xs"
+                            className="size-5 text-muted-foreground"
+                            aria-label={`Increase quantity for item ${index + 1}`}
+                            onClick={() =>
+                              updateItem(item.key, {
+                                quantity: item.quantity + 1,
+                              })
+                            }
+                          >
+                            <Plus className="size-3" />
+                          </Button>
+                        </div>
+                        <button
                           type="button"
-                          variant="ghost"
-                          size="icon-xs"
-                          className="size-6 text-muted-foreground"
-                          aria-label={`Decrease quantity for item ${index + 1}`}
-                          disabled={item.quantity <= 1}
-                          onClick={() =>
-                            updateItem(item.key, {
-                              quantity: Math.max(1, item.quantity - 1),
-                            })
-                          }
+                          className="flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary/70 focus-visible:ring-3 focus-visible:ring-ring/20 focus-visible:outline-none"
+                          aria-label={`Edit item ${index + 1}`}
+                          onClick={() => setAssignmentItemKey(item.key)}
                         >
-                          <Minus className="size-3" />
-                        </Button>
-                        <span
-                          className="min-w-6 text-center text-[11px] font-semibold tabular-nums"
-                          aria-label={`Quantity ${item.quantity}`}
-                        >
-                          ×{item.quantity}
-                        </span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-xs"
-                          className="size-6 text-muted-foreground"
-                          aria-label={`Increase quantity for item ${index + 1}`}
-                          onClick={() =>
-                            updateItem(item.key, {
-                              quantity: item.quantity + 1,
-                            })
-                          }
-                        >
-                          <Plus className="size-3" />
-                        </Button>
+                          <ChevronRight className="size-4" />
+                        </button>
                       </div>
-
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-xs"
-                        className="size-7 shrink-0 text-muted-foreground/70 hover:text-destructive"
-                        aria-label={`Remove item ${index + 1}`}
-                        onClick={() => {
-                          setItems((current) =>
-                            current.filter(
-                              (candidate) => candidate.key !== item.key,
-                            ),
-                          );
-                          if (assignmentItemKey === item.key) {
-                            setAssignmentItemKey(null);
-                          }
-                        }}
-                      >
-                        <Trash2 className="size-3.5" />
-                      </Button>
                     </div>
 
                     {showLineTotal && unitCents != null && (
-                      <p className="mt-0.5 text-right text-xs tabular-nums text-muted-foreground">
-                        = {formatMoney(lineTotalCents(unitCents, item.quantity), currency)}
+                      <p className="text-right text-[11px] tabular-nums text-muted-foreground">
+                        ={" "}
+                        {formatMoney(
+                          lineTotalCents(unitCents, item.quantity),
+                          currency,
+                        )}
                       </p>
                     )}
 
                     <button
                       type="button"
                       className={cn(
-                        "mt-1 flex h-9 w-full min-w-0 items-center gap-2 rounded-xl px-1.5 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/20",
+                        "mt-0.5 flex min-h-7 w-full min-w-0 items-center gap-1.5 rounded-lg px-0.5 py-0.5 text-left text-xs transition-colors focus-visible:ring-3 focus-visible:ring-ring/20 focus-visible:outline-none",
                         item.memberIds.length === 0 && splitInteracted
-                          ? "bg-destructive/5 text-destructive"
-                          : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground",
+                          ? "text-destructive"
+                          : "text-muted-foreground hover:text-foreground",
                       )}
                       aria-label={`Choose who shared item ${index + 1}. Currently ${assignmentSummary(item)}`}
                       onClick={() => setAssignmentItemKey(item.key)}
@@ -1176,25 +1238,24 @@ export function ExpenseForm({
                           {visibleAssignees.map((member) => (
                             <span
                               key={member.id}
-                              className="flex size-6 items-center justify-center rounded-full bg-secondary text-[10px] font-bold text-secondary-foreground ring-2 ring-card"
+                              className="flex size-5 items-center justify-center rounded-full bg-secondary text-[9px] font-bold text-secondary-foreground ring-2 ring-card"
                               title={member.displayName}
                             >
                               {memberInitials(member.displayName)}
                             </span>
                           ))}
                           {extraAssignees > 0 && (
-                            <span className="flex size-6 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground ring-2 ring-card">
+                            <span className="flex size-5 items-center justify-center rounded-full bg-muted text-[9px] font-bold text-muted-foreground ring-2 ring-card">
                               +{extraAssignees}
                             </span>
                           )}
                         </span>
                       ) : (
-                        <Users className="size-4 shrink-0" />
+                        <Users className="size-3.5 shrink-0" />
                       )}
-                      <span className="min-w-0 flex-1 truncate font-medium">
+                      <span className="min-w-0 flex-1 font-medium break-words">
                         {assignmentSummary(item)}
                       </span>
-                      <ChevronRight className="size-4 shrink-0 opacity-60" />
                     </button>
                   </article>
                   );
@@ -1213,102 +1274,70 @@ export function ExpenseForm({
             </Button>
           </section>
 
-          <section className="space-y-3">
-            <div className="px-1">
-              <Label>Adjustments</Label>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Tax and tip are shared in proportion to each person’s items.
-              </p>
+          <section className="overflow-hidden rounded-2xl bg-card shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
+            <div className="flex min-h-11 items-center gap-2 border-b border-border/65 px-3">
+              <Label htmlFor="itemized-tax" className="w-8 shrink-0 text-sm">
+                Tax
+              </Label>
+              <div className="relative ml-auto w-[6.5rem] shrink-0">
+                <span className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-xs text-muted-foreground">
+                  {currencySymbol}
+                </span>
+                <Input
+                  id="itemized-tax"
+                  aria-label="Tax amount"
+                  className="h-8 border-0 bg-secondary/70 px-2 pl-5 text-right text-sm font-semibold tabular-nums shadow-none focus-visible:bg-secondary focus-visible:ring-0"
+                  inputMode="decimal"
+                  value={taxAmount}
+                  onChange={(event) => setTaxAmount(event.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
             </div>
-            <div className="overflow-hidden rounded-2xl bg-card shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
-              <div className="flex min-h-14 items-center gap-3 border-b border-border/65 px-4">
-                <Label htmlFor="itemized-tax" className="min-w-0 flex-1">
-                  Tax
+            <div className="space-y-2 px-3 py-2.5">
+              <div className="flex min-h-8 items-center gap-2">
+                <Label htmlFor="itemized-tip" className="w-8 shrink-0 text-sm">
+                  Tip
                 </Label>
-                <div className="relative w-[7.5rem] shrink-0">
+                <div className="relative ml-auto w-[6.5rem] shrink-0">
                   <span className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-xs text-muted-foreground">
                     {currencySymbol}
                   </span>
                   <Input
-                    id="itemized-tax"
-                    aria-label="Tax amount"
-                    className="h-10 border-0 bg-secondary/70 px-2 pl-5 text-right font-semibold tabular-nums shadow-none focus-visible:bg-secondary focus-visible:ring-0"
+                    id="itemized-tip"
+                    aria-label="Tip amount"
+                    className="h-8 border-0 bg-secondary/70 px-2 pl-5 text-right text-sm font-semibold tabular-nums shadow-none focus-visible:bg-secondary focus-visible:ring-0"
                     inputMode="decimal"
-                    value={taxAmount}
-                    onChange={(event) => setTaxAmount(event.target.value)}
+                    value={tipAmount}
+                    onChange={(event) => {
+                      setTipAmount(event.target.value);
+                      setCustomTipPercent("");
+                    }}
                     placeholder="0.00"
                   />
                 </div>
               </div>
-              <div className="space-y-3 px-4 py-3">
-                <div className="flex min-h-10 items-center gap-3">
-                  <Label htmlFor="itemized-tip" className="min-w-0 flex-1">
-                    Tip
-                  </Label>
-                  <div className="relative w-[7.5rem] shrink-0">
-                    <span className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-xs text-muted-foreground">
-                      {currencySymbol}
-                    </span>
-                    <Input
-                      id="itemized-tip"
-                      aria-label="Tip amount"
-                      className="h-10 border-0 bg-secondary/70 px-2 pl-5 text-right font-semibold tabular-nums shadow-none focus-visible:bg-secondary focus-visible:ring-0"
-                      inputMode="decimal"
-                      value={tipAmount}
-                      onChange={(event) => {
-                        setTipAmount(event.target.value);
-                        setCustomTipPercent("");
-                      }}
-                      placeholder="0.00"
-                    />
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {TIP_PERCENT_PRESETS.map((percent) => {
-                    const selected =
-                      itemizedPreview.itemSubtotalCents > 0 &&
-                      tipCents ===
-                        tipCentsFromPercent(
-                          itemizedPreview.itemSubtotalCents,
-                          percent,
-                        );
-                    return (
-                      <button
-                        key={percent}
-                        type="button"
-                        className={cn(
-                          "inline-flex h-8 items-center rounded-lg border px-2.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/20",
-                          selected
-                            ? "border-primary/25 bg-accent text-accent-foreground"
-                            : "border-border bg-secondary text-secondary-foreground hover:bg-muted",
-                        )}
-                        onClick={() => {
-                          setCustomTipPercent(String(percent));
-                          setTipAmount(
-                            formatCents(
-                              tipCentsFromPercent(
-                                itemizedPreview.itemSubtotalCents,
-                                percent,
-                              ),
-                            ),
-                          );
-                        }}
-                      >
-                        {percent}%
-                      </button>
-                    );
-                  })}
-                  <div className="relative w-[4.75rem]">
-                    <Input
-                      aria-label="Custom tip percent"
-                      className="h-8 border-0 bg-secondary/70 pr-6 text-right text-xs font-semibold tabular-nums shadow-none focus-visible:bg-secondary focus-visible:ring-0"
-                      inputMode="decimal"
-                      value={customTipPercent}
-                      onChange={(event) => {
-                        const value = event.target.value;
-                        setCustomTipPercent(value);
-                        const percent = Number(value);
-                        if (!Number.isFinite(percent) || percent < 0) return;
+              <div className="flex flex-wrap items-center gap-1">
+                {TIP_PERCENT_PRESETS.map((percent) => {
+                  const selected =
+                    itemizedPreview.itemSubtotalCents > 0 &&
+                    tipCents ===
+                      tipCentsFromPercent(
+                        itemizedPreview.itemSubtotalCents,
+                        percent,
+                      );
+                  return (
+                    <button
+                      key={percent}
+                      type="button"
+                      className={cn(
+                        "inline-flex h-7 items-center rounded-full border px-2.5 text-xs font-semibold transition-colors focus-visible:ring-3 focus-visible:ring-ring/20 focus-visible:outline-none",
+                        selected
+                          ? "border-primary/25 bg-accent text-accent-foreground"
+                          : "border-border bg-secondary text-secondary-foreground hover:bg-muted",
+                      )}
+                      onClick={() => {
+                        setCustomTipPercent(String(percent));
                         setTipAmount(
                           formatCents(
                             tipCentsFromPercent(
@@ -1318,97 +1347,42 @@ export function ExpenseForm({
                           ),
                         );
                       }}
-                      placeholder=""
-                    />
-                    <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] text-muted-foreground">
-                      %
-                    </span>
-                  </div>
+                    >
+                      {percent}%
+                    </button>
+                  );
+                })}
+                <div className="relative w-[4.5rem]">
+                  <Input
+                    aria-label="Custom tip percent"
+                    className="h-7 rounded-full border-0 bg-secondary/70 pr-5 text-right text-xs font-semibold tabular-nums shadow-none focus-visible:bg-secondary focus-visible:ring-0"
+                    inputMode="decimal"
+                    value={customTipPercent}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setCustomTipPercent(value);
+                      const percent = Number(value);
+                      if (!Number.isFinite(percent) || percent < 0) return;
+                      setTipAmount(
+                        formatCents(
+                          tipCentsFromPercent(
+                            itemizedPreview.itemSubtotalCents,
+                            percent,
+                          ),
+                        ),
+                      );
+                    }}
+                    placeholder="Custom"
+                  />
+                  <span className="pointer-events-none absolute inset-y-0 right-1.5 flex items-center text-[10px] text-muted-foreground">
+                    %
+                  </span>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Percents apply to the items subtotal.
-                </p>
               </div>
-            </div>
-          </section>
-
-          <section
-            className={cn(
-              "rounded-2xl p-4 ring-1",
-              splitStatus === "balanced"
-                ? "bg-accent/70 text-accent-foreground ring-primary/15"
-                : splitStatus === "invalid"
-                  ? "bg-destructive/5 ring-destructive/20"
-                  : "bg-card ring-foreground/[0.07]",
-            )}
-          >
-            <div className="mb-4 flex items-start gap-3">
-              <span
-                className={cn(
-                  "flex size-10 shrink-0 items-center justify-center rounded-xl",
-                  splitStatus === "balanced"
-                    ? "bg-primary text-primary-foreground"
-                    : splitStatus === "invalid"
-                      ? "bg-destructive/10 text-destructive"
-                      : "bg-secondary text-secondary-foreground",
-                )}
-              >
-                {splitStatus === "balanced" ? (
-                  <CircleCheck className="size-5" />
-                ) : (
-                  <ReceiptText className="size-5" />
-                )}
-              </span>
-              <div className="min-w-0">
-                <h3 className="font-semibold">
-                  {splitStatus === "invalid"
-                    ? hasUnassignedItems
-                      ? "Choose who shared each item"
-                      : "Check the receipt details"
-                    : splitStatus === "balanced"
-                      ? taxCents || tipCents
-                        ? "Tax & tip included"
-                        : "Ready to split"
-                      : "Finish the receipt"}
-                </h3>
-                <p className="mt-0.5 text-xs opacity-70">
-                  {splitStatus === "balanced"
-                    ? "Tax and tip are split in proportion to each person’s items."
-                    : splitStatus === "invalid"
-                      ? hasUnassignedItems
-                        ? "Every item needs at least one person before you can finish."
-                        : "Fix item names, amounts, tax, or tip before finishing."
-                      : "Add item names, amounts, and who shared each one."}
-                </p>
-              </div>
-            </div>
-            <div className="space-y-2.5 text-sm">
-              <div className="flex justify-between">
-                <span className="opacity-65">Items</span>
-                <span>
-                  {formatMoney(itemizedPreview.itemSubtotalCents, currency)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="opacity-65">Tax</span>
-                <span>
-                  {taxCents == null ? "—" : formatMoney(taxCents, currency)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="opacity-65">Tip</span>
-                <span>
-                  {tipCents == null ? "—" : formatMoney(tipCents, currency)}
-                </span>
-              </div>
-              <div className="flex justify-between border-t border-current/10 pt-2.5 font-semibold">
-                <span>Receipt total</span>
-                <span>
-                  {itemizedPreview.printedTotalCents == null
-                    ? "—"
-                    : formatMoney(itemizedPreview.printedTotalCents, currency)}
-                </span>
-              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Percentages apply to the items subtotal. Tax and tip are shared
+                in proportion to each person’s items.
+              </p>
             </div>
           </section>
 
@@ -1559,6 +1533,23 @@ export function ExpenseForm({
                   </div>
                 </div>
               )}
+              {activeAssignmentItem ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="mx-4 text-muted-foreground hover:text-destructive"
+                  onClick={() => {
+                    const key = activeAssignmentItem.key;
+                    setItems((current) =>
+                      current.filter((candidate) => candidate.key !== key),
+                    );
+                    setAssignmentItemKey(null);
+                  }}
+                >
+                  <Trash2 className="size-3.5" />
+                  Remove item
+                </Button>
+              ) : null}
               <SheetFooter className="border-t border-border/65 bg-popover p-4">
                 <Button
                   type="button"
