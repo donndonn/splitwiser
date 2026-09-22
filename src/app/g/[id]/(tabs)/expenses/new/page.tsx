@@ -28,7 +28,7 @@ export default async function NewExpensePage({
   const action = createExpenseAction.bind(null, id);
 
   return (
-    <AppShell title="Add expense" backHref={`/g/${id}`} withBottomNav>
+    <AppShell title="Add expense" backHref={`/g/${id}`}>
       <DescribeExpense
         groupId={id}
         members={roster}

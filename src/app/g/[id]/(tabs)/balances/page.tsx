@@ -58,7 +58,7 @@ export default async function BalancesPage({
   );
 
   return (
-    <AppShell title="Balances" backHref={`/g/${id}`} withBottomNav>
+    <AppShell title="Balances" backHref={`/g/${id}`}>
       {settleView.showPrompt ? <MarkAsSettledPrompt groupId={id} /> : null}
 
       <SettleUpSection

@@ -1,4 +1,4 @@
-import { GroupBottomNav } from "@/components/group-bottom-nav";
+import { GroupTabsShell } from "@/components/group-tabs-shell";
 
 export default async function GroupTabsLayout({
   children,
@@ -9,10 +9,5 @@ export default async function GroupTabsLayout({
 }) {
   const { id } = await params;
 
-  return (
-    <>
-      {children}
-      <GroupBottomNav groupId={id} />
-    </>
-  );
+  return <GroupTabsShell groupId={id}>{children}</GroupTabsShell>;
 }

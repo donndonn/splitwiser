@@ -38,7 +38,7 @@ export function GroupBottomNav({ groupId }: { groupId: string }) {
   const base = `/g/${groupId}`;
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border/60 bg-card/90 backdrop-blur-xl supports-[backdrop-filter]:bg-card/80 pb-[env(safe-area-inset-bottom)]">
+    <nav className="shrink-0 border-t border-border/60 bg-card pb-[env(safe-area-inset-bottom)]">
       <ul className="mx-auto flex max-w-lg items-stretch justify-between gap-0.5 px-1">
         {tabs.map((tab) => {
           const href = `${base}${tab.href}`;

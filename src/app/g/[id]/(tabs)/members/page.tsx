@@ -66,7 +66,7 @@ export default async function MembersPage({
   }));
 
   return (
-    <AppShell title="Members" backHref={`/g/${id}`} withBottomNav>
+    <AppShell title="Members" backHref={`/g/${id}`}>
       <div className={cn(groupedListClass, "mb-6")}>
         <ul className="divide-y divide-border">
           {roster.map((m) => (
