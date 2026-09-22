@@ -64,6 +64,13 @@
       "when": 1788671222162,
       "tag": "0008_lucky_cloak",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790041988801,
+      "tag": "0009_even_scorpion",
+      "breakpoints": true
     }
   ]
 }

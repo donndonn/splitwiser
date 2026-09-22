@@ -1,6 +1,7 @@
 "use client";
 
 import { useOptimistic, useState, useTransition } from "react";
+import { ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { removeExpenseAction } from "@/app/g/[id]/expenses/actions";
 import { SwipeableExpenseRow } from "@/components/swipeable-expense-row";
@@ -21,7 +22,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { formatMoney } from "@/lib/money";
-import { groupedListClass } from "@/lib/utils";
+import { cn, groupedListClass } from "@/lib/utils";
 
 export type RecentExpenseItem = {
   id: string;
@@ -35,23 +36,35 @@ export function RecentExpensesList({
   groupId,
   currency,
   expenses: initialExpenses,
+  archivedExpenses = [],
+  settleMarkerLabel = null,
 }: {
   groupId: string;
   currency: string;
   expenses: RecentExpenseItem[];
+  archivedExpenses?: RecentExpenseItem[];
+  settleMarkerLabel?: string | null;
 }) {
   const [items, removeOptimistic] = useOptimistic(
     initialExpenses,
     (current, deletedId: string) =>
       current.filter((expense) => expense.id !== deletedId),
   );
+  const [archived, removeArchivedOptimistic] = useOptimistic(
+    archivedExpenses,
+    (current, deletedId: string) =>
+      current.filter((expense) => expense.id !== deletedId),
+  );
   const [openId, setOpenId] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<RecentExpenseItem | null>(
     null,
   );
   const [pending, startTransition] = useTransition();
 
-  if (items.length === 0) {
+  const showHistory = archived.length > 0 && Boolean(settleMarkerLabel);
+
+  if (items.length === 0 && !showHistory) {
     return (
       <Card>
         <CardHeader>
@@ -72,6 +85,7 @@ export function RecentExpensesList({
 
     startTransition(async () => {
       removeOptimistic(target.id);
+      removeArchivedOptimistic(target.id);
       try {
         await removeExpenseAction(groupId, target.id);
         toast.success("Expense deleted");
@@ -100,6 +114,43 @@ export function RecentExpensesList({
               />
             </li>
           ))}
+          {showHistory ? (
+            <li>
+              <button
+                type="button"
+                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm text-muted-foreground"
+                aria-expanded={historyOpen}
+                onClick={() => setHistoryOpen((open) => !open)}
+              >
+                <span>
+                  Earlier expenses settled
+                  {settleMarkerLabel ? ` · ${settleMarkerLabel}` : ""}
+                </span>
+                <ChevronDown
+                  className={cn(
+                    "size-4 shrink-0 transition-transform",
+                    historyOpen && "rotate-180",
+                  )}
+                  aria-hidden
+                />
+              </button>
+            </li>
+          ) : null}
+          {showHistory && historyOpen
+            ? archived.map((e) => (
+                <li key={e.id}>
+                  <SwipeableExpenseRow
+                    href={`/g/${groupId}/expenses/${e.id}`}
+                    description={e.description}
+                    subtitle={`${e.paidByName} · ${e.spentAtLabel}`}
+                    amountLabel={formatMoney(e.amountCents, currency)}
+                    open={openId === e.id}
+                    onOpenChange={(next) => setOpenId(next ? e.id : null)}
+                    onDeleteRequest={() => setPendingDelete(e)}
+                  />
+                </li>
+              ))
+            : null}
         </ul>
       </div>
 

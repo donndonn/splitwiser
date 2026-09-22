@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { desc, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { Plus, Settings } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { MarkAsSettledPrompt } from "@/components/mark-as-settled-prompt";
 import { RecentExpensesList } from "@/components/recent-expenses-list";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,10 +12,27 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { db } from "@/db";
-import { expenses, groups, members } from "@/db/schema";
+import { groups } from "@/db/schema";
 import { requireMember } from "@/lib/auth-guards";
-import { getMemberNet } from "@/lib/balances";
 import { formatMoney } from "@/lib/money";
+import { formatExpenseDateLabel } from "@/lib/settle-marker";
+import { getGroupSettleView } from "@/lib/settle-marker-store";
+
+function toRecentItem(row: {
+  id: string;
+  description: string;
+  amountCents: number;
+  spentAt: Date;
+  paidByName: string;
+}) {
+  return {
+    id: row.id,
+    description: row.description,
+    amountCents: row.amountCents,
+    paidByName: row.paidByName,
+    spentAtLabel: formatExpenseDateLabel(row.spentAt),
+  };
+}
 
 export default async function GroupDashboardPage({
   params,
@@ -24,27 +42,21 @@ export default async function GroupDashboardPage({
   const { id } = await params;
   const { member } = await requireMember(id);
 
-  const [[group], net, recent] = await Promise.all([
+  const [[group], settleView] = await Promise.all([
     db.select().from(groups).where(eq(groups.id, id)).limit(1),
-    getMemberNet(id, member.id),
-    db
-      .select({
-        id: expenses.id,
-        description: expenses.description,
-        amountCents: expenses.amountCents,
-        spentAt: expenses.spentAt,
-        paidByName: members.displayName,
-      })
-      .from(expenses)
-      .innerJoin(members, eq(expenses.paidByMemberId, members.id))
-      .where(eq(expenses.groupId, id))
-      .orderBy(desc(expenses.spentAt), desc(expenses.createdAt))
-      .limit(20),
+    getGroupSettleView(id, member.id),
   ]);
 
   if (!group) {
     return null;
   }
+
+  const net =
+    settleView.balances.find((row) => row.memberId === member.id)?.netCents ??
+    0;
+  const settleMarkerLabel = settleView.archived[0]
+    ? formatExpenseDateLabel(settleView.archived[0].spentAt)
+    : null;
 
   return (
     <AppShell
@@ -80,6 +92,8 @@ export default async function GroupDashboardPage({
         </CardHeader>
       </Card>
 
+      {settleView.showPrompt ? <MarkAsSettledPrompt groupId={id} /> : null}
+
       <div className="mb-6 flex flex-col gap-2">
         <Button asChild size="lg" className="w-full">
           <Link href={`/g/${id}/expenses/new`}>
@@ -100,16 +114,9 @@ export default async function GroupDashboardPage({
       <RecentExpensesList
         groupId={id}
         currency={group.currency}
-        expenses={recent.map((e) => ({
-          id: e.id,
-          description: e.description,
-          amountCents: e.amountCents,
-          paidByName: e.paidByName,
-          spentAtLabel: e.spentAt.toLocaleDateString(undefined, {
-            month: "short",
-            day: "numeric",
-          }),
-        }))}
+        expenses={settleView.recent.map(toRecentItem)}
+        archivedExpenses={settleView.archived.map(toRecentItem)}
+        settleMarkerLabel={settleMarkerLabel}
       />
     </AppShell>
   );

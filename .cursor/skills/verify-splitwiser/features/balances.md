@@ -28,7 +28,7 @@ Preconditions:
 - **Owe state.** Alice's row includes `you` and `owed $6.17`. Sam's row includes `owes $6.17`. A `Record` button is visible on the suggestion. Screenshot `balances-owe.png`.
 - **Record suggested payment.** Choose `Record`. Dialog title `Record this payment?`. Choose `Record` in the dialog. Toast `Payment recorded` (or equivalent success). Alice's row becomes `settled`. Sam's row becomes `settled`. `Your balance` path back on Home reads `All settled up`.
 - **Recent payment.** Still on Balances, a recent payment lists Sam paying Alice `$6.17`. Screenshot `balances-settled.png`.
-- **Home confirm.** Choose tab `Home`. `All settled up`. Groceries remains under `Recent expenses`.
+- **Home confirm.** Choose tab `Home`. `All settled up`. Groceries remains under `Recent expenses` until someone chooses `Mark as settled` (see mark-as-settled). The `Everyone's settled up` prompt may appear; do not confirm it in this recipe.
 - **Proof.** Capture the owed list, the confirm dialog, the settled list with the payment row, and home `All settled up`. If you use `Settle group` instead of `Record`, say so — that path records all suggestions at once and is a different sub-feature (`Settle the group?` dialog, confirm `Settle group`).
 
 ## Gotchas
