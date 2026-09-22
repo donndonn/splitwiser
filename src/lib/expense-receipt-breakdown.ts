@@ -84,6 +84,8 @@ export function buildItemizedReceiptBreakdown(input: {
     }
   >;
   memberNames: Map<string, string>;
+  /** Final owed amounts from expense_splits — preferred for rollup totals. */
+  storedSplits?: Array<{ memberId: string; amountCents: number }>;
 }): ItemizedReceiptBreakdown {
   const calculation = calculateItemizedExpense({
     items: input.items,
@@ -115,6 +117,11 @@ export function buildItemizedReceiptBreakdown(input: {
     ]),
   );
 
+  const rollupSource =
+    input.storedSplits && input.storedSplits.length > 0
+      ? input.storedSplits
+      : calculation.splits;
+
   return {
     kind: "itemized",
     caption: itemizedSplitCaption(input.taxCents, input.tipCents),
@@ -132,7 +139,7 @@ export function buildItemizedReceiptBreakdown(input: {
       input.taxCents > 0 || input.tipCents > 0
         ? "Tax and tip are shared in proportion to each person’s item totals."
         : "Each item is split evenly among the people assigned to it.",
-    personRollups: calculation.splits.map((split) => ({
+    personRollups: rollupSource.map((split) => ({
       memberId: split.memberId,
       displayName: input.memberNames.get(split.memberId) ?? "Someone",
       itemsLabel: money(itemSubtotalByMember.get(split.memberId) ?? 0),

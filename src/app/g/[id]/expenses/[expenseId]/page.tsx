@@ -137,6 +137,10 @@ export default async function ExpenseDetailPage({
         };
       }),
       memberNames,
+      storedSplits: splits.map((split) => ({
+        memberId: split.memberId,
+        amountCents: split.amountCents,
+      })),
     });
   } else {
     receiptBreakdown = buildSimpleReceiptBreakdown({
