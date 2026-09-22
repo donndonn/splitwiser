@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 /** Above a 4rem tab bar plus the home-indicator inset, with room for the shadow. */
 export const addExpenseFabOffsetClass =
@@ -24,17 +23,13 @@ export function AddExpensePill({ href }: { href: string }) {
 }
 
 /**
- * Group Home only. Anchored in the tab shell (not position:fixed) so it
- * stays above the in-flow tab bar without the iOS fixed-layer bug.
+ * Group Home only. An in-flow row in the tab shell, above the tab bar.
+ * Not position:fixed or absolute: a fixed layer is what made the iOS tab
+ * bar stick, and absolute bottom inside this flex column lands at the top.
  */
 export function GroupHomeExpenseFab({ groupId }: { groupId: string }) {
   return (
-    <div
-      className={cn(
-        "pointer-events-none absolute inset-x-0 z-30 mx-auto flex w-full max-w-lg justify-end px-4",
-        addExpenseFabOffsetClass,
-      )}
-    >
+    <div className="pointer-events-none mx-auto flex w-full max-w-lg shrink-0 justify-end px-4 pt-1 pb-3">
       <AddExpensePill href={`/g/${groupId}/expenses/new`} />
     </div>
   );

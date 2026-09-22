@@ -76,7 +76,6 @@ export default async function GroupDashboardPage({
     <AppShell
       title={group.name}
       backHref="/"
-      className="pb-28"
       actions={
         <Button asChild variant="ghost" size="icon">
           <Link href={`/g/${id}/settings`} aria-label="Settings">

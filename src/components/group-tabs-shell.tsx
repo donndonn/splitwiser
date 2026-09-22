@@ -68,7 +68,7 @@ export function GroupTabsShell({
   return (
     <div
       data-group-tabs=""
-      className="relative flex h-dvh max-h-dvh w-full min-w-0 flex-col overflow-hidden"
+      className="flex h-dvh max-h-dvh w-full min-w-0 flex-col overflow-hidden"
     >
       <div
         ref={scrollerRef}
