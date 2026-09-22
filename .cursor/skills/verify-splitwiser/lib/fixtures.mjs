@@ -113,6 +113,8 @@ async function deleteVerifyGroups(sql, runId) {
       await sql`delete from expenses where id in ${sql(ids)}`;
     }
     await sql`delete from settlements where group_id = ${group.id}`;
+    await sql`delete from group_settle_prompt_dismissals where group_id = ${group.id}`;
+    await sql`delete from group_settle_markers where group_id = ${group.id}`;
     await sql`delete from group_activities where group_id = ${group.id}`;
     await sql`delete from invites where group_id = ${group.id}`;
     await sql`delete from members where group_id = ${group.id}`;

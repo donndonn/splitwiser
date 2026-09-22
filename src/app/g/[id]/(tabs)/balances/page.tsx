@@ -1,10 +1,11 @@
 import { desc, eq } from "drizzle-orm";
 import { AppShell } from "@/components/app-shell";
+import { MarkAsSettledPrompt } from "@/components/mark-as-settled-prompt";
 import { db } from "@/db";
 import { groups, members, settlements } from "@/db/schema";
 import { requireMember } from "@/lib/auth-guards";
-import { getGroupBalances } from "@/lib/balances";
 import { suggestSettlements } from "@/lib/money";
+import { getGroupSettleView } from "@/lib/settle-marker-store";
 import { RecentPaymentsList } from "./recent-payments-list";
 import { SettleUpSection } from "./settle-up-section";
 
@@ -16,26 +17,28 @@ export default async function BalancesPage({
   const { id } = await params;
   const { member } = await requireMember(id);
 
-  const [[group], roster, balances, recentSettlements] = await Promise.all([
+  const [[group], roster, recentSettlements, settleView] = await Promise.all([
     db.select().from(groups).where(eq(groups.id, id)).limit(1),
     db
       .select()
       .from(members)
       .where(eq(members.groupId, id))
       .orderBy(members.createdAt),
-    getGroupBalances(id),
     db
       .select()
       .from(settlements)
       .where(eq(settlements.groupId, id))
       .orderBy(desc(settlements.settledAt))
       .limit(50),
+    getGroupSettleView(id, member.id),
   ]);
 
   if (!group) return null;
 
   const nameById = new Map(roster.map((m) => [m.id, m.displayName]));
-  const balanceById = new Map(balances.map((b) => [b.memberId, b.netCents]));
+  const balanceById = new Map(
+    settleView.balances.map((b) => [b.memberId, b.netCents]),
+  );
 
   const rows = [
     ...roster.filter((m) => m.id === member.id),
@@ -56,6 +59,8 @@ export default async function BalancesPage({
 
   return (
     <AppShell title="Balances" backHref={`/g/${id}`} withBottomNav>
+      {settleView.showPrompt ? <MarkAsSettledPrompt groupId={id} /> : null}
+
       <SettleUpSection
         groupId={id}
         currency={group.currency}

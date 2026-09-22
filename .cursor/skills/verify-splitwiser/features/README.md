@@ -47,3 +47,4 @@ Keep implementation details out of the map. Name only user paths, stable handles
 - [Add an expense](./add-expense.md) covers manual expense entry, equal split, and persistence on group home.
 - [Friends](./friends.md) covers search, request, accept, and the friends list.
 - [Balances](./balances.md) covers owed amounts, recording a payment, and the settled state.
+- [Mark as settled](./mark-as-settled.md) covers the post-$0 prompt, archiving Recent, history, dismiss, and a new open period.

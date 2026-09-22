@@ -264,6 +264,61 @@ export const settlements = pgTable(
   (table) => [index("settlements_group_id_idx").on(table.groupId)],
 );
 
+/**
+ * Explicit “Mark as settled” cutoff for a group. Recent expenses only include
+ * rows created after the latest marker’s settledAt. Pairwise settlements are
+ * unchanged — this is archive-from-Recent, not a payment.
+ */
+export const groupSettleMarkers = pgTable(
+  "group_settle_markers",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    groupId: text("group_id")
+      .notNull()
+      .references(() => groups.id, { onDelete: "cascade" }),
+    settledAt: timestamp("settled_at", { mode: "date" }).notNull(),
+    createdByMemberId: text("created_by_member_id")
+      .notNull()
+      .references(() => members.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("group_settle_markers_group_id_idx").on(table.groupId),
+    index("group_settle_markers_group_settled_at_idx").on(
+      table.groupId,
+      table.settledAt,
+    ),
+  ],
+);
+
+/**
+ * Per-member dismissal of the Mark as settled prompt for the current
+ * zero-balance streak, identified by the group’s activity watermark.
+ */
+export const groupSettlePromptDismissals = pgTable(
+  "group_settle_prompt_dismissals",
+  {
+    groupId: text("group_id")
+      .notNull()
+      .references(() => groups.id, { onDelete: "cascade" }),
+    memberId: text("member_id")
+      .notNull()
+      .references(() => members.id, { onDelete: "cascade" }),
+    activityWatermark: timestamp("activity_watermark", {
+      mode: "date",
+    }).notNull(),
+    dismissedAt: timestamp("dismissed_at", { mode: "date" })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.groupId, table.memberId] }),
+    index("group_settle_prompt_dismissals_member_id_idx").on(table.memberId),
+  ],
+);
+
 export type GroupActivityPayload = {
   actorName: string;
   description?: string;
@@ -386,6 +441,8 @@ export const groupsRelations = relations(groups, ({ many }) => ({
   invites: many(invites),
   expenses: many(expenses),
   settlements: many(settlements),
+  settleMarkers: many(groupSettleMarkers),
+  settlePromptDismissals: many(groupSettlePromptDismissals),
   activities: many(groupActivities),
 }));
 
@@ -471,6 +528,34 @@ export const settlementsRelations = relations(settlements, ({ one }) => ({
   }),
 }));
 
+export const groupSettleMarkersRelations = relations(
+  groupSettleMarkers,
+  ({ one }) => ({
+    group: one(groups, {
+      fields: [groupSettleMarkers.groupId],
+      references: [groups.id],
+    }),
+    createdBy: one(members, {
+      fields: [groupSettleMarkers.createdByMemberId],
+      references: [members.id],
+    }),
+  }),
+);
+
+export const groupSettlePromptDismissalsRelations = relations(
+  groupSettlePromptDismissals,
+  ({ one }) => ({
+    group: one(groups, {
+      fields: [groupSettlePromptDismissals.groupId],
+      references: [groups.id],
+    }),
+    member: one(members, {
+      fields: [groupSettlePromptDismissals.memberId],
+      references: [members.id],
+    }),
+  }),
+);
+
 export const groupActivitiesRelations = relations(
   groupActivities,
   ({ one }) => ({
@@ -532,6 +617,9 @@ export type ExpenseItem = typeof expenseItems.$inferSelect;
 export type ExpenseItemAssignment = typeof expenseItemAssignments.$inferSelect;
 export type ExpenseSplit = typeof expenseSplits.$inferSelect;
 export type Settlement = typeof settlements.$inferSelect;
+export type GroupSettleMarker = typeof groupSettleMarkers.$inferSelect;
+export type GroupSettlePromptDismissal =
+  typeof groupSettlePromptDismissals.$inferSelect;
 export type GroupActivity = typeof groupActivities.$inferSelect;
 export type AiParseRequest = typeof aiParseRequests.$inferSelect;
 export type SplitMode = (typeof splitModeEnum.enumValues)[number];
