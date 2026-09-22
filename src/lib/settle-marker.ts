@@ -58,3 +58,14 @@ export function formatExpenseDateLabel(date: Date, locale?: string): string {
     day: "numeric",
   });
 }
+
+/** Month above day for a recent-expense row, e.g. Sep / 08. */
+export function formatExpenseDateParts(
+  date: Date,
+  locale?: string,
+): { month: string; day: string } {
+  return {
+    month: date.toLocaleDateString(locale, { month: "short" }),
+    day: date.toLocaleDateString(locale, { day: "2-digit" }),
+  };
+}

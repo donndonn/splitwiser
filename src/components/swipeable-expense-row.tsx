@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Receipt, Trash2, UtensilsCrossed } from "lucide-react";
+import type { ExpenseIconKind } from "@/lib/expense-row";
 import { cn } from "@/lib/utils";
 
 const ACTION_WIDTH = 80;
@@ -13,21 +14,41 @@ const ACTIVATE_THRESHOLD = 12;
 const TAP_SLOP = 8;
 const OPEN_RATIO = 0.4;
 
+type ExpenseShareDisplay =
+  | { kind: "borrowed" | "lent"; amountLabel: string }
+  | { kind: "settled" | "none" };
+
 type SwipeableExpenseRowProps = {
   href: string;
   description: string;
-  subtitle: string;
-  amountLabel: string;
+  paidLabel: string;
+  month: string;
+  day: string;
+  icon: ExpenseIconKind;
+  share: ExpenseShareDisplay;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onDeleteRequest: () => void;
 };
 
+const shareToneClass = {
+  borrowed: "text-balance-negative",
+  lent: "text-balance-positive",
+} as const;
+
+const shareLabel = {
+  borrowed: "You borrowed",
+  lent: "You lent",
+} as const;
+
 export function SwipeableExpenseRow({
   href,
   description,
-  subtitle,
-  amountLabel,
+  paidLabel,
+  month,
+  day,
+  icon,
+  share,
   open,
   onOpenChange,
   onDeleteRequest,
@@ -208,14 +229,52 @@ export function SwipeableExpenseRow({
             }
           }}
         >
-          <div className="flex items-center justify-between gap-3 px-4 py-3">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium">{description}</p>
+          <div className="flex items-center gap-3 px-3 py-3">
+            <div className="flex w-9 shrink-0 flex-col items-center leading-none text-muted-foreground">
+              <span className="text-[11px] font-medium">{month}</span>
+              <span className="mt-1 text-base font-medium tabular-nums">
+                {day}
+              </span>
+            </div>
+            <div
+              className={cn(
+                "flex size-10 shrink-0 items-center justify-center rounded-lg",
+                icon === "food"
+                  ? "bg-accent text-accent-foreground"
+                  : "bg-secondary text-secondary-foreground",
+              )}
+            >
+              {icon === "food" ? (
+                <UtensilsCrossed className="size-5" strokeWidth={1.75} aria-hidden />
+              ) : (
+                <Receipt className="size-5" strokeWidth={1.75} aria-hidden />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold">{description}</p>
               <p className="truncate text-xs text-muted-foreground">
-                {subtitle}
+                {paidLabel}
               </p>
             </div>
-            <p className="shrink-0 text-sm font-medium">{amountLabel}</p>
+            {share.kind === "borrowed" || share.kind === "lent" ? (
+              <div
+                className={cn(
+                  "shrink-0 text-right leading-tight",
+                  shareToneClass[share.kind],
+                )}
+              >
+                <p className="text-[11px] font-medium">
+                  {shareLabel[share.kind]}
+                </p>
+                <p className="text-sm font-semibold tabular-nums">
+                  {share.amountLabel}
+                </p>
+              </div>
+            ) : share.kind === "settled" ? (
+              <p className="shrink-0 text-xs font-medium text-muted-foreground">
+                Settled
+              </p>
+            ) : null}
           </div>
         </Link>
       </div>

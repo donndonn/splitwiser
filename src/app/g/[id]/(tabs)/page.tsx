@@ -3,7 +3,10 @@ import { eq } from "drizzle-orm";
 import { Plus, Settings } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { MarkAsSettledPrompt } from "@/components/mark-as-settled-prompt";
-import { RecentExpensesList } from "@/components/recent-expenses-list";
+import {
+  RecentExpensesList,
+  type RecentExpenseItem,
+} from "@/components/recent-expenses-list";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -19,22 +22,26 @@ import {
   viewerBalanceContext,
 } from "@/lib/balance-context";
 import { formatMoney } from "@/lib/money";
-import { formatExpenseDateLabel } from "@/lib/settle-marker";
-import { getGroupSettleView } from "@/lib/settle-marker-store";
+import { formatExpenseDateLabel, formatExpenseDateParts } from "@/lib/settle-marker";
+import {
+  getGroupSettleView,
+  type SettleExpenseRow,
+} from "@/lib/settle-marker-store";
 
-function toRecentItem(row: {
-  id: string;
-  description: string;
-  amountCents: number;
-  spentAt: Date;
-  paidByName: string;
-}) {
+function toRecentItem(
+  row: SettleExpenseRow,
+  viewerMemberId: string,
+): RecentExpenseItem {
+  const date = formatExpenseDateParts(row.spentAt);
   return {
     id: row.id,
     description: row.description,
     amountCents: row.amountCents,
+    month: date.month,
+    day: date.day,
     paidByName: row.paidByName,
-    spentAtLabel: formatExpenseDateLabel(row.spentAt),
+    paidByViewer: row.paidByMemberId === viewerMemberId,
+    viewerShareCents: row.viewerShareCents ?? 0,
   };
 }
 
@@ -127,8 +134,10 @@ export default async function GroupDashboardPage({
       <RecentExpensesList
         groupId={id}
         currency={group.currency}
-        expenses={settleView.recent.map(toRecentItem)}
-        archivedExpenses={settleView.archived.map(toRecentItem)}
+        expenses={settleView.recent.map((row) => toRecentItem(row, member.id))}
+        archivedExpenses={settleView.archived.map((row) =>
+          toRecentItem(row, member.id),
+        )}
         settleMarkerLabel={settleMarkerLabel}
       />
     </AppShell>

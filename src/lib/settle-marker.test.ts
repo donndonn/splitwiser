@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   areAllBalancesZero,
   formatExpenseDateLabel,
+  formatExpenseDateParts,
   isDismissalActive,
   isExpenseInOpenPeriod,
   laterDate,
@@ -137,5 +138,13 @@ describe("formatExpenseDateLabel", () => {
     expect(formatExpenseDateLabel(new Date("2026-07-05T12:00:00Z"), "en-US")).toBe(
       "Jul 5",
     );
+  });
+});
+
+describe("formatExpenseDateParts", () => {
+  it("stacks a short month over a zero-padded day", () => {
+    expect(
+      formatExpenseDateParts(new Date("2026-09-08T12:00:00Z"), "en-US"),
+    ).toEqual({ month: "Sep", day: "08" });
   });
 });
