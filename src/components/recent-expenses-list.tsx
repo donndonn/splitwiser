@@ -21,6 +21,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { viewerExpenseShare } from "@/lib/expense-row";
 import { formatMoney } from "@/lib/money";
 import { cn, groupedListClass } from "@/lib/utils";
 
@@ -28,8 +29,11 @@ export type RecentExpenseItem = {
   id: string;
   description: string;
   amountCents: number;
-  spentAtLabel: string;
+  month: string;
+  day: string;
   paidByName: string;
+  paidByViewer: boolean;
+  viewerShareCents: number;
 };
 
 export function RecentExpensesList({
@@ -63,6 +67,28 @@ export function RecentExpensesList({
   const [pending, startTransition] = useTransition();
 
   const showHistory = archived.length > 0 && Boolean(settleMarkerLabel);
+
+  function rowContent(expense: RecentExpenseItem) {
+    const share = viewerExpenseShare({
+      amountCents: expense.amountCents,
+      paidByViewer: expense.paidByViewer,
+      viewerShareCents: expense.viewerShareCents,
+    });
+    const payer = expense.paidByViewer ? "You" : expense.paidByName;
+    return {
+      description: expense.description,
+      paidLabel: `${payer} paid ${formatMoney(expense.amountCents, currency)}`,
+      month: expense.month,
+      day: expense.day,
+      share:
+        share.kind === "borrowed" || share.kind === "lent"
+          ? {
+              kind: share.kind,
+              amountLabel: formatMoney(share.amountCents, currency),
+            }
+          : { kind: share.kind },
+    };
+  }
 
   if (items.length === 0 && !showHistory) {
     return (
@@ -105,9 +131,7 @@ export function RecentExpensesList({
             <li key={e.id}>
               <SwipeableExpenseRow
                 href={`/g/${groupId}/expenses/${e.id}`}
-                description={e.description}
-                subtitle={`${e.paidByName} · ${e.spentAtLabel}`}
-                amountLabel={formatMoney(e.amountCents, currency)}
+                {...rowContent(e)}
                 open={openId === e.id}
                 onOpenChange={(next) => setOpenId(next ? e.id : null)}
                 onDeleteRequest={() => setPendingDelete(e)}
@@ -141,9 +165,7 @@ export function RecentExpensesList({
                 <li key={e.id}>
                   <SwipeableExpenseRow
                     href={`/g/${groupId}/expenses/${e.id}`}
-                    description={e.description}
-                    subtitle={`${e.paidByName} · ${e.spentAtLabel}`}
-                    amountLabel={formatMoney(e.amountCents, currency)}
+                    {...rowContent(e)}
                     open={openId === e.id}
                     onOpenChange={(next) => setOpenId(next ? e.id : null)}
                     onDeleteRequest={() => setPendingDelete(e)}

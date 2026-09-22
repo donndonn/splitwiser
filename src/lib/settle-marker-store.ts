@@ -1,6 +1,7 @@
 import { and, desc, eq, gt, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
+  expenseSplits,
   expenses,
   groupSettleMarkers,
   groupSettlePromptDismissals,
@@ -28,7 +29,10 @@ export type SettleExpenseRow = {
   amountCents: number;
   spentAt: Date;
   createdAt: Date;
+  paidByMemberId: string;
   paidByName: string;
+  /** This member's split, or null when they are not on the expense. */
+  viewerShareCents: number | null;
 };
 
 const expenseListColumns = {
@@ -37,6 +41,7 @@ const expenseListColumns = {
   amountCents: expenses.amountCents,
   spentAt: expenses.spentAt,
   createdAt: expenses.createdAt,
+  paidByMemberId: expenses.paidByMemberId,
   paidByName: members.displayName,
 };
 
@@ -96,11 +101,12 @@ async function countOpenPeriodExpenses(
 
 async function listExpenses(input: {
   groupId: string;
+  memberId: string;
   settledAt: Date | null;
   open: boolean;
   limit: number;
 }): Promise<SettleExpenseRow[]> {
-  const { groupId, settledAt, open, limit } = input;
+  const { groupId, memberId, settledAt, open, limit } = input;
   const cutoffClause =
     settledAt == null
       ? open
@@ -115,13 +121,29 @@ async function listExpenses(input: {
       ? eq(expenses.groupId, groupId)
       : and(eq(expenses.groupId, groupId), cutoffClause);
 
-  return db
-    .select(expenseListColumns)
+  const rows = await db
+    .select({
+      ...expenseListColumns,
+      viewerShareCents: expenseSplits.amountCents,
+    })
     .from(expenses)
     .innerJoin(members, eq(expenses.paidByMemberId, members.id))
+    .leftJoin(
+      expenseSplits,
+      and(
+        eq(expenseSplits.expenseId, expenses.id),
+        eq(expenseSplits.memberId, memberId),
+      ),
+    )
     .where(where)
     .orderBy(desc(expenses.spentAt), desc(expenses.createdAt))
     .limit(limit);
+
+  return rows.map((row) => ({
+    ...row,
+    viewerShareCents:
+      row.viewerShareCents == null ? null : Number(row.viewerShareCents),
+  }));
 }
 
 export async function getGroupSettleView(groupId: string, memberId: string) {
@@ -148,6 +170,7 @@ export async function getGroupSettleView(groupId: string, memberId: string) {
     countOpenPeriodExpenses(groupId, settledAt),
     listExpenses({
       groupId,
+      memberId,
       settledAt,
       open: true,
       limit: 20,
@@ -155,6 +178,7 @@ export async function getGroupSettleView(groupId: string, memberId: string) {
     settledAt
       ? listExpenses({
           groupId,
+          memberId,
           settledAt,
           open: false,
           limit: 50,
