@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { eq } from "drizzle-orm";
-import { Plus } from "lucide-react";
+import { UserRoundPlus } from "lucide-react";
+import { AddExpenseFab } from "@/components/add-expense-fab";
 import { AppBottomNav } from "@/components/app-bottom-nav";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
@@ -63,20 +64,25 @@ export default async function HomePage() {
 
   return (
     <>
-      <AppShell title="Your groups" withBottomNav>
-        <Button asChild size="lg" className="mb-5 w-full">
-          <Link href="/new">
-            <Plus className="size-4" />
-            Create group
-          </Link>
-        </Button>
-
+      <AppShell
+        title="Your groups"
+        withBottomNav
+        className="pb-[calc(9rem+env(safe-area-inset-bottom))]"
+        actions={
+          <Button asChild variant="ghost" size="icon">
+            <Link href="/new" aria-label="Create group">
+              <UserRoundPlus className="size-5" />
+            </Link>
+          </Button>
+        }
+      >
         {withBalances.length === 0 ? (
           <Card>
             <CardHeader>
               <CardTitle>No groups yet</CardTitle>
               <CardDescription>
-                Create a group or open an invite link someone shared with you.
+                Create a group from the header, or open an invite link someone
+                shared with you.
               </CardDescription>
             </CardHeader>
           </Card>
@@ -120,6 +126,12 @@ export default async function HomePage() {
           </div>
         )}
       </AppShell>
+      <AddExpenseFab
+        groups={withBalances.map((g) => ({
+          id: g.groupId,
+          name: g.groupName,
+        }))}
+      />
       <AppBottomNav />
     </>
   );
