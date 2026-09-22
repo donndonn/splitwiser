@@ -79,6 +79,21 @@
   --chart-4: #c3893a;
   --chart-5: #5558a8;
   --radius: 0.875rem;
+  /*
+   * Add expense pill pocket, shared by Your groups (fixed) and group Home
+   * (in-flow). Both tab bars are --tab-bar-height plus a 1px top border and
+   * the home-indicator inset. The pill sits --add-expense-fab-gap above that
+   * border and --add-expense-fab-right in from the column edge.
+   * --add-expense-fab-bottom is the fixed offset: bar + border + gap + inset.
+   * Group Home only applies the gap, because its bar is already in the column.
+   */
+  --tab-bar-height: 4rem;
+  --add-expense-fab-gap: 1.75rem;
+  --add-expense-fab-right: 1rem;
+  --add-expense-fab-bottom: calc(
+    var(--tab-bar-height) + 1px + var(--add-expense-fab-gap) +
+      env(safe-area-inset-bottom, 0px)
+  );
   --sidebar: #fffefa;
   --sidebar-foreground: #1e2a28;
   --sidebar-primary: #17796f;

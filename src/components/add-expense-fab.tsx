@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { Receipt } from "lucide-react";
 import {
+  AddExpenseFabSlot,
   AddExpensePill,
   addExpenseFabButtonClass,
-  addExpenseFabOffsetClass,
 } from "@/components/add-expense-pill";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,34 +22,21 @@ import {
 } from "@/lib/add-expense-entry";
 import { cn } from "@/lib/utils";
 
-function FabSlot({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      className={cn(
-        "pointer-events-none fixed inset-x-0 z-[41] mx-auto flex w-full max-w-lg justify-end px-4",
-        addExpenseFabOffsetClass,
-      )}
-    >
-      {children}
-    </div>
-  );
-}
-
 export function AddExpenseFab({ groups }: { groups: AddExpenseGroup[] }) {
   const entry = resolveAddExpenseEntry(groups);
 
   if (entry.type === "direct") {
     return (
-      <FabSlot>
+      <AddExpenseFabSlot fixed>
         <AddExpensePill href={`/g/${entry.groupId}/expenses/new`} />
-      </FabSlot>
+      </AddExpenseFabSlot>
     );
   }
 
   const empty = entry.type === "empty";
 
   return (
-    <FabSlot>
+    <AddExpenseFabSlot fixed>
       <Sheet>
         <SheetTrigger asChild>
           <Button type="button" size="lg" className={addExpenseFabButtonClass}>
@@ -102,6 +89,6 @@ export function AddExpenseFab({ groups }: { groups: AddExpenseGroup[] }) {
           )}
         </SheetContent>
       </Sheet>
-    </FabSlot>
+    </AddExpenseFabSlot>
   );
 }
