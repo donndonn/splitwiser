@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 
 /** Sits above the root tab bar and the home-indicator inset. */
 const fabSlotClass =
-  "pointer-events-none fixed inset-x-0 z-[41] mx-auto flex w-full max-w-lg justify-end px-4 bottom-[calc(5rem+env(safe-area-inset-bottom))]";
+  "pointer-events-none fixed inset-x-0 z-[41] mx-auto flex w-full max-w-lg justify-end px-4 bottom-[calc(5.75rem+env(safe-area-inset-bottom))]";
 
 const fabButtonClass =
   "pointer-events-auto h-12 rounded-full px-5 shadow-lg shadow-primary/25";

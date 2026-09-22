@@ -67,7 +67,7 @@ export default async function HomePage() {
       <AppShell
         title="Your groups"
         withBottomNav
-        className="pb-[calc(9rem+env(safe-area-inset-bottom))]"
+        className="pb-[calc(10rem+env(safe-area-inset-bottom))]"
         actions={
           <Button asChild variant="ghost" size="icon">
             <Link href="/new" aria-label="Create group">
