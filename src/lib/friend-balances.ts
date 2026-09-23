@@ -1,7 +1,7 @@
 import { eq, inArray, or } from "drizzle-orm";
 import { db } from "@/db";
 import { friendships, groups, members } from "@/db/schema";
-import { getGroupBalances } from "@/lib/balances";
+import { getBalancesByGroup } from "@/lib/balances";
 import { formatMoney, suggestSettlements } from "@/lib/money";
 
 export type CurrencyNet = {
@@ -143,7 +143,7 @@ export async function friendNetsForUsers(
     });
   }
 
-  const [roster, balanceLists] = await Promise.all([
+  const [roster, balancesByGroup] = await Promise.all([
     db
       .select({
         groupId: members.groupId,
@@ -152,12 +152,7 @@ export async function friendNetsForUsers(
       })
       .from(members)
       .where(inArray(members.groupId, groupIds)),
-    Promise.all(
-      groupIds.map(async (groupId) => ({
-        groupId,
-        balances: await getGroupBalances(groupId),
-      })),
-    ),
+    getBalancesByGroup(groupIds),
   ]);
 
   const membersByGroup = new Map<
@@ -169,10 +164,6 @@ export async function friendNetsForUsers(
     list.push({ memberId: row.memberId, userId: row.userId });
     membersByGroup.set(row.groupId, list);
   }
-  const balancesByGroup = new Map(
-    balanceLists.map((row) => [row.groupId, row.balances]),
-  );
-
   return aggregateFriendNets({
     viewerUserId,
     friendUserIds: uniqueFriends,

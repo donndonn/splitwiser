@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { eq } from "drizzle-orm";
 import { AddExpenseFab } from "@/components/add-expense-fab";
 import { UsersPlusIcon } from "@/components/users-plus-icon";
 import { AppBottomNav } from "@/components/app-bottom-nav";
@@ -11,11 +10,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { db } from "@/db";
-import { groups, members } from "@/db/schema";
 import { getOptionalUser } from "@/lib/auth-guards";
+import { listViewerGroupSummaries } from "@/lib/balances";
 import { formatMoney } from "@/lib/money";
-import { getGroupBalances } from "@/lib/balances";
 import { cn, groupedListClass } from "@/lib/utils";
 
 export default async function HomePage() {
@@ -41,26 +38,7 @@ export default async function HomePage() {
     );
   }
 
-  const memberships = await db
-    .select({
-      groupId: groups.id,
-      groupName: groups.name,
-      currency: groups.currency,
-      memberId: members.id,
-      displayName: members.displayName,
-    })
-    .from(members)
-    .innerJoin(groups, eq(members.groupId, groups.id))
-    .where(eq(members.userId, sessionUser.id));
-
-  const withBalances = await Promise.all(
-    memberships.map(async (m) => {
-      const balances = await getGroupBalances(m.groupId);
-      const net =
-        balances.find((b) => b.memberId === m.memberId)?.netCents ?? 0;
-      return { ...m, net };
-    }),
-  );
+  const withBalances = await listViewerGroupSummaries(sessionUser.id);
 
   return (
     <>
@@ -106,18 +84,18 @@ export default async function HomePage() {
                     <p
                       className={cn(
                         "shrink-0 text-sm",
-                        g.net > 0
+                        g.netCents > 0
                           ? "font-medium text-balance-positive"
-                          : g.net < 0
+                          : g.netCents < 0
                             ? "font-medium text-balance-negative"
                             : "text-muted-foreground",
                       )}
                     >
-                      {g.net === 0
+                      {g.netCents === 0
                         ? "settled"
-                        : g.net > 0
-                          ? `+${formatMoney(g.net, g.currency)}`
-                          : formatMoney(g.net, g.currency)}
+                        : g.netCents > 0
+                          ? `+${formatMoney(g.netCents, g.currency)}`
+                          : formatMoney(g.netCents, g.currency)}
                     </p>
                   </Link>
                 </li>
