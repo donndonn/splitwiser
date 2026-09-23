@@ -45,6 +45,8 @@ export const users = pgTable(
       .$defaultFn(() => crypto.randomUUID()),
     name: text("name"),
     username: text("username"),
+    /** Venmo handle without a leading @. Visible to group peers on settle. */
+    venmoUsername: text("venmo_username"),
     email: text("email").unique(),
     emailVerified: timestamp("emailVerified", { mode: "date" }),
     image: text("image"),

@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { requireUser } from "@/lib/auth-guards";
 import { validateUsername } from "@/lib/friends";
+import { parseVenmoUsername } from "@/lib/venmo";
 
 const MAX_NAME_LENGTH = 50;
 
@@ -13,6 +14,7 @@ export async function updateProfileAction(formData: FormData) {
   const user = await requireUser("/profile");
   const name = String(formData.get("name") ?? "").trim();
   const usernameRaw = String(formData.get("username") ?? "");
+  const venmoUsername = parseVenmoUsername(String(formData.get("venmo") ?? ""));
 
   if (!name) {
     throw new Error("Display name is required");
@@ -40,7 +42,7 @@ export async function updateProfileAction(formData: FormData) {
 
   await db
     .update(users)
-    .set({ name, username })
+    .set({ name, username, venmoUsername })
     .where(eq(users.id, user.id));
 
   revalidatePath("/profile");

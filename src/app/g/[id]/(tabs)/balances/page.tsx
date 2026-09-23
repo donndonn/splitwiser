@@ -2,7 +2,7 @@ import { desc, eq } from "drizzle-orm";
 import { AppShell } from "@/components/app-shell";
 import { MarkAsSettledPrompt } from "@/components/mark-as-settled-prompt";
 import { db } from "@/db";
-import { groups, members, settlements } from "@/db/schema";
+import { groups, members, settlements, users } from "@/db/schema";
 import { requireMember } from "@/lib/auth-guards";
 import { suggestSettlements } from "@/lib/money";
 import { getGroupSettleView } from "@/lib/settle-marker-store";
@@ -20,8 +20,13 @@ export default async function BalancesPage({
   const [[group], roster, recentSettlements, settleView] = await Promise.all([
     db.select().from(groups).where(eq(groups.id, id)).limit(1),
     db
-      .select()
+      .select({
+        id: members.id,
+        displayName: members.displayName,
+        venmoUsername: users.venmoUsername,
+      })
       .from(members)
+      .leftJoin(users, eq(members.userId, users.id))
       .where(eq(members.groupId, id))
       .orderBy(members.createdAt),
     db
@@ -63,11 +68,13 @@ export default async function BalancesPage({
 
       <SettleUpSection
         groupId={id}
+        groupName={group.name}
         currency={group.currency}
         currentMemberId={member.id}
         members={roster.map((m) => ({
           id: m.id,
           displayName: m.displayName,
+          venmoUsername: m.venmoUsername,
         }))}
         rows={rows}
         suggestions={suggestions}

@@ -67,6 +67,7 @@ export default async function ProfilePage() {
           name={dbUser?.name?.trim() || name}
           username={username}
           email={email}
+          venmoUsername={dbUser?.venmoUsername ?? null}
         />
       </AppShell>
       <AppBottomNav />

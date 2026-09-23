@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition, type MouseEvent } from "react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -28,8 +28,30 @@ import {
   type SettlementSuggestion,
 } from "@/lib/settlement-copy";
 import { cn, groupedListClass } from "@/lib/utils";
+import {
+  listVenmoPayLinks,
+  openVenmoPay,
+  prefersVenmoApp,
+  type VenmoPayLink,
+} from "@/lib/venmo";
 import { recordSettlementAction, settleGroupAction } from "./actions";
 import { RecordPaymentForm } from "./record-payment-form";
+
+/** Simple V mark. Not Venmo’s trademarked wordmark. */
+function VenmoMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className}>
+      <path
+        d="M6.2 4.2 12 19.2 17.8 4.2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 export type BalanceRow = {
   memberId: string;
@@ -38,10 +60,15 @@ export type BalanceRow = {
   isYou: boolean;
 };
 
-type MemberOption = { id: string; displayName: string };
+type MemberOption = {
+  id: string;
+  displayName: string;
+  venmoUsername: string | null;
+};
 
 export function SettleUpSection({
   groupId,
+  groupName,
   currency,
   currentMemberId,
   members,
@@ -49,6 +76,7 @@ export function SettleUpSection({
   suggestions,
 }: {
   groupId: string;
+  groupName: string;
   currency: string;
   currentMemberId: string;
   members: MemberOption[];
@@ -64,6 +92,20 @@ export function SettleUpSection({
   const nameById = useMemo(
     () => new Map(members.map((m) => [m.id, m.displayName])),
     [members],
+  );
+
+  const venmoPays = useMemo(
+    () =>
+      listVenmoPayLinks({
+        currency,
+        groupName,
+        currentMemberId,
+        suggestions,
+        venmoUsernameByMemberId: new Map(
+          members.map((member) => [member.id, member.venmoUsername]),
+        ),
+      }),
+    [currency, groupName, currentMemberId, suggestions, members],
   );
 
   const suggestionsByRow = useMemo(() => {
@@ -107,6 +149,24 @@ export function SettleUpSection({
         );
       }
     });
+  }
+
+  function onPayVenmoClick(
+    event: MouseEvent<HTMLAnchorElement>,
+    link: VenmoPayLink,
+  ) {
+    if (
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return;
+    }
+    if (!prefersVenmoApp()) return;
+    event.preventDefault();
+    openVenmoPay(link.appUrl, link.webUrl);
   }
 
   function confirmSettleGroup() {
@@ -182,6 +242,33 @@ export function SettleUpSection({
           })}
         </ul>
       </div>
+
+      {venmoPays.map((link) => (
+        <Button
+          key={link.toMemberId}
+          variant="outline"
+          size="lg"
+          className="w-full min-w-0 justify-between overflow-hidden border-transparent bg-[#008CFF] text-white shadow-none hover:bg-[#0074FF] hover:text-white active:bg-[#0074FF] dark:border-transparent dark:bg-[#008CFF] dark:text-white dark:hover:bg-[#0074FF] dark:hover:text-white"
+          asChild
+        >
+          <a
+            href={link.webUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={`@${link.username}`}
+            onClick={(event) => onPayVenmoClick(event, link)}
+          >
+            <span className="flex min-w-0 flex-1 items-center gap-2">
+              <VenmoMark className="size-4 shrink-0" />
+              <span className="truncate">
+                Pay {nameById.get(link.toMemberId) ?? "them"}{" "}
+                {formatMoney(link.amountCents, currency)}
+              </span>
+            </span>
+            <span className="shrink-0 font-bold tracking-tight">Venmo</span>
+          </a>
+        </Button>
+      ))}
 
       {suggestions.length > 0 ? (
         <>
@@ -296,7 +383,10 @@ export function SettleUpSection({
           <div className="px-4 pb-8">
             <RecordPaymentForm
               groupId={groupId}
-              members={members}
+              members={members.map((member) => ({
+                id: member.id,
+                displayName: member.displayName,
+              }))}
               currency={currency}
               currentMemberId={currentMemberId}
               onSuccess={() => setRecordOpen(false)}
