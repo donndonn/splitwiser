@@ -24,8 +24,8 @@ Preconditions:
 - Start signed in as Alice.
 - Alice and Bob are not already friends. If they are leftovers from a crashed run, cleanup and re-seed.
 
-- **Open Friends.** Choose `Friends` in `App navigation`. Heading is `Friends`. Region `Find friends` is visible. Screenshot `friends-empty.png` if `No friends yet` is shown.
-- **Search miss.** In the textbox with placeholder `email or @username`, type `nobody-swv-miss@splitwiser.invalid`. Choose `Search`. A `No user found` toast appears and no Add button is shown.
+- **Open Friends.** Choose `Friends` in `App navigation`. Heading is `Friends`. Header button `Find friends` is in the top right. The large inline search card is not on the page. Screenshot `friends-empty.png` if `No friends yet` is shown. Accepted friends, when present, show a net on the row (`owes you`, `you owe`, or `settled`). Pending sent requests stay separate and have no balance.
+- **Search miss.** Choose header button `Find friends`. Heading `Find friends` opens. In the textbox with placeholder `email or @username`, type `nobody-swv-miss@splitwiser.invalid`. Choose `Search`. A `No user found` toast appears and no Add button is shown.
 - **Search Bob.** Replace the query with `VERIFY_BOB_EMAIL` (or `@` plus Bob's username). Choose `Search`. A result named `Bob Verify` appears with button `Add`.
 - **Send request.** Choose `Add`. The result status becomes `Requested` (or toast `Friend request sent`). Under `Sent requests`, `Bob Verify` is listed with `Pending`.
 - **Switch to Bob.** Choose `Profile`, then `Sign out`. Sign in with `VERIFY_BOB_EMAIL` and `SPLITWISER_VERIFY_SECRET`. Open `Friends`. Heading `Friend requests` lists `Alice Verify` with `Accept` and `Decline`.

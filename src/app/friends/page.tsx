@@ -13,10 +13,16 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { requireUser } from "@/lib/auth-guards";
 import {
+  friendBalancePhrase,
+  friendNetsForUsers,
+  type CurrencyNet,
+} from "@/lib/friend-balances";
+import {
   listFriends,
   listIncomingRequests,
   listOutgoingRequests,
 } from "@/lib/friends";
+import { cn } from "@/lib/utils";
 import {
   acceptFriendRequestAction,
   cancelFriendRequestAction,
@@ -27,20 +33,24 @@ import { FriendSearch } from "./friend-search";
 
 export default async function FriendsPage() {
   const sessionUser = await requireUser("/friends");
-  const [[dbUser], friends, incoming, outgoing] = await Promise.all([
+  const [[dbUser], friends, incoming, outgoing, balanceNets] = await Promise.all([
     db.select().from(users).where(eq(users.id, sessionUser.id)).limit(1),
     listFriends(sessionUser.id),
     listIncomingRequests(sessionUser.id),
     listOutgoingRequests(sessionUser.id),
+    friendNetsForUsers(sessionUser.id),
   ]);
 
   const hasUsername = Boolean(dbUser?.username);
 
   return (
     <>
-      <AppShell title="Friends" withBottomNav>
+      <AppShell
+        title="Friends"
+        withBottomNav
+        actions={<FriendSearch hasUsername={hasUsername} />}
+      >
         <div className="space-y-6">
-        <FriendSearch hasUsername={hasUsername} />
 
         {incoming.length > 0 && (
           <div className="space-y-2">
@@ -149,11 +159,16 @@ export default async function FriendsPage() {
                         : friend.email}
                     </p>
                   </div>
-                  <form action={removeFriendAction.bind(null, friend.id)}>
-                    <Button type="submit" size="sm" variant="ghost">
-                      Remove
-                    </Button>
-                  </form>
+                  <div className="flex shrink-0 flex-col items-end gap-0.5">
+                    <FriendBalance
+                      nets={balanceNets.get(friend.id) ?? []}
+                    />
+                    <form action={removeFriendAction.bind(null, friend.id)}>
+                      <Button type="submit" size="sm" variant="ghost">
+                        Remove
+                      </Button>
+                    </form>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -163,5 +178,29 @@ export default async function FriendsPage() {
       </AppShell>
       <AppBottomNav />
     </>
+  );
+}
+
+function FriendBalance({ nets }: { nets: CurrencyNet[] }) {
+  if (nets.length === 0) {
+    return <p className="text-sm text-muted-foreground">settled</p>;
+  }
+
+  return (
+    <div className="text-right">
+      {nets.map((net) => (
+        <p
+          key={net.currency}
+          className={cn(
+            "text-sm font-medium tabular-nums",
+            net.netCents > 0
+              ? "text-balance-positive"
+              : "text-balance-negative",
+          )}
+        >
+          {friendBalancePhrase(net)}
+        </p>
+      ))}
+    </div>
   );
 }

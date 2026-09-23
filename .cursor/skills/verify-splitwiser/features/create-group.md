@@ -11,7 +11,7 @@ Create a group lets a signed-in user name a group, pick their display name and c
 
 ## How to get to it (user POV)
 
-- On `Your groups`, choose the header link `Create group` (people-plus icon, upper right).
+- On `Your groups`, choose the header link `Create group` (two-person plus icon, upper right).
 - Go to `http://127.0.0.1:3017/new` while signed in.
 
 ## Driving it with Cursor browser

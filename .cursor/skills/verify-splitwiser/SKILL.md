@@ -93,7 +93,7 @@ Stable handles in this repo:
 | Save expense | button `Add expense` |
 | Group tabs | `Home`, `Add`, `Balances`, `Activity`, `Members` |
 | Members placeholder | textbox placeholder `Name` + button `Add` |
-| Friends search | heading `Find friends`; textbox placeholder `email or @username`; button `Search` |
+| Friends search | header button `Find friends`; heading `Find friends`; textbox placeholder `email or @username`; button `Search` |
 | Sign out | heading `Profile`; button `Sign out` |
 | Back | link `Back` |
 
