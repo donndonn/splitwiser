@@ -51,7 +51,7 @@ Run this first whenever anything looks off:
 It is read-only. Success prints `ok run=... url=http://127.0.0.1:3017 ...` and Alice's email. Failure means stop driving. Typical causes:
 
 - Process in `.run/<RUN_ID>/pid` is dead.
-- Port 3017 is not owned by that process tree (shared instance — refuse).
+- Port 3017 is not owned by that process tree (shared instance — refuse). Listener lookup uses `lsof` when it can see the socket, and `/proc/net/tcp` when `lsof` returns nothing.
 - `/` does not contain `Splitwiser`.
 - `/signin` lacks `Verify sign-in` (server started without `SPLITWISER_VERIFY_SECRET`).
 - `fixtures.json` missing (seed was skipped).
