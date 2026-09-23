@@ -32,7 +32,7 @@ Preconditions:
 ## Gotchas
 
 - Only admins see invite and placeholder controls. Alice is the creator, so she is an admin.
-- `Add` on this page is not the friend-search `Add`. Use the button on Bob’s row under `Add from friends`.
+- `Add` on this page is not the friend-search `Add`. The placeholder form has its own `Add` button with the same name. Use the button on Bob’s row under `Add from friends`.
 - `Create & share link` calls the browser share sheet when `navigator.share` exists, and copies to the clipboard otherwise. A cancelled share sheet creates the link without the copied toast. The `Invite links` row is the proof either way.
 - Do not choose `Revoke` during proof. Cleanup removes the group.
 - Placeholder `Sam` cannot sign in. Bob can. Adding Bob is what the profile Venmo recipe needs.

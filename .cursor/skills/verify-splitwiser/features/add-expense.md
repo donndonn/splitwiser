@@ -35,7 +35,7 @@ Preconditions:
 - **Tab entry.** From group home, choose tab `Add`. The same describe step appears.
 - **Manual form.** Choose `Enter manually`. Heading stays `Add expense`. Textbox `What was it for?` and an amount field whose name starts with `Amount` are visible. Default split copy includes `split` `equally`. Default payer is Alice's display name.
 - **Fill.** Fill `What was it for?` with `Groceries`. Fill the amount textbox with `12.34`. Leave date as today.
-- **Save.** Choose button `Add expense`. The app returns to group home. `Recent expenses` includes `Groceries`. Amount displays as `$12.34`. The paid-by line is `You paid $12.34` when Alice paid (the list says `You`, not `Alice Verify`). With Sam on the expense, the row’s stake reads `Owes you` and `$6.17`. Screenshot `add-expense-home.png`.
+- **Save.** Choose button `Add expense`. The app returns to group home. `Recent expenses` includes `Groceries`. Amount displays as `$12.34`. The paid-by line is `You paid $12.34` when Alice paid (the list says `You`, not `Alice Verify`). With Sam on the expense, the row’s stake reads `Owes you` and `$6.17`. `Your balance` reads `You're owed $6.17`, with the line `1 person owes you`. Screenshot `add-expense-home.png`.
 - **Activity.** Choose tab `Activity`. A row describes Alice adding Groceries (wording includes `Groceries` and `$12.34`, and the actor name `Alice Verify`). Screenshot `add-expense-activity.png`.
 - **Proof.** Save the describe step, the filled manual form, group home with the new row, and activity. If `Fill form` / `Scan receipt` were skipped, record that skip — do not mark them verified.
 
