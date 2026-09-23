@@ -1,7 +1,9 @@
 "use client";
 
 import { useOptimistic, useState, useTransition } from "react";
+import { Undo2 } from "lucide-react";
 import { toast } from "sonner";
+import { SwipeableRow } from "@/components/swipeable-row";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,7 +14,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
 import { groupedListClass } from "@/lib/utils";
 import { reverseSettlementAction } from "./actions";
@@ -40,6 +41,7 @@ export function RecentPaymentsList({
     (current, deletedId: string) =>
       current.filter((payment) => payment.id !== deletedId),
   );
+  const [openId, setOpenId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<RecentPaymentItem | null>(
     null,
   );
@@ -51,6 +53,7 @@ export function RecentPaymentsList({
     if (!pendingDelete) return;
     const target = pendingDelete;
     setPendingDelete(null);
+    setOpenId(null);
 
     startTransition(async () => {
       removeOptimistic(target.id);
@@ -73,34 +76,30 @@ export function RecentPaymentsList({
       <div className={groupedListClass}>
         <ul className="divide-y divide-border">
           {items.map((payment) => (
-            <li
-              key={payment.id}
-              className="flex items-center justify-between gap-3 px-4 py-3"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm text-foreground">
-                  {payment.fromName} → {payment.toName}
-                </p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {payment.settledAtLabel}
-                  {payment.note ? ` · ${payment.note}` : ""}
-                </p>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <span className="text-sm font-medium">
-                  {formatMoney(payment.amountCents, currency)}
-                </span>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  className="text-muted-foreground"
-                  disabled={pending}
-                  onClick={() => setPendingDelete(payment)}
-                >
-                  Undo
-                </Button>
-              </div>
+            <li key={payment.id}>
+              <SwipeableRow
+                open={openId === payment.id}
+                onOpenChange={(next) => setOpenId(next ? payment.id : null)}
+                onAction={() => setPendingDelete(payment)}
+                actionLabel="Undo"
+                actionAriaLabel={`Undo payment from ${payment.fromName} to ${payment.toName}`}
+                actionIcon={<Undo2 className="size-4" />}
+              >
+                <div className="flex items-center justify-between gap-3 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm text-foreground">
+                      {payment.fromName} → {payment.toName}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {payment.settledAtLabel}
+                      {payment.note ? ` · ${payment.note}` : ""}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-sm font-medium">
+                    {formatMoney(payment.amountCents, currency)}
+                  </span>
+                </div>
+              </SwipeableRow>
             </li>
           ))}
         </ul>
