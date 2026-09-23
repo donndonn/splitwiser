@@ -2,17 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowLeftRight, History, Home, Receipt, Users } from "lucide-react";
+import { ArrowLeftRight, History, Home, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const tabs = [
   { href: "", label: "Home", icon: Home, match: "exact" as const },
-  {
-    href: "/expenses/new",
-    label: "Add",
-    icon: Receipt,
-    match: "prefix" as const,
-  },
   {
     href: "/balances",
     label: "Balances",
