@@ -34,7 +34,7 @@ Preconditions:
 ## Gotchas
 
 - A group name without the `swv-<RUN_ID>` prefix survives cleanup and pollutes the shared database. Always prefix.
-- `Create group` appears twice: the header icon link on `Your groups`, and the form submit button on `New group`. The groups list has no full-width create button.
+- `Create group` is the header icon link on `Your groups` and the form submit button on `New group`. The groups list has no full-width create button. A third control with the same name sits in the empty Add expense sheet (`Create a group first`); that path belongs to add-expense.
 - A click on `Create group` or `Back` can lag before the next snapshot. Wait and snapshot again, or open `/new` and `/` directly — both are mapped entry points.
 - Creating a group with an empty name is blocked by the required `Group name` field. Do not treat a stay-on-form as a save.
 - Friends checkboxes only appear if Alice already has friends. Baseline create-group does not require them; adding friends belongs to the friends feature.

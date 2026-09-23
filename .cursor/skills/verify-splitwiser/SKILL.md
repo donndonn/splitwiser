@@ -91,9 +91,15 @@ Stable handles in this repo:
 | Expense description | textbox `What was it for?` |
 | Expense amount | textbox whose name starts with `Amount` |
 | Save expense | button `Add expense` |
+| Expense row when you paid | `You paid $…`; stake `Owes you` or `You owe` |
+| Expense detail | heading `Expense`; button name includes `Show details` (then `Hide details`) |
 | Group tabs | `Home`, `Add`, `Balances`, `Activity`, `Members` |
 | Members placeholder | textbox placeholder `Name` + button `Add` |
+| Invite link | heading `Create invite link`; button `Create & share link` |
 | Friends search | header button `Find friends`; heading `Find friends`; textbox placeholder `email or @username`; button `Search` |
+| Payment undo | swipe the recent-payment row left; button `Undo` (hidden until open) |
+| Profile Venmo | heading `Profile`; button `Edit profile`; textbox `Venmo`; button `Save` |
+| Venmo pay link | link whose name includes `Pay` and `Venmo` (do not complete Venmo) |
 | Sign out | heading `Profile`; button `Sign out` |
 | Back | link `Back` |
 

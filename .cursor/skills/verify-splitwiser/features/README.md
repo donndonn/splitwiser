@@ -45,6 +45,9 @@ Keep implementation details out of the map. Name only user paths, stable handles
 - [Sign in](./sign-in.md) covers the signed-out landing, Google CTA (do not complete), verify credentials, and sign out.
 - [Create a group](./create-group.md) covers creating a named group from the home list.
 - [Add an expense](./add-expense.md) covers manual expense entry, equal split, and persistence on group home.
+- [Expense detail](./expense-detail.md) covers opening a saved expense and expanding split math.
+- [Members](./members.md) covers placeholder names, adding a friend, and creating an invite link.
 - [Friends](./friends.md) covers search, request, accept, and the friends list.
-- [Balances](./balances.md) covers owed amounts, recording a payment, and the settled state.
+- [Balances](./balances.md) covers owed amounts, recording a payment, swipe-to-undo, and the settled state.
 - [Mark as settled](./mark-as-settled.md) covers the post-$0 prompt, archiving Recent, history, dismiss, and a new open period.
+- [Profile](./profile.md) covers the Venmo username and the Balances pay link (do not complete Venmo).

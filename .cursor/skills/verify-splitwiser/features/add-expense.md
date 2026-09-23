@@ -35,15 +35,16 @@ Preconditions:
 - **Tab entry.** From group home, choose tab `Add`. The same describe step appears.
 - **Manual form.** Choose `Enter manually`. Heading stays `Add expense`. Textbox `What was it for?` and an amount field whose name starts with `Amount` are visible. Default split copy includes `split` `equally`. Default payer is Alice's display name.
 - **Fill.** Fill `What was it for?` with `Groceries`. Fill the amount textbox with `12.34`. Leave date as today.
-- **Save.** Choose button `Add expense`. The app returns to group home. `Recent expenses` includes `Groceries`. Amount displays as `$12.34`. Paid-by text includes `Alice Verify`. Screenshot `add-expense-home.png`.
-- **Activity.** Choose tab `Activity`. A row describes Alice adding Groceries (wording includes `Groceries` and `$12.34`). Screenshot `add-expense-activity.png`.
+- **Save.** Choose button `Add expense`. The app returns to group home. `Recent expenses` includes `Groceries`. Amount displays as `$12.34`. The paid-by line is `You paid $12.34` when Alice paid (the list says `You`, not `Alice Verify`). With Sam on the expense, the row’s stake reads `Owes you` and `$6.17`. Screenshot `add-expense-home.png`.
+- **Activity.** Choose tab `Activity`. A row describes Alice adding Groceries (wording includes `Groceries` and `$12.34`, and the actor name `Alice Verify`). Screenshot `add-expense-activity.png`.
 - **Proof.** Save the describe step, the filled manual form, group home with the new row, and activity. If `Fill form` / `Scan receipt` were skipped, record that skip — do not mark them verified.
 
 ## Gotchas
 
-- The first Add expense screen is a describe step, not the money form. `Add expense` on that step does not exist until after `Enter manually`.
-- On `Your groups` and on group home, `Add expense` is the floating pill above the tab bar. Group home links straight to that group's form. On `Your groups`, one group skips the picker, and zero or many groups open a sheet. Do not confuse either pill with the form submit button.
+- The first Add expense screen is a describe step, not the money form. `Describe the expense` is a tall textarea. `Add expense` on that step does not exist until after `Enter manually`.
+- On `Your groups` and on group home, `Add expense` is the floating pill above the tab bar, over `Recent expenses` on group home. Group home links straight to that group's form. On `Your groups`, one group skips the picker, and zero or many groups open a sheet. Do not confuse either pill with the form submit button.
+- `Scan receipt` leaves the describe step for a page whose only primary control is `Upload receipt`. Skip it with `Fill form` unless `GOOGLE_API_KEY` is set. Opening the expense and `Show details` is the expense-detail feature, not this one.
 - `Fill form` needs `GOOGLE_API_KEY` and hits Gemini rate limits. A toast error is not a product-regression by itself if the key is missing.
 - Equal split among Alice and Sam makes Alice owed and Sam owe. `All settled up` is wrong after this expense; expect a non-zero `Your balance` on home (`You're owed $6.17` with two members).
 - Equal split with only Alice (no Sam) stays settled because she paid her own share. If you skipped the Sam placeholder, assert `All settled up` and still assert the Groceries row exists.
-- Reopen the expense from the recent list (row `Groceries`) if you need a third view; heading is `Expense`.
+- Reopening `Groceries` (heading `Expense`, `Show details`) is the expense-detail feature. This recipe stops at group home and Activity.
