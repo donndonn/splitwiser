@@ -2,8 +2,12 @@
 
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
-import { GroupHomeExpenseFab } from "@/components/add-expense-pill";
+import {
+  GroupHomeExpenseFab,
+  groupHomeScrollClearanceClass,
+} from "@/components/add-expense-pill";
 import { GroupBottomNav } from "@/components/group-bottom-nav";
+import { cn } from "@/lib/utils";
 
 /**
  * Viewport column for group tabs.
@@ -15,6 +19,10 @@ import { GroupBottomNav } from "@/components/group-bottom-nav";
  * picker closes. A full reload rebuilds the layer, which is why a restart
  * cleared it. Members is the tall tab with text fields, so it hit the bug
  * first. The bar is now an in-flow footer; only the pane above it scrolls.
+ *
+ * The Home Add expense pill is absolute on this shell, which is not itself
+ * a flex container, so it overlays the pane. It is not a sibling row between
+ * the pane and the bar.
  */
 export function GroupTabsShell({
   groupId,
@@ -68,16 +76,21 @@ export function GroupTabsShell({
   return (
     <div
       data-group-tabs=""
-      className="flex h-dvh max-h-dvh w-full min-w-0 flex-col overflow-hidden"
+      className="relative h-dvh max-h-dvh w-full min-w-0 overflow-hidden"
     >
-      <div
-        ref={scrollerRef}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain"
-      >
-        {children}
+      <div className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden">
+        <div
+          ref={scrollerRef}
+          className={cn(
+            "min-h-0 flex-1 overflow-y-auto overscroll-y-contain",
+            isHome && groupHomeScrollClearanceClass,
+          )}
+        >
+          {children}
+        </div>
+        <GroupBottomNav groupId={groupId} />
       </div>
       {isHome ? <GroupHomeExpenseFab groupId={groupId} /> : null}
-      <GroupBottomNav groupId={groupId} />
     </div>
   );
 }

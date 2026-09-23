@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
- * Fixed offset for the root groups FAB. The length is
- * `--add-expense-fab-bottom` in globals.css (tab bar + border + gap +
- * safe area), the same gap and right inset the in-flow group Home pill uses.
+ * Offset from the bottom of the viewport (Your groups, fixed) or the group
+ * shell (group Home, absolute). `--add-expense-fab-bottom` is tab bar +
+ * border + gap + safe area.
  */
 export const addExpenseFabOffsetClass = "bottom-[var(--add-expense-fab-bottom)]";
 
@@ -19,11 +19,18 @@ const addExpenseFabColumnClass =
   "pointer-events-none mx-auto flex w-full max-w-lg justify-end px-[var(--add-expense-fab-right)]";
 
 /**
+ * Padding inside the Home scroll pane so the last expense can scroll clear
+ * of the floating pill. 3rem matches the pill's h-12. Not a reserved row.
+ */
+export const groupHomeScrollClearanceClass =
+  "pb-[calc(3rem+var(--add-expense-fab-gap))]";
+
+/**
  * Shared pill pocket.
  * `fixed` anchors to the viewport for the root tab bar (that bar is
- * position:fixed). Group Home passes `fixed={false}` so the row stays in
- * the tab column: a fixed layer is what made the iOS tab bar stick, and
- * absolute bottom inside that flex column lands at the top.
+ * position:fixed). Group Home is absolute against the group shell. That
+ * shell is not a flex container: absolute bottom on a flex item lands at
+ * the top. The tab bar stays an in-flow footer either way.
  */
 export function AddExpenseFabSlot({
   fixed = false,
@@ -36,9 +43,9 @@ export function AddExpenseFabSlot({
     <div
       className={cn(
         addExpenseFabColumnClass,
-        fixed
-          ? cn("fixed inset-x-0 z-[41]", addExpenseFabOffsetClass)
-          : "shrink-0 pt-1 pb-[var(--add-expense-fab-gap)]",
+        "inset-x-0 z-[41]",
+        addExpenseFabOffsetClass,
+        fixed ? "fixed" : "absolute",
       )}
     >
       {children}
@@ -57,7 +64,7 @@ export function AddExpensePill({ href }: { href: string }) {
   );
 }
 
-/** Group Home only. In-flow row above the group tab bar, same pocket as the root FAB. */
+/** Group Home only. Floats over the scroll pane, same pocket as the root FAB. */
 export function GroupHomeExpenseFab({ groupId }: { groupId: string }) {
   return (
     <AddExpenseFabSlot>
