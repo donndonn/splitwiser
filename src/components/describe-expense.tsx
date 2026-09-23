@@ -95,7 +95,8 @@ export function DescribeExpense({
           value={text}
           onChange={(e) => setText(e.target.value)}
           maxLength={MAX_EXPENSE_TEXT_LENGTH}
-          rows={5}
+          rows={8}
+          className="min-h-48"
           placeholder={`e.g. Uber $24 split with Sam\n\nor lunch total 100 — I had burger 25, Alex salad 26, Bob pasta 27`}
           disabled={pending}
         />

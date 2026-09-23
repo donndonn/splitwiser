@@ -2,11 +2,10 @@
 
 import { useRef, useState, useTransition } from "react";
 import {
-  Camera,
   ChevronLeft,
-  ImageIcon,
   ListChecks,
   Split,
+  Upload,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -55,14 +54,12 @@ export function ScanReceipt({
   const [formKey, setFormKey] = useState(0);
   const [pending, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   function clearPhoto() {
     setPreviewUrl(null);
     setReceiptFile(null);
     setReceipt(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
-    if (cameraInputRef.current) cameraInputRef.current.value = "";
   }
 
   function onFileSelected(file: File | undefined) {
@@ -245,44 +242,23 @@ export function ScanReceipt({
       ) : null}
 
       <input
-        ref={cameraInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        disabled={pending}
-        onChange={(e) => onFileSelected(e.target.files?.[0])}
-      />
-      <input
         ref={fileInputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+        accept="image/*"
         className="hidden"
         disabled={pending}
         onChange={(e) => onFileSelected(e.target.files?.[0])}
       />
 
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <Button
-          type="button"
-          className="gap-2"
-          disabled={pending}
-          onClick={() => cameraInputRef.current?.click()}
-        >
-          <Camera className="size-4" />
-          {pending ? "Reading receipt…" : "Take photo"}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          className="gap-2"
-          disabled={pending}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <ImageIcon className="size-4" />
-          Choose from library
-        </Button>
-      </div>
+      <Button
+        type="button"
+        className="w-full gap-2"
+        disabled={pending}
+        onClick={() => fileInputRef.current?.click()}
+      >
+        <Upload className="size-4" />
+        {pending ? "Reading receipt…" : "Upload receipt"}
+      </Button>
     </div>
   );
 }
