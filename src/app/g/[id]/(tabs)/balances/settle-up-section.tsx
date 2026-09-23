@@ -37,6 +37,22 @@ import {
 import { recordSettlementAction, settleGroupAction } from "./actions";
 import { RecordPaymentForm } from "./record-payment-form";
 
+/** Simple V mark. Not Venmo’s trademarked wordmark. */
+function VenmoMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className}>
+      <path
+        d="M6.2 4.2 12 19.2 17.8 4.2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export type BalanceRow = {
   memberId: string;
   displayName: string;
@@ -232,7 +248,7 @@ export function SettleUpSection({
           key={link.toMemberId}
           variant="outline"
           size="lg"
-          className="w-full min-w-0 overflow-hidden"
+          className="w-full min-w-0 justify-between overflow-hidden border-transparent bg-[#008CFF] text-white shadow-none hover:bg-[#0074FF] hover:text-white active:bg-[#0074FF] dark:border-transparent dark:bg-[#008CFF] dark:text-white dark:hover:bg-[#0074FF] dark:hover:text-white"
           asChild
         >
           <a
@@ -242,10 +258,14 @@ export function SettleUpSection({
             title={`@${link.username}`}
             onClick={(event) => onPayVenmoClick(event, link)}
           >
-            <span className="truncate">
-              Pay {nameById.get(link.toMemberId) ?? "them"}{" "}
-              {formatMoney(link.amountCents, currency)} on Venmo
+            <span className="flex min-w-0 flex-1 items-center gap-2">
+              <VenmoMark className="size-4 shrink-0" />
+              <span className="truncate">
+                Pay {nameById.get(link.toMemberId) ?? "them"}{" "}
+                {formatMoney(link.amountCents, currency)}
+              </span>
             </span>
+            <span className="shrink-0 font-bold tracking-tight">Venmo</span>
           </a>
         </Button>
       ))}
