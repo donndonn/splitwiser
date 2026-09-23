@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { eq } from "drizzle-orm";
-import { UserRoundPlus } from "lucide-react";
 import { AddExpenseFab } from "@/components/add-expense-fab";
+import { UsersPlusIcon } from "@/components/users-plus-icon";
 import { AppBottomNav } from "@/components/app-bottom-nav";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
@@ -71,7 +71,7 @@ export default async function HomePage() {
         actions={
           <Button asChild variant="ghost" size="icon">
             <Link href="/new" aria-label="Create group">
-              <UserRoundPlus className="size-5" />
+              <UsersPlusIcon className="size-5" />
             </Link>
           </Button>
         }

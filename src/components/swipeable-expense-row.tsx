@@ -35,8 +35,8 @@ const shareToneClass = {
 } as const;
 
 const shareLabel = {
-  borrowed: "You borrowed",
-  lent: "You lent",
+  borrowed: "You owe",
+  lent: "Owes you",
 } as const;
 
 export function SwipeableExpenseRow({
