@@ -28,14 +28,15 @@ Preconditions:
 
 - **Open landing.** Go to `http://127.0.0.1:3017/`. The heading is `Splitwiser` and a link named `Sign in with Google` is visible. Screenshot `sign-in-landing.png`.
 - **Sign-in page.** Choose `Sign in with Google`. The heading is `Sign in` / `Welcome back`. Buttons named `Continue with Google` and `Verify sign-in` are both visible. Do not choose `Continue with Google`.
-- **Protected redirect.** In a signed-out session, go to `http://127.0.0.1:3017/new`. The app redirects to `/signin` with a callback. The same `Welcome back` heading appears.
-- **Verify credentials.** Fill textbox `Verify email` with `VERIFY_ALICE_EMAIL` and textbox `Verify secret` with `SPLITWISER_VERIFY_SECRET`. Choose `Verify sign-in`. The heading becomes `Your groups`. Empty state copy is `No groups yet` unless this run already created groups.
+- **Protected redirect.** In a signed-out session, go to `http://127.0.0.1:3017/new`. The app redirects to `/signin?callbackUrl=%2Fnew`. The same `Welcome back` heading appears. Do not submit credentials on that URL yet: the callback sends a successful verify to `/new` (heading `New group`), not `Your groups`.
+- **Verify credentials.** Open `http://127.0.0.1:3017/signin` with no callback (or use `Sign in with Google` from `/`). Fill textbox `Verify email` with `VERIFY_ALICE_EMAIL` and textbox `Verify secret` with `SPLITWISER_VERIFY_SECRET`. Choose `Verify sign-in`. The heading becomes `Your groups`. Empty state copy is `No groups yet` unless this run already created groups.
 - **Sign out.** In navigation `App navigation`, choose `Profile`. Choose `Sign out`. The heading is `Splitwiser` again and `Sign in with Google` is visible.
 - **Proof.** Save snapshots of signed-out landing, the sign-in form showing `Verification sign-in`, the post-login `Your groups` heading, and the post-logout landing. Record entry points used in `notes.md`.
 
 ## Gotchas
 
 - `Continue with Google` leaves the app. Abort the run if that navigation happens; do not complete Google's account picker.
+- Verify on `/signin?callbackUrl=…` follows that callback. A check that the home heading is `Your groups` must submit from `/signin` with no callback.
 - Typing the secret into `Verify email` fails silently into `CredentialsSignin`. Use `show` values, not guessed passwords.
 - Verify accounts must already exist (seed). A well-formed secret with an unknown email does not create a user.
 - Production and `next start` hide the verify form. This skill launches `npm run dev` only.

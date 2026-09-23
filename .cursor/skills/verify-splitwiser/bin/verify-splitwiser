@@ -66,7 +66,58 @@ killtree() {
 
 port_pids() {
   local port="$1"
-  lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null || true
+  local from_lsof=""
+  from_lsof="$(lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null || true)"
+  if [[ -n "$from_lsof" ]]; then
+    echo "$from_lsof"
+    return 0
+  fi
+  # Some sandboxes hide TCP sockets from lsof. Fall back to /proc/net/tcp.
+  node -e '
+    const fs = require("fs");
+    const port = Number(process.argv[1]);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) process.exit(0);
+    const hex = port.toString(16).toUpperCase().padStart(4, "0");
+    let tcp = "";
+    try {
+      tcp = fs.readFileSync("/proc/net/tcp", "utf8");
+    } catch {
+      process.exit(0);
+    }
+    const inodes = new Set();
+    for (const line of tcp.split("\n").slice(1)) {
+      const parts = line.trim().split(/\s+/);
+      if (parts.length < 10) continue;
+      if (parts[3] !== "0A") continue;
+      const localPort = (parts[1].split(":")[1] || "").toUpperCase();
+      if (localPort === hex) inodes.add(parts[9]);
+    }
+    if (inodes.size === 0) process.exit(0);
+    const pids = [];
+    for (const dir of fs.readdirSync("/proc")) {
+      if (!/^\d+$/.test(dir)) continue;
+      let fds;
+      try {
+        fds = fs.readdirSync(`/proc/${dir}/fd`);
+      } catch {
+        continue;
+      }
+      for (const fd of fds) {
+        let link = "";
+        try {
+          link = fs.readlinkSync(`/proc/${dir}/fd/${fd}`);
+        } catch {
+          continue;
+        }
+        const match = link.match(/^socket:\[(\d+)\]$/);
+        if (match && inodes.has(match[1])) {
+          pids.push(dir);
+          break;
+        }
+      }
+    }
+    if (pids.length) console.log(pids.join("\n"));
+  ' "$port" || true
 }
 
 cmd_launch() {
