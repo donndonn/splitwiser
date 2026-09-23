@@ -71,6 +71,13 @@
       "when": 1790041988801,
       "tag": "0009_even_scorpion",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790136214924,
+      "tag": "0010_venmo_username",
+      "breakpoints": true
     }
   ]
 }

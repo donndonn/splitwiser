@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition, type MouseEvent } from "react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -28,6 +28,12 @@ import {
   type SettlementSuggestion,
 } from "@/lib/settlement-copy";
 import { cn, groupedListClass } from "@/lib/utils";
+import {
+  listVenmoPayLinks,
+  openVenmoPay,
+  prefersVenmoApp,
+  type VenmoPayLink,
+} from "@/lib/venmo";
 import { recordSettlementAction, settleGroupAction } from "./actions";
 import { RecordPaymentForm } from "./record-payment-form";
 
@@ -38,10 +44,15 @@ export type BalanceRow = {
   isYou: boolean;
 };
 
-type MemberOption = { id: string; displayName: string };
+type MemberOption = {
+  id: string;
+  displayName: string;
+  venmoUsername: string | null;
+};
 
 export function SettleUpSection({
   groupId,
+  groupName,
   currency,
   currentMemberId,
   members,
@@ -49,6 +60,7 @@ export function SettleUpSection({
   suggestions,
 }: {
   groupId: string;
+  groupName: string;
   currency: string;
   currentMemberId: string;
   members: MemberOption[];
@@ -64,6 +76,20 @@ export function SettleUpSection({
   const nameById = useMemo(
     () => new Map(members.map((m) => [m.id, m.displayName])),
     [members],
+  );
+
+  const venmoPays = useMemo(
+    () =>
+      listVenmoPayLinks({
+        currency,
+        groupName,
+        currentMemberId,
+        suggestions,
+        venmoUsernameByMemberId: new Map(
+          members.map((member) => [member.id, member.venmoUsername]),
+        ),
+      }),
+    [currency, groupName, currentMemberId, suggestions, members],
   );
 
   const suggestionsByRow = useMemo(() => {
@@ -107,6 +133,24 @@ export function SettleUpSection({
         );
       }
     });
+  }
+
+  function onPayVenmoClick(
+    event: MouseEvent<HTMLAnchorElement>,
+    link: VenmoPayLink,
+  ) {
+    if (
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return;
+    }
+    if (!prefersVenmoApp()) return;
+    event.preventDefault();
+    openVenmoPay(link.appUrl, link.webUrl);
   }
 
   function confirmSettleGroup() {
@@ -182,6 +226,29 @@ export function SettleUpSection({
           })}
         </ul>
       </div>
+
+      {venmoPays.map((link) => (
+        <Button
+          key={link.toMemberId}
+          variant="outline"
+          size="lg"
+          className="w-full min-w-0 overflow-hidden"
+          asChild
+        >
+          <a
+            href={link.webUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={`@${link.username}`}
+            onClick={(event) => onPayVenmoClick(event, link)}
+          >
+            <span className="truncate">
+              Pay {nameById.get(link.toMemberId) ?? "them"}{" "}
+              {formatMoney(link.amountCents, currency)} on Venmo
+            </span>
+          </a>
+        </Button>
+      ))}
 
       {suggestions.length > 0 ? (
         <>
@@ -296,7 +363,10 @@ export function SettleUpSection({
           <div className="px-4 pb-8">
             <RecordPaymentForm
               groupId={groupId}
-              members={members}
+              members={members.map((member) => ({
+                id: member.id,
+                displayName: member.displayName,
+              }))}
               currency={currency}
               currentMemberId={currentMemberId}
               onSuccess={() => setRecordOpen(false)}
