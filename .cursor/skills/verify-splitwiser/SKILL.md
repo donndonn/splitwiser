@@ -5,7 +5,7 @@ description: Drive the Splitwiser web PWA (Next.js at http://127.0.0.1:3017) the
 
 # Verify Splitwiser
 
-Splitwiser is a Next.js 16 App Router PWA. Users create groups, add expenses with splits, invite people, and settle balances. Google OAuth is the production sign-in path. Verification never completes Google OAuth. Local runs enable a gated credentials form on `/signin` when `SPLITWISER_VERIFY_SECRET` is set and `NODE_ENV` is not `production`.
+Splitwiser is a Next.js 16 App Router PWA. Users create groups, add expenses with splits, invite people, and settle balances. Google and Apple OAuth are the production sign-in paths. Verification never completes Google or Apple OAuth. Local runs enable a gated credentials form on `/signin` when `SPLITWISER_VERIFY_SECRET` is set and `NODE_ENV` is not `production`.
 
 Primary surface: the web UI. There is no CLI, no Playwright harness, and no public API besides Auth.js and server actions behind the UI. Drive the UI with the Cursor IDE browser (CDP). Unit tests (`npm test`) are not a substitute for this skill.
 
@@ -76,6 +76,7 @@ Stable handles in this repo:
 | Open sign-in | link `Sign in with Google` |
 | Sign-in heading | `Welcome back` |
 | Production OAuth (do not complete) | button `Continue with Google` |
+| Production Apple OAuth (do not complete) | button `Continue with Apple` |
 | Verify email | textbox `Verify email` |
 | Verify secret | textbox `Verify secret` |
 | Submit verify session | button `Verify sign-in` |
@@ -103,7 +104,7 @@ Stable handles in this repo:
 | Sign out | heading `Profile`; button `Sign out` |
 | Back | link `Back` |
 
-Do not click `Continue with Google`. That leaves the app for Google's OAuth screen and cannot be completed by this harness.
+Do not click `Continue with Google` or `Continue with Apple`. Those leave the app for the provider's OAuth screen and cannot be completed by this harness. Apple sign-in is production-only and will fail locally without Apple env.
 
 Gemini (`Fill form`, `Scan receipt`) calls Google. Skip those sub-features unless the map's gotchas say to run them and `GOOGLE_API_KEY` is present. Manual expense entry is the default proof path.
 

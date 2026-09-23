@@ -16,6 +16,25 @@
 3. OAuth consent screen → **Publish** (email + profile scopes only; no verification needed).
 4. Copy Client ID and Client Secret.
 
+## 2b. Sign in with Apple (production)
+
+Apple rejects `http://localhost`. Configure this on the production domain only. The App ID, Services ID, key, domain, and return URL are already registered in Apple Developer — do not recreate them. Do not commit the `.p8` or put the Team ID / Key ID in source.
+
+1. `AUTH_APPLE_ID` is the Services ID (OAuth client id), not the App ID.
+2. Generate `AUTH_APPLE_SECRET` (a JWT, maximum lifetime 6 months):
+
+   ```bash
+   npx auth add apple
+   ```
+
+   The CLI prompts for Team ID, Key ID, Services ID, and the `.p8`. Paste the printed secret into Vercel. Rotate it before it expires and redeploy.
+3. Return URL already registered for the Services ID:
+   `https://splitwiser-lime.vercel.app/api/auth/callback/apple`
+4. Set both variables on the **Production** environment (not Preview). Preview deployments cannot reuse this Services ID. Auth.js also ignores `AUTH_REDIRECT_PROXY_URL` for Apple because the callback is `response_mode=form_post`.
+5. The app still builds and the verify credentials form still works when these variables are unset. The Apple button then fails only when someone submits it.
+
+Account linking: the same verified email as an existing Google user is linked onto that user (`allowDangerousEmailAccountLinking`). Hide My Email shares a private-relay address (`…@privaterelay.appleid.com`) that will not match the Google mailbox, so that person gets a separate Splitwiser user. Apple sends email and name only on the first consent; later sign-ins resolve the existing `accounts` row (`provider = apple`, Apple user id). No schema change is required.
+
 ## 3. Vercel project
 
 ```bash
@@ -23,6 +42,8 @@ npx vercel link
 npx vercel env add AUTH_SECRET
 npx vercel env add AUTH_GOOGLE_ID
 npx vercel env add AUTH_GOOGLE_SECRET
+npx vercel env add AUTH_APPLE_ID production
+npx vercel env add AUTH_APPLE_SECRET production
 # DATABASE_URL vars come from Neon marketplace integration
 # BLOB_READ_WRITE_TOKEN / OIDC come from connecting a private Blob store
 npx vercel --prod

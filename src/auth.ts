@@ -1,6 +1,7 @@
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { eq } from "drizzle-orm";
 import NextAuth from "next-auth";
+import Apple from "next-auth/providers/apple";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import { accounts, users, verificationTokens } from "@/db/schema";
@@ -17,6 +18,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     Google({
       clientId: process.env.AUTH_GOOGLE_ID,
       clientSecret: process.env.AUTH_GOOGLE_SECRET,
+      allowDangerousEmailAccountLinking: true,
+    }),
+    // AUTH_APPLE_ID is the Services ID. AUTH_APPLE_SECRET is a short-lived JWT
+    // (npx auth add apple). Missing env does not throw here; Apple sign-in
+    // fails at runtime until both are set. Hide My Email uses a private-relay
+    // address, so it will not match an existing Google mailbox.
+    Apple({
+      clientId: process.env.AUTH_APPLE_ID,
+      clientSecret: process.env.AUTH_APPLE_SECRET,
       allowDangerousEmailAccountLinking: true,
     }),
     ...(isVerifyAuthEnabled()
