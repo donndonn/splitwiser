@@ -73,7 +73,7 @@ Stable handles in this repo:
 | What | Handle |
 | --- | --- |
 | Signed-out home heading | `Splitwiser` |
-| Open sign-in | link `Sign in with Google` |
+| Signed-out home providers | button `Continue with Google`, button `Continue with Apple` |
 | Sign-in heading | `Welcome back` |
 | Production OAuth (do not complete) | button `Continue with Google` |
 | Production Apple OAuth (do not complete) | button `Continue with Apple` |
