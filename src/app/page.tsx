@@ -3,6 +3,7 @@ import { AddExpenseFab } from "@/components/add-expense-fab";
 import { UsersPlusIcon } from "@/components/users-plus-icon";
 import { AppBottomNav } from "@/components/app-bottom-nav";
 import { AppShell } from "@/components/app-shell";
+import { SignInProviders } from "@/components/sign-in-providers";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -31,9 +32,7 @@ export default async function HomePage() {
             fairly.
           </p>
         </div>
-        <Button asChild size="lg" className="w-full">
-          <Link href="/signin">Sign in with Google</Link>
-        </Button>
+        <SignInProviders redirectTo="/" />
       </div>
     );
   }
