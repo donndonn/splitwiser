@@ -5,7 +5,10 @@ import { db } from "@/db";
 import { groups, members, settlements, users } from "@/db/schema";
 import { requireMember } from "@/lib/auth-guards";
 import { suggestSettlements } from "@/lib/money";
-import { getGroupSettleView } from "@/lib/settle-marker-store";
+import {
+  beginGroupSettleView,
+  catchIfAbandoned,
+} from "@/lib/settle-marker-store";
 import { RecentPaymentsList } from "./recent-payments-list";
 import { SettleUpSection } from "./settle-up-section";
 
@@ -15,10 +18,11 @@ export default async function BalancesPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { member } = await requireMember(id);
-
-  const [[group], roster, recentSettlements, settleView] = await Promise.all([
+  const settle = beginGroupSettleView(id);
+  const groupPromise = catchIfAbandoned(
     db.select().from(groups).where(eq(groups.id, id)).limit(1),
+  );
+  const rosterPromise = catchIfAbandoned(
     db
       .select({
         id: members.id,
@@ -29,13 +33,22 @@ export default async function BalancesPage({
       .leftJoin(users, eq(members.userId, users.id))
       .where(eq(members.groupId, id))
       .orderBy(members.createdAt),
+  );
+  const settlementsPromise = catchIfAbandoned(
     db
       .select()
       .from(settlements)
       .where(eq(settlements.groupId, id))
       .orderBy(desc(settlements.settledAt))
       .limit(50),
-    getGroupSettleView(id, member.id),
+  );
+  const { member } = await requireMember(id);
+
+  const [[group], roster, recentSettlements, settleView] = await Promise.all([
+    groupPromise,
+    rosterPromise,
+    settlementsPromise,
+    settle.finish(member.id),
   ]);
 
   if (!group) return null;

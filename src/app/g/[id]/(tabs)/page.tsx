@@ -24,7 +24,8 @@ import {
 import { formatMoney } from "@/lib/money";
 import { formatExpenseDateLabel, formatExpenseDateParts } from "@/lib/settle-marker";
 import {
-  getGroupSettleView,
+  beginGroupSettleView,
+  catchIfAbandoned,
   type SettleExpenseRow,
 } from "@/lib/settle-marker-store";
 
@@ -51,11 +52,15 @@ export default async function GroupDashboardPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const settle = beginGroupSettleView(id);
+  const groupPromise = catchIfAbandoned(
+    db.select().from(groups).where(eq(groups.id, id)).limit(1),
+  );
   const { member } = await requireMember(id);
 
   const [[group], settleView] = await Promise.all([
-    db.select().from(groups).where(eq(groups.id, id)).limit(1),
-    getGroupSettleView(id, member.id),
+    groupPromise,
+    settle.finish(member.id),
   ]);
 
   if (!group) {

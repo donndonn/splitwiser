@@ -13,9 +13,18 @@ import { getGroupBalances } from "@/lib/balances";
 import {
   areAllBalancesZero,
   isDismissalActive,
-  laterDate,
   shouldPromptMarkAsSettled,
 } from "@/lib/settle-marker";
+
+/**
+ * A query started before auth can reject after redirect or notFound, when
+ * nothing is left to await it. This handler marks that rejection as handled.
+ * Awaiting the original promise still throws.
+ */
+export function catchIfAbandoned<T>(promise: Promise<T>): Promise<T> {
+  void promise.catch(() => undefined);
+  return promise;
+}
 
 function asDate(value: Date | string | null | undefined): Date | null {
   if (value == null || value === "") return null;
@@ -63,22 +72,13 @@ export async function getLatestSettleMarker(
 export async function getGroupActivityWatermark(
   groupId: string,
 ): Promise<Date | null> {
-  const [[expenseMax], [settlementMax]] = await Promise.all([
-    db
-      .select({
-        value: sql<Date | null>`max(${expenses.createdAt})`,
-      })
-      .from(expenses)
-      .where(eq(expenses.groupId, groupId)),
-    db
-      .select({
-        value: sql<Date | null>`max(${settlements.createdAt})`,
-      })
-      .from(settlements)
-      .where(eq(settlements.groupId, groupId)),
-  ]);
-
-  return laterDate(asDate(expenseMax?.value), asDate(settlementMax?.value));
+  const rows = await db.execute<{ value: Date | string | null }>(sql`
+    select greatest(
+      (select max(${expenses.createdAt}) from ${expenses} where ${eq(expenses.groupId, groupId)}),
+      (select max(${settlements.createdAt}) from ${settlements} where ${eq(settlements.groupId, groupId)})
+    ) as value
+  `);
+  return asDate(rows[0]?.value);
 }
 
 async function countOpenPeriodExpenses(
@@ -146,23 +146,64 @@ async function listExpenses(input: {
   }));
 }
 
-export async function getGroupSettleView(groupId: string, memberId: string) {
-  const [balances, latestMarker, dismissal, activityWatermark] =
+function loadDismissal(groupId: string, memberId: string) {
+  return db
+    .select()
+    .from(groupSettlePromptDismissals)
+    .where(
+      and(
+        eq(groupSettlePromptDismissals.groupId, groupId),
+        eq(groupSettlePromptDismissals.memberId, memberId),
+      ),
+    )
+    .limit(1)
+    .then((rows) => rows[0] ?? null);
+}
+
+/**
+ * Start the group reads that do not need the viewer. Call this before
+ * awaiting membership so those queries overlap the auth check.
+ * Rejections are handled if finish() never runs.
+ */
+export function beginGroupSettleView(groupId: string) {
+  const balancesPromise = catchIfAbandoned(getGroupBalances(groupId));
+  const latestMarkerPromise = catchIfAbandoned(getLatestSettleMarker(groupId));
+  const activityWatermarkPromise = catchIfAbandoned(
+    getGroupActivityWatermark(groupId),
+  );
+
+  return {
+    finish(memberId: string) {
+      return finishGroupSettleView(groupId, memberId, {
+        balancesPromise,
+        latestMarkerPromise,
+        activityWatermarkPromise,
+        dismissalPromise: loadDismissal(groupId, memberId),
+      });
+    },
+  };
+}
+
+export function getGroupSettleView(groupId: string, memberId: string) {
+  return beginGroupSettleView(groupId).finish(memberId);
+}
+
+async function finishGroupSettleView(
+  groupId: string,
+  memberId: string,
+  started: {
+    balancesPromise: ReturnType<typeof getGroupBalances>;
+    latestMarkerPromise: ReturnType<typeof getLatestSettleMarker>;
+    activityWatermarkPromise: ReturnType<typeof getGroupActivityWatermark>;
+    dismissalPromise: ReturnType<typeof loadDismissal>;
+  },
+) {
+  const [balances, latestMarker, activityWatermark, dismissal] =
     await Promise.all([
-      getGroupBalances(groupId),
-      getLatestSettleMarker(groupId),
-      db
-        .select()
-        .from(groupSettlePromptDismissals)
-        .where(
-          and(
-            eq(groupSettlePromptDismissals.groupId, groupId),
-            eq(groupSettlePromptDismissals.memberId, memberId),
-          ),
-        )
-        .limit(1)
-        .then((rows) => rows[0] ?? null),
-      getGroupActivityWatermark(groupId),
+      started.balancesPromise,
+      started.latestMarkerPromise,
+      started.activityWatermarkPromise,
+      started.dismissalPromise,
     ]);
 
   const settledAt = latestMarker?.settledAt ?? null;
