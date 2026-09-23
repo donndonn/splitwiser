@@ -9,7 +9,7 @@ This directory is the maintained source for verifying the user-facing behavior o
 - Run `verify-splitwiser show` and treat `URL`, `SPLITWISER_VERIFY_SECRET`, `VERIFY_ALICE_EMAIL`, `VERIFY_BOB_EMAIL`, and `GROUP_NAME_PREFIX` as literals.
 - Never drive an instance that was not started by this verification run. Never use `localhost:3000` or `localhost:3001`.
 - Every group created during the run must be named `<GROUP_NAME_PREFIX> <rest>` (example: `swv-a1b2c3d4 Cabin`).
-- Sign in through the `/signin` form labeled `Verification sign-in`. Do not complete Google OAuth.
+- Sign in through the `/signin` form labeled `Verification sign-in`. Do not complete Google or Apple OAuth.
 
 ## Driving conventions
 
@@ -42,7 +42,7 @@ Keep implementation details out of the map. Name only user paths, stable handles
 
 ## Features
 
-- [Sign in](./sign-in.md) covers the signed-out landing, Google CTA (do not complete), verify credentials, and sign out.
+- [Sign in](./sign-in.md) covers the signed-out landing, Google and Apple CTAs (do not complete), verify credentials, and sign out.
 - [Create a group](./create-group.md) covers creating a named group from the home list.
 - [Add an expense](./add-expense.md) covers manual expense entry, equal split, and persistence on group home.
 - [Expense detail](./expense-detail.md) covers opening a saved expense and expanding split math.
