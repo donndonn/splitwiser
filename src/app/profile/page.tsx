@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { signOut } from "@/auth";
 import { AppBottomNav } from "@/components/app-bottom-nav";
 import { AppShell } from "@/components/app-shell";
+import { InstallCoach } from "@/components/install-coach";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ThemeSelector } from "@/components/theme-selector";
@@ -60,6 +61,8 @@ export default async function ProfilePage() {
             <p className="truncate text-sm text-muted-foreground">{email}</p>
           </div>
         </div>
+
+        <InstallCoach venue="profile" />
 
         <ThemeSelector />
 

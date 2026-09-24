@@ -3,6 +3,7 @@ import { AddExpenseFab } from "@/components/add-expense-fab";
 import { UsersPlusIcon } from "@/components/users-plus-icon";
 import { AppBottomNav } from "@/components/app-bottom-nav";
 import { AppShell } from "@/components/app-shell";
+import { InstallCoach } from "@/components/install-coach";
 import { SignInProviders } from "@/components/sign-in-providers";
 import { Button } from "@/components/ui/button";
 import {
@@ -53,6 +54,7 @@ export default async function HomePage() {
           </Button>
         }
       >
+        <InstallCoach venue="home" />
         {withBalances.length === 0 ? (
           <Card>
             <CardHeader>
