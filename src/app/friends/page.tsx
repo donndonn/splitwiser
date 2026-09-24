@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { AppBottomNav } from "@/components/app-bottom-nav";
 import { AppShell } from "@/components/app-shell";
@@ -143,32 +144,36 @@ export default async function FriendsPage() {
               {friends.map((friend) => (
                 <li
                   key={friend.id}
-                  className="flex items-center gap-3 px-4 py-3"
+                  className="relative"
                 >
-                  <Avatar>
-                    <AvatarImage src={friend.image ?? undefined} alt="" />
-                    <AvatarFallback>
-                      {friend.displayName.slice(0, 1).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{friend.displayName}</p>
-                    <p className="truncate text-sm text-muted-foreground">
-                      {friend.username
-                        ? `@${friend.username}`
-                        : friend.email}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 flex-col items-end gap-0.5">
-                    <FriendBalance
-                      nets={balanceNets.get(friend.id) ?? []}
-                    />
-                    <form action={removeFriendAction.bind(null, friend.id)}>
-                      <Button type="submit" size="sm" variant="ghost">
-                        Remove
-                      </Button>
-                    </form>
-                  </div>
+                  <Link
+                    href={`/friends/${friend.id}`}
+                    className="flex min-h-24 items-center gap-3 rounded-2xl px-4 pb-9 pt-3 transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <Avatar>
+                      <AvatarImage src={friend.image ?? undefined} alt="" />
+                      <AvatarFallback>
+                        {friend.displayName.slice(0, 1).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium">{friend.displayName}</p>
+                      <p className="truncate text-sm text-muted-foreground">
+                        {friend.username
+                          ? `@${friend.username}`
+                          : friend.email}
+                      </p>
+                    </div>
+                    <FriendBalance nets={balanceNets.get(friend.id) ?? []} />
+                  </Link>
+                  <form
+                    action={removeFriendAction.bind(null, friend.id)}
+                    className="absolute bottom-2 right-3"
+                  >
+                    <Button type="submit" size="sm" variant="ghost">
+                      Remove
+                    </Button>
+                  </form>
                 </li>
               ))}
             </ul>

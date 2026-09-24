@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { aggregateFriendNets, friendBalancePhrase } from "./friend-balances";
+import {
+  aggregateFriendNets,
+  breakdownBySharedGroup,
+  friendBalancePhrase,
+} from "./friend-balances";
 
 const alice = { memberId: "m-alice", userId: "alice" };
 const bob = { memberId: "m-bob", userId: "bob" };
@@ -207,5 +211,73 @@ describe("friendBalancePhrase", () => {
     expect(friendBalancePhrase({ currency: "USD", netCents: 0 })).toBe(
       "settled",
     );
+  });
+});
+
+describe("breakdownBySharedGroup", () => {
+  it("keeps every shared group and its pairwise balance", () => {
+    const groups = [
+      {
+        groupId: "trip",
+        groupName: "Trip",
+        currency: "USD",
+        members: [alice, bob],
+        balances: [
+          { memberId: alice.memberId, netCents: 1200 },
+          { memberId: bob.memberId, netCents: -1200 },
+        ],
+      },
+      {
+        groupId: "dinner",
+        groupName: "Dinner",
+        currency: "USD",
+        members: [alice, bob],
+        balances: [
+          { memberId: alice.memberId, netCents: -500 },
+          { memberId: bob.memberId, netCents: 500 },
+        ],
+      },
+      {
+        groupId: "settled",
+        groupName: "Old trip",
+        currency: "EUR",
+        members: [alice, bob],
+        balances: [],
+      },
+      {
+        groupId: "other-debt",
+        groupName: "House",
+        currency: "USD",
+        members: [alice, bob, cara],
+        balances: [
+          { memberId: alice.memberId, netCents: -300 },
+          { memberId: bob.memberId, netCents: 0 },
+          { memberId: cara.memberId, netCents: 300 },
+        ],
+      },
+    ];
+
+    const breakdown = breakdownBySharedGroup({
+      viewerUserId: "alice",
+      friendUserId: "bob",
+      groups,
+    });
+
+    expect(breakdown).toEqual([
+      { groupId: "trip", groupName: "Trip", currency: "USD", netCents: 1200 },
+      { groupId: "dinner", groupName: "Dinner", currency: "USD", netCents: -500 },
+      { groupId: "settled", groupName: "Old trip", currency: "EUR", netCents: 0 },
+      { groupId: "other-debt", groupName: "House", currency: "USD", netCents: 0 },
+    ]);
+    expect(breakdown.reduce((sum, group) => sum + group.netCents, 0)).toBe(
+      700,
+    );
+    expect(
+      aggregateFriendNets({
+        viewerUserId: "alice",
+        friendUserIds: ["bob"],
+        groups,
+      }).get("bob"),
+    ).toEqual([{ currency: "USD", netCents: 700 }]);
   });
 });
