@@ -8,6 +8,13 @@ import {
   markGroupSettledAction,
 } from "@/app/g/[id]/settle/actions";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 export function MarkAsSettledPrompt({ groupId }: { groupId: string }) {
   const router = useRouter();
@@ -50,13 +57,15 @@ export function MarkAsSettledPrompt({ groupId }: { groupId: string }) {
   }
 
   return (
-    <section className="mb-6 border-b border-border/70 bg-accent/45 px-4 py-4">
-      <h2 className="text-sm font-semibold">Everyone&apos;s settled up</h2>
-      <p className="mt-1 text-sm text-muted-foreground">
+    <Card className="mb-4" size="sm">
+      <CardHeader>
+        <CardTitle>Everyone&apos;s settled up</CardTitle>
+        <CardDescription>
           Mark as settled? Recent expenses will only show what happens after
           this point. Earlier ones stay in history.
-      </p>
-      <div className="mt-3 flex justify-end gap-2">
+        </CardDescription>
+      </CardHeader>
+      <CardFooter className="justify-end gap-2">
         <Button
           type="button"
           variant="ghost"
@@ -69,7 +78,7 @@ export function MarkAsSettledPrompt({ groupId }: { groupId: string }) {
         <Button type="button" size="sm" disabled={pending} onClick={confirm}>
           Mark as settled
         </Button>
-      </div>
-    </section>
+      </CardFooter>
+    </Card>
   );
 }

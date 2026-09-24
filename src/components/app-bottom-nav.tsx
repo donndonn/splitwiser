@@ -32,7 +32,7 @@ export function AppBottomNav() {
   return (
     <nav
       aria-label="App navigation"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-border/70 bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-border/60 bg-card/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl supports-[backdrop-filter]:bg-card/80"
     >
       <ul className="mx-auto flex max-w-lg items-stretch justify-between gap-0.5 px-1">
         {tabs.map((tab) => {
@@ -48,14 +48,14 @@ export function AppBottomNav() {
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "relative flex min-h-[var(--tab-bar-height)] flex-col items-center justify-center gap-0.5 px-0.5 py-2 text-[11px] font-medium transition-colors",
+                  "relative flex min-h-[var(--tab-bar-height)] flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 py-2 text-[10px] font-medium transition-colors",
                   active
                     ? "text-primary"
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 {active && (
-                  <span className="absolute top-0 h-0.5 w-8 rounded-full bg-primary" />
+                  <span className="absolute top-1 h-1 w-5 rounded-full bg-primary" />
                 )}
                 <Icon
                   className="size-5 shrink-0"

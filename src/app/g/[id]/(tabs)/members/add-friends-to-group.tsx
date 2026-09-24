@@ -24,7 +24,7 @@ export function AddFriendsToGroup({
 
   if (friends.length === 0) {
     return (
-      <div className="space-y-2 border-t border-border/70 pt-6">
+      <div className="space-y-2 rounded-xl border p-4">
         <h3 className="text-sm font-medium">Add from friends</h3>
         <p className="text-xs text-muted-foreground">
           No friends left to add. Invite someone from Friends, or they may
@@ -35,7 +35,7 @@ export function AddFriendsToGroup({
   }
 
   return (
-    <div className="space-y-3 border-t border-border/70 pt-6">
+    <div className="space-y-3 rounded-xl border p-4">
       <div>
         <h3 className="text-sm font-medium">Add from friends</h3>
         <p className="text-xs text-muted-foreground">
