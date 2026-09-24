@@ -79,7 +79,7 @@ export default async function SettingsPage({
               .map((m) => (
                 <li
                   key={m.id}
-                  className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm"
+                  className="flex items-center justify-between border-b border-border/70 py-3 text-sm"
                 >
                   <span>
                     {m.displayName}

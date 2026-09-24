@@ -32,7 +32,7 @@ export function GroupBottomNav({ groupId }: { groupId: string }) {
   const base = `/g/${groupId}`;
 
   return (
-    <nav className="shrink-0 border-t border-border/60 bg-card pb-[env(safe-area-inset-bottom)]">
+    <nav className="shrink-0 border-t border-border/70 bg-background pb-[env(safe-area-inset-bottom)]">
       <ul className="mx-auto flex max-w-lg items-stretch justify-between gap-0.5 px-1">
         {tabs.map((tab) => {
           const href = `${base}${tab.href}`;
@@ -46,14 +46,14 @@ export function GroupBottomNav({ groupId }: { groupId: string }) {
               <Link
                 href={href}
                 className={cn(
-                  "relative flex min-h-[var(--tab-bar-height)] flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 py-2 text-[10px] font-medium transition-colors",
+                  "relative flex min-h-[var(--tab-bar-height)] flex-col items-center justify-center gap-0.5 px-0.5 py-2 text-[11px] font-medium transition-colors",
                   active
                     ? "text-primary"
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 {active && (
-                  <span className="absolute top-1 h-1 w-5 rounded-full bg-primary" />
+                  <span className="absolute top-0 h-0.5 w-8 rounded-full bg-primary" />
                 )}
                 <Icon className="size-5 shrink-0" strokeWidth={active ? 2.4 : 1.8} />
                 <span className="max-w-full truncate">{tab.label}</span>

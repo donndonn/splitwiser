@@ -54,7 +54,7 @@ export default async function FriendDetailPage({
   return (
     <>
       <AppShell title={name} backHref="/friends" withBottomNav>
-        <section className="mb-8 flex items-center gap-4 rounded-2xl bg-card p-5 ring-1 ring-foreground/[0.07]">
+        <section className="mb-8 flex items-center gap-4 border-b border-border/70 pb-7 pt-2">
           <Avatar className="size-16 shrink-0 text-xl">
             <AvatarImage src={friend.image ?? undefined} alt="" />
             <AvatarFallback>{name.slice(0, 1).toUpperCase()}</AvatarFallback>
@@ -100,7 +100,7 @@ export default async function FriendDetailPage({
             </span>
           </div>
           {sharedGroups.length === 0 ? (
-            <p className="rounded-2xl bg-card px-4 py-6 text-sm text-muted-foreground ring-1 ring-foreground/[0.07]">
+            <p className="border-y border-border/70 py-7 text-sm text-muted-foreground">
               You and {name} aren&apos;t in any groups together yet.
             </p>
           ) : (
@@ -110,7 +110,7 @@ export default async function FriendDetailPage({
                   <li key={group.groupId}>
                     <Link
                       href={`/g/${group.groupId}/balances`}
-                      className="flex min-h-20 items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none"
+                      className="flex min-h-20 items-center gap-3 py-3 transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none"
                     >
                       <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground">
                         <WalletCards className="size-5" aria-hidden="true" />

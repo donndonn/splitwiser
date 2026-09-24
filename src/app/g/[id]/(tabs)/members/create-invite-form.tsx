@@ -34,7 +34,7 @@ export function CreateInviteForm({ groupId }: { groupId: string }) {
   const [link, setLink] = useState<string | null>(null);
 
   return (
-    <div className="space-y-3 rounded-xl border p-4">
+    <div className="space-y-3 border-t border-border/70 pt-6">
       <h3 className="text-sm font-medium">Create invite link</h3>
       <form
         className="space-y-3"

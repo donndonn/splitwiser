@@ -5,6 +5,7 @@ import { ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { removeExpenseAction } from "@/app/g/[id]/expenses/actions";
 import { SwipeableExpenseRow } from "@/components/swipeable-expense-row";
+import { EmptyState } from "@/components/empty-state";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,12 +16,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { viewerExpenseShare } from "@/lib/expense-row";
 import { formatMoney } from "@/lib/money";
 import { cn, groupedListClass } from "@/lib/utils";
@@ -92,14 +87,9 @@ export function RecentExpensesList({
 
   if (items.length === 0 && !showHistory) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">No expenses yet</CardTitle>
-          <CardDescription>
-            Add the first one to start splitting.
-          </CardDescription>
-        </CardHeader>
-      </Card>
+      <EmptyState title="No expenses yet">
+        Add the first one to start splitting.
+      </EmptyState>
     );
   }
 
