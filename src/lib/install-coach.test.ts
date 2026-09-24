@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  GENERIC_INSTALL_HINT,
+  INSTALL_SHEET_BODY,
+  INSTALL_SHEET_TITLE,
+  IOS_INSTALL_STEPS,
   bootCoach,
   memoryFromStore,
   memoryToStore,
@@ -41,6 +45,24 @@ const homeVisible: CoachState = {
   surface: "generic",
   memory: { kind: "open" },
 };
+
+describe("install sheet copy", () => {
+  it("names the sheet and the Safari share path", () => {
+    expect(INSTALL_SHEET_TITLE).toBe("Install Splitwiser");
+    expect(INSTALL_SHEET_BODY).toBe(
+      "For the best experience, add Splitwiser to your home screen.",
+    );
+    expect(IOS_INSTALL_STEPS).toEqual([
+      "Open the browser menu (⋯) at the bottom of the screen.",
+      "Tap Share.",
+      "If Add to Home Screen is not visible, tap View More.",
+      "Tap Add to Home Screen.",
+      "Tap Add.",
+    ]);
+    expect(GENERIC_INSTALL_HINT).toContain("Install app");
+    expect(GENERIC_INSTALL_HINT).toContain("Add to Home Screen");
+  });
+});
 
 describe("memoryFromStore / memoryToStore", () => {
   it("treats null as open and stores open as deletion", () => {

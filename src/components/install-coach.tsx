@@ -1,17 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useSyncExternalStore } from "react";
-import { Share } from "lucide-react";
+import { Ellipsis, Share } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
+  GENERIC_INSTALL_HINT,
+  INSTALL_SHEET_BODY,
+  INSTALL_SHEET_TITLE,
+  IOS_INSTALL_STEPS,
   SESSION_KEY,
   STORAGE_KEY,
   bootCoach,
@@ -251,92 +255,119 @@ export function InstallCoach({ venue }: { venue: "home" | "profile" }) {
 
   const view = viewOf(snapshot).view;
   if (view === "silent") return null;
-  if (view === "profile-row") {
+
+  const sheet =
+    view === "native" || view === "ios-steps" || view === "generic-steps" ? (
+      <CoachSheet view={view} venue={venue} />
+    ) : null;
+
+  if (venue === "profile") {
     return (
-      <section className="mb-6 space-y-2" aria-labelledby="home-screen-heading">
-        <h2 id="home-screen-heading" className="text-sm font-medium">
-          Home screen
-        </h2>
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full"
-          onClick={() => dispatch({ type: "expand" })}
-        >
-          Add to Home Screen
-        </Button>
-      </section>
+      <>
+        <section className="mb-6 space-y-2" aria-labelledby="home-screen-heading">
+          <h2 id="home-screen-heading" className="text-sm font-medium">
+            Home screen
+          </h2>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={() => dispatch({ type: "expand" })}
+          >
+            Add to Home Screen
+          </Button>
+        </section>
+        {sheet}
+      </>
     );
   }
 
-  return <CoachCard view={view} live={venue === "home"} />;
+  return sheet;
 }
 
-function CoachCard({
+function dismissSheet(venue: "home" | "profile") {
+  const view = viewOf(snapshots[venue]).view;
+  if (view === "silent" || view === "profile-row") return;
+  if (venue === "profile") dispatch({ type: "collapse" });
+  else dispatch({ type: "not-now", now: Date.now() });
+}
+
+function CoachSheet({
   view,
-  live,
+  venue,
 }: {
   view: Exclude<CoachView["view"], "silent" | "profile-row">;
-  live: boolean;
+  venue: "home" | "profile";
 }) {
   return (
-    <Card
-      className="mb-4"
-      size="sm"
-      {...(live ? { "aria-live": "polite" as const } : {})}
+    <Sheet
+      open
+      onOpenChange={(next) => {
+        if (!next) dismissSheet(venue);
+      }}
     >
-      {view === "native" ? (
-        <CardHeader>
-          <CardTitle>Install Splitwiser</CardTitle>
-          <CardDescription>
-            Keep groups one tap away, without the browser bar.
-          </CardDescription>
-        </CardHeader>
-      ) : (
-        <CardContent>
-          {view === "ios-steps" ? (
-            <ol className="list-decimal space-y-2 pl-5 text-sm">
-              <li>
-                Tap{" "}
-                <span className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 align-middle text-foreground">
-                  <Share className="size-3.5" aria-hidden="true" />
-                  Share
-                </span>{" "}
-                in the Safari toolbar.
-              </li>
-              <li>Scroll and tap Add to Home Screen.</li>
-              <li>Tap Add.</li>
-            </ol>
-          ) : (
-            <p>
-              From the browser menu, choose Install app or Add to Home Screen.
-            </p>
-          )}
-        </CardContent>
-      )}
-      <CardFooter className="flex-wrap justify-end gap-2">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => dispatch({ type: "not-now", now: Date.now() })}
-        >
-          Not now
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => dispatch({ type: "retire" })}
-        >
-          Don&apos;t show again
-        </Button>
-        {view === "native" ? (
-          <Button type="button" size="sm" onClick={() => void onInstall()}>
-            Install
-          </Button>
+      <SheetContent
+        side="bottom"
+        className="mx-auto max-h-[min(32rem,85vh)] max-w-lg overflow-y-auto rounded-t-3xl border-border/70 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
+        {...(venue === "home" ? { "aria-live": "polite" as const } : {})}
+      >
+        <SheetHeader className="pr-12">
+          <SheetTitle>{INSTALL_SHEET_TITLE}</SheetTitle>
+          <SheetDescription>{INSTALL_SHEET_BODY}</SheetDescription>
+        </SheetHeader>
+        {view === "ios-steps" ? <IosSteps /> : null}
+        {view === "generic-steps" ? (
+          <p className="px-4 text-sm">{GENERIC_INSTALL_HINT}</p>
         ) : null}
-      </CardFooter>
-    </Card>
+        <SheetFooter>
+          {view === "native" ? (
+            <Button type="button" className="w-full" onClick={() => void onInstall()}>
+              Install
+            </Button>
+          ) : null}
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => dispatch({ type: "not-now", now: Date.now() })}
+            >
+              Not now
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => dispatch({ type: "retire" })}
+            >
+              Don&apos;t show again
+            </Button>
+          </div>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function IosSteps() {
+  return (
+    <ol className="list-decimal space-y-3 px-4 pl-9 text-sm">
+      <li>
+        Open the browser menu{" "}
+        <Ellipsis className="inline size-4 align-text-bottom" aria-hidden="true" />{" "}
+        at the bottom of the screen.
+      </li>
+      <li>
+        Tap{" "}
+        <span className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 align-middle text-foreground">
+          <Share className="size-3.5" aria-hidden="true" />
+          Share
+        </span>
+        .
+      </li>
+      <li>{IOS_INSTALL_STEPS[2]}</li>
+      <li>{IOS_INSTALL_STEPS[3]}</li>
+      <li>{IOS_INSTALL_STEPS[4]}</li>
+    </ol>
   );
 }

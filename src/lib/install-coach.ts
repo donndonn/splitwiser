@@ -1,3 +1,18 @@
+export const INSTALL_SHEET_TITLE = "Install Splitwiser";
+export const INSTALL_SHEET_BODY =
+  "For the best experience, add Splitwiser to your home screen.";
+
+export const IOS_INSTALL_STEPS = [
+  "Open the browser menu (⋯) at the bottom of the screen.",
+  "Tap Share.",
+  "If Add to Home Screen is not visible, tap View More.",
+  "Tap Add to Home Screen.",
+  "Tap Add.",
+] as const;
+
+export const GENERIC_INSTALL_HINT =
+  "Open the browser menu and choose Install app or Add to Home Screen.";
+
 export const APPEAR_DELAY_MS = 2_000;
 export const SNOOZE_MS = 7 * 24 * 60 * 60 * 1000;
 export const STORAGE_KEY = "splitwiser.install-coach";
