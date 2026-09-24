@@ -109,7 +109,7 @@ export default async function FriendDetailPage({
                 {sharedGroups.map((group) => (
                   <li key={group.groupId}>
                     <Link
-                      href={`/g/${group.groupId}`}
+                      href={`/g/${group.groupId}/balances`}
                       className="flex min-h-20 items-center gap-3 py-3 transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none"
                     >
                       <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground">
