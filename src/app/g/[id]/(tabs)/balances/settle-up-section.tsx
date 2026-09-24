@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition, type MouseEvent } from "react";
+import { ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -86,6 +87,7 @@ export function SettleUpSection({
   const [pending, startTransition] = useTransition();
   const [settleOpen, setSettleOpen] = useState(false);
   const [recordOpen, setRecordOpen] = useState(false);
+  const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
   const [pendingSuggestion, setPendingSuggestion] =
     useState<SettlementSuggestion | null>(null);
 
@@ -134,6 +136,11 @@ export function SettleUpSection({
     }
     return map;
   }, [suggestions, currentMemberId]);
+
+  const selectedRow = rows.find((row) => row.memberId === selectedRowId);
+  const selectedSuggestions = selectedRowId
+    ? (suggestionsByRow.get(selectedRowId) ?? [])
+    : [];
 
   function labelFor(suggestion: SettlementSuggestion) {
     return paymentActionLabel(
@@ -205,12 +212,9 @@ export function SettleUpSection({
         <ul className="divide-y divide-border">
           {rows.map((row) => {
             const rowSuggestions = suggestionsByRow.get(row.memberId) ?? [];
-            return (
-              <li
-                key={row.memberId}
-                className="flex items-center justify-between gap-3 px-4 py-3"
-              >
-                <div className="flex min-w-0 items-center gap-2.5">
+            const content = (
+              <>
+                <span className="flex min-w-0 items-center gap-2.5">
                   <Avatar size="sm">
                     <AvatarFallback>
                       {row.displayName.slice(0, 1).toUpperCase()}
@@ -220,11 +224,11 @@ export function SettleUpSection({
                     {row.displayName}
                     {row.isYou ? " (you)" : ""}
                   </span>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
+                </span>
+                <span className="flex shrink-0 items-center gap-2">
                   <span
                     className={cn(
-                      "text-sm font-medium",
+                      "text-right text-sm font-medium tabular-nums",
                       row.netCents > 0
                         ? "text-balance-positive"
                         : row.netCents < 0
@@ -238,61 +242,37 @@ export function SettleUpSection({
                         ? `owed ${formatMoney(row.netCents, currency)}`
                         : `owes ${formatMoney(-row.netCents, currency)}`}
                   </span>
-                  {rowSuggestions.map((suggestion) => (
-                    <Button
-                      key={`${suggestion.fromMemberId}-${suggestion.toMemberId}`}
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      disabled={pending}
-                      onClick={() => setPendingSuggestion(suggestion)}
-                    >
-                      {rowSuggestions.length > 1
-                        ? formatMoney(suggestion.amountCents, currency)
-                        : "Record"}
-                    </Button>
-                  ))}
-                </div>
+                  {rowSuggestions.length > 0 && (
+                    <ChevronRight
+                      className="size-4 text-muted-foreground"
+                      aria-hidden="true"
+                    />
+                  )}
+                </span>
+              </>
+            );
+            return (
+              <li key={row.memberId}>
+                {rowSuggestions.length > 0 ? (
+                  <button
+                    type="button"
+                    className="flex min-h-14 w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                    aria-label={`Payment options for ${row.displayName}`}
+                    disabled={pending}
+                    onClick={() => setSelectedRowId(row.memberId)}
+                  >
+                    {content}
+                  </button>
+                ) : (
+                  <div className="flex min-h-14 items-center justify-between gap-3 px-4 py-3">
+                    {content}
+                  </div>
+                )}
               </li>
             );
           })}
         </ul>
       </div>
-
-      {[
-        ...venmoPays.map((link) => ({
-          key: `pay-${link.toMemberId}`,
-          label: `Pay ${nameById.get(link.toMemberId) ?? "them"} ${formatMoney(link.amountCents, currency)}`,
-          link,
-        })),
-        ...venmoRequests.map((link) => ({
-          key: `request-${link.fromMemberId}`,
-          label: `Request ${nameById.get(link.fromMemberId) ?? "them"} ${formatMoney(link.amountCents, currency)}`,
-          link,
-        })),
-      ].map(({ key, label, link }) => (
-        <Button
-          key={key}
-          variant="outline"
-          size="lg"
-          className="w-full min-w-0 justify-between overflow-hidden border-transparent bg-[#008CFF] text-white shadow-none hover:bg-[#0074FF] hover:text-white active:bg-[#0074FF] dark:border-transparent dark:bg-[#008CFF] dark:text-white dark:hover:bg-[#0074FF] dark:hover:text-white"
-          asChild
-        >
-          <a
-            href={link.webUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            title={`@${link.username}`}
-            onClick={(event) => onVenmoClick(event, link)}
-          >
-            <span className="flex min-w-0 flex-1 items-center gap-2">
-              <VenmoMark className="size-4 shrink-0" />
-              <span className="truncate">{label}</span>
-            </span>
-            <span className="shrink-0 font-bold tracking-tight">Venmo</span>
-          </a>
-        </Button>
-      ))}
 
       {suggestions.length > 0 ? (
         <>
@@ -415,6 +395,92 @@ export function SettleUpSection({
               currentMemberId={currentMemberId}
               onSuccess={() => setRecordOpen(false)}
             />
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet
+        open={selectedRowId !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedRowId(null);
+        }}
+      >
+        <SheetContent side="bottom" className="mx-auto max-w-lg">
+          <SheetHeader>
+            <SheetTitle>
+              {selectedRow ? `Payments for ${selectedRow.displayName}` : "Payments"}
+            </SheetTitle>
+            <SheetDescription>
+              Choose a suggested payment. Venmo opens the payment or request;
+              record it here after the money moves.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="max-h-[60dvh] space-y-4 overflow-y-auto px-4 pb-8">
+            {selectedSuggestions.map((suggestion) => {
+              const venmoPay =
+                suggestion.fromMemberId === currentMemberId
+                  ? venmoPays.find(
+                      (link) =>
+                        link.toMemberId === suggestion.toMemberId &&
+                        link.amountCents === suggestion.amountCents,
+                    )
+                  : undefined;
+              const venmoRequest =
+                suggestion.toMemberId === currentMemberId
+                  ? venmoRequests.find(
+                      (link) =>
+                        link.fromMemberId === suggestion.fromMemberId &&
+                        link.amountCents === suggestion.amountCents,
+                    )
+                  : undefined;
+              const venmoLink = venmoPay ?? venmoRequest;
+
+              return (
+                <div
+                  key={`${suggestion.fromMemberId}-${suggestion.toMemberId}`}
+                  className="space-y-3 rounded-2xl bg-muted/50 p-4"
+                >
+                  <div className="flex items-baseline justify-between gap-3">
+                    <p className="min-w-0 text-sm font-medium">
+                      {labelFor(suggestion)}
+                    </p>
+                    <p className="shrink-0 text-sm font-semibold tabular-nums">
+                      {formatMoney(suggestion.amountCents, currency)}
+                    </p>
+                  </div>
+                  {venmoLink && (
+                    <Button
+                      variant="outline"
+                      className="w-full justify-center gap-2 border-transparent bg-[#008CFF] text-white shadow-none hover:bg-[#0074FF] hover:text-white active:bg-[#0074FF] dark:border-transparent dark:bg-[#008CFF] dark:text-white dark:hover:bg-[#0074FF] dark:hover:text-white"
+                      asChild
+                    >
+                      <a
+                        href={venmoLink.webUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={`@${venmoLink.username}`}
+                        onClick={(event) => onVenmoClick(event, venmoLink)}
+                      >
+                        <VenmoMark className="size-4" />
+                        {venmoPay ? "Pay with Venmo" : "Request on Venmo"}
+                      </a>
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    disabled={pending}
+                    onClick={() => {
+                      setSelectedRowId(null);
+                      setPendingSuggestion(suggestion);
+                    }}
+                  >
+                    Record payment
+                  </Button>
+                </div>
+              );
+            })}
           </div>
         </SheetContent>
       </Sheet>
