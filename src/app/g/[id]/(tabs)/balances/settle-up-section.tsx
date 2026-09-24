@@ -30,9 +30,9 @@ import {
 import { cn, groupedListClass } from "@/lib/utils";
 import {
   listVenmoPayLinks,
+  listVenmoRequestLinks,
   openVenmoPay,
   prefersVenmoApp,
-  type VenmoPayLink,
 } from "@/lib/venmo";
 import { recordSettlementAction, settleGroupAction } from "./actions";
 import { RecordPaymentForm } from "./record-payment-form";
@@ -94,6 +94,12 @@ export function SettleUpSection({
     [members],
   );
 
+  const venmoDirectory = useMemo(
+    () =>
+      new Map(members.map((member) => [member.id, member.venmoUsername])),
+    [members],
+  );
+
   const venmoPays = useMemo(
     () =>
       listVenmoPayLinks({
@@ -101,11 +107,21 @@ export function SettleUpSection({
         groupName,
         currentMemberId,
         suggestions,
-        venmoUsernameByMemberId: new Map(
-          members.map((member) => [member.id, member.venmoUsername]),
-        ),
+        venmoUsernameByMemberId: venmoDirectory,
       }),
-    [currency, groupName, currentMemberId, suggestions, members],
+    [currency, groupName, currentMemberId, suggestions, venmoDirectory],
+  );
+
+  const venmoRequests = useMemo(
+    () =>
+      listVenmoRequestLinks({
+        currency,
+        groupName,
+        currentMemberId,
+        suggestions,
+        venmoUsernameByMemberId: venmoDirectory,
+      }),
+    [currency, groupName, currentMemberId, suggestions, venmoDirectory],
   );
 
   const suggestionsByRow = useMemo(() => {
@@ -151,9 +167,9 @@ export function SettleUpSection({
     });
   }
 
-  function onPayVenmoClick(
+  function onVenmoClick(
     event: MouseEvent<HTMLAnchorElement>,
-    link: VenmoPayLink,
+    link: { appUrl: string; webUrl: string },
   ) {
     if (
       event.button !== 0 ||
@@ -243,9 +259,20 @@ export function SettleUpSection({
         </ul>
       </div>
 
-      {venmoPays.map((link) => (
+      {[
+        ...venmoPays.map((link) => ({
+          key: `pay-${link.toMemberId}`,
+          label: `Pay ${nameById.get(link.toMemberId) ?? "them"} ${formatMoney(link.amountCents, currency)}`,
+          link,
+        })),
+        ...venmoRequests.map((link) => ({
+          key: `request-${link.fromMemberId}`,
+          label: `Request ${nameById.get(link.fromMemberId) ?? "them"} ${formatMoney(link.amountCents, currency)}`,
+          link,
+        })),
+      ].map(({ key, label, link }) => (
         <Button
-          key={link.toMemberId}
+          key={key}
           variant="outline"
           size="lg"
           className="w-full min-w-0 justify-between overflow-hidden border-transparent bg-[#008CFF] text-white shadow-none hover:bg-[#0074FF] hover:text-white active:bg-[#0074FF] dark:border-transparent dark:bg-[#008CFF] dark:text-white dark:hover:bg-[#0074FF] dark:hover:text-white"
@@ -256,14 +283,11 @@ export function SettleUpSection({
             target="_blank"
             rel="noopener noreferrer"
             title={`@${link.username}`}
-            onClick={(event) => onPayVenmoClick(event, link)}
+            onClick={(event) => onVenmoClick(event, link)}
           >
             <span className="flex min-w-0 flex-1 items-center gap-2">
               <VenmoMark className="size-4 shrink-0" />
-              <span className="truncate">
-                Pay {nameById.get(link.toMemberId) ?? "them"}{" "}
-                {formatMoney(link.amountCents, currency)}
-              </span>
+              <span className="truncate">{label}</span>
             </span>
             <span className="shrink-0 font-bold tracking-tight">Venmo</span>
           </a>

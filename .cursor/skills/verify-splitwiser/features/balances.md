@@ -42,4 +42,4 @@ Preconditions:
 - After settlement, group home hides `Settle up` because net is 0. Use tab `Balances` to see payment history.
 - `Undo` is not an always-on button. It stays off-screen until the row is swiped left. There is no click that reveals it. A short left drag is the control.
 - Placeholder `Sam` cannot sign in. Only Alice can record or undo the payment in this recipe.
-- A blue `Pay … Venmo` link is a different feature (profile). It appears only when you owe a member who saved a Venmo username. Do not treat a missing Venmo button on the Sam placeholder flow as a balances failure.
+- A blue `Pay … Venmo` link appears when you owe a member who saved a Venmo username. A blue `Request … Venmo` link appears when a member who saved a Venmo username owes you. Both sit below the balance list and neither replaces `Record`. USD only. Do not treat a missing Venmo button on the Sam placeholder flow as a balances failure — Sam has no username.
