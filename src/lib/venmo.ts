@@ -25,32 +25,69 @@ export function venmoSettleNote(groupName: string): string {
   return note.length <= NOTE_MAX ? note : note.slice(0, NOTE_MAX);
 }
 
+/** `pay` sends money. `charge` is Venmo’s request (same paycharge scheme). */
+type VenmoTxn = "pay" | "charge";
+
 /**
- * Native Venmo pay link. `recipients` is what the app uses to pick the person.
+ * Native Venmo link. `recipients` is what the app uses to pick the person.
  * https://venmo.com/{user}?txn=pay does not always hand the recipient through.
+ * `txn=charge` is the request form of the same `venmo://paycharge` link.
  */
+function venmoAppTxnUrl(
+  txn: VenmoTxn,
+  username: string,
+  amount: string,
+  note: string,
+): string {
+  return `venmo://paycharge?txn=${txn}&recipients=${encodeURIComponent(username)}&amount=${encodeURIComponent(amount)}&note=${encodeURIComponent(note)}`;
+}
+
+/**
+ * Web link with amount and note. Profile-only `/u/{user}` does not prefill.
+ * On phones, try the app URL first, then this if the app does not open.
+ */
+function venmoWebTxnUrl(
+  txn: VenmoTxn,
+  username: string,
+  amount: string,
+  note: string,
+): string {
+  return `https://venmo.com/${encodeURIComponent(username)}?txn=${txn}&amount=${encodeURIComponent(amount)}&note=${encodeURIComponent(note)}`;
+}
+
 export function venmoAppPayUrl(
   username: string,
   amount: string,
   note: string,
 ): string {
-  return `venmo://paycharge?txn=pay&recipients=${encodeURIComponent(username)}&amount=${encodeURIComponent(amount)}&note=${encodeURIComponent(note)}`;
+  return venmoAppTxnUrl("pay", username, amount, note);
 }
 
-/**
- * Web pay link with amount and note. Profile-only `/u/{user}` does not prefill.
- * On phones, try {@link venmoAppPayUrl} first, then this if the app does not open.
- */
 export function venmoWebPayUrl(
   username: string,
   amount: string,
   note: string,
 ): string {
-  return `https://venmo.com/${encodeURIComponent(username)}?txn=pay&amount=${encodeURIComponent(amount)}&note=${encodeURIComponent(note)}`;
+  return venmoWebTxnUrl("pay", username, amount, note);
 }
 
-export type VenmoPayLink = {
-  toMemberId: string;
+export function venmoAppChargeUrl(
+  username: string,
+  amount: string,
+  note: string,
+): string {
+  return venmoAppTxnUrl("charge", username, amount, note);
+}
+
+export function venmoWebChargeUrl(
+  username: string,
+  amount: string,
+  note: string,
+): string {
+  return venmoWebTxnUrl("charge", username, amount, note);
+}
+
+type VenmoLinkBase = {
   username: string;
   amountCents: number;
   amount: string;
@@ -59,7 +96,16 @@ export type VenmoPayLink = {
   webUrl: string;
 };
 
-export function listVenmoPayLinks(input: {
+export type VenmoPayLink = VenmoLinkBase & {
+  toMemberId: string;
+};
+
+/** Debtor (`fromMemberId`) is the person you request money from. */
+export type VenmoRequestLink = VenmoLinkBase & {
+  fromMemberId: string;
+};
+
+type VenmoDirectoryInput = {
   currency: string;
   groupName: string;
   currentMemberId: string;
@@ -69,30 +115,59 @@ export function listVenmoPayLinks(input: {
     amountCents: number;
   }>;
   venmoUsernameByMemberId: ReadonlyMap<string, string | null | undefined>;
-}): VenmoPayLink[] {
+};
+
+function listDirectedVenmoLinks(
+  input: VenmoDirectoryInput,
+  txn: VenmoTxn,
+): Array<VenmoLinkBase & { counterpartyMemberId: string }> {
   if (input.currency.toUpperCase() !== "USD") return [];
 
   const note = venmoSettleNote(input.groupName);
-  const links: VenmoPayLink[] = [];
+  const links: Array<VenmoLinkBase & { counterpartyMemberId: string }> = [];
 
   for (const suggestion of input.suggestions) {
-    if (suggestion.fromMemberId !== input.currentMemberId) continue;
     if (suggestion.amountCents <= 0) continue;
-    const username = input.venmoUsernameByMemberId.get(suggestion.toMemberId);
+    const viewerIsPayer = suggestion.fromMemberId === input.currentMemberId;
+    const viewerIsPayee = suggestion.toMemberId === input.currentMemberId;
+    if (txn === "pay" ? !viewerIsPayer : !viewerIsPayee) continue;
+    const counterpartyMemberId =
+      txn === "pay" ? suggestion.toMemberId : suggestion.fromMemberId;
+    const username = input.venmoUsernameByMemberId.get(counterpartyMemberId);
     if (!username) continue;
     const amount = formatCents(suggestion.amountCents);
     links.push({
-      toMemberId: suggestion.toMemberId,
+      counterpartyMemberId,
       username,
       amountCents: suggestion.amountCents,
       amount,
       note,
-      appUrl: venmoAppPayUrl(username, amount, note),
-      webUrl: venmoWebPayUrl(username, amount, note),
+      appUrl: venmoAppTxnUrl(txn, username, amount, note),
+      webUrl: venmoWebTxnUrl(txn, username, amount, note),
     });
   }
 
   return links;
+}
+
+export function listVenmoPayLinks(input: VenmoDirectoryInput): VenmoPayLink[] {
+  return listDirectedVenmoLinks(input, "pay").map(
+    ({ counterpartyMemberId, ...link }) => ({
+      ...link,
+      toMemberId: counterpartyMemberId,
+    }),
+  );
+}
+
+export function listVenmoRequestLinks(
+  input: VenmoDirectoryInput,
+): VenmoRequestLink[] {
+  return listDirectedVenmoLinks(input, "charge").map(
+    ({ counterpartyMemberId, ...link }) => ({
+      ...link,
+      fromMemberId: counterpartyMemberId,
+    }),
+  );
 }
 
 export function prefersVenmoApp(): boolean {
@@ -100,7 +175,7 @@ export function prefersVenmoApp(): boolean {
   return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 }
 
-/** Open the Venmo app, then the web pay page if the app does not take over. */
+/** Open the Venmo app, then the web pay or request page if the app does not take over. */
 export function openVenmoPay(appUrl: string, webUrl: string): void {
   if (!prefersVenmoApp()) {
     window.open(webUrl, "_blank", "noopener,noreferrer");
