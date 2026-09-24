@@ -8,6 +8,12 @@ import {
   type RecentExpenseItem,
 } from "@/components/recent-expenses-list";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { db } from "@/db";
 import { groups } from "@/db/schema";
 import { requireMember } from "@/lib/auth-guards";
@@ -83,26 +89,44 @@ export default async function GroupDashboardPage({
         </Button>
       }
     >
-      <section className="mb-6 border-b border-border/70 pb-6" aria-label="Your balance">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Your balance</p>
-        <p className={net > 0 ? "mt-2 text-3xl font-semibold tracking-tight text-balance-positive" : net < 0 ? "mt-2 text-3xl font-semibold tracking-tight text-balance-negative" : "mt-2 text-3xl font-semibold tracking-tight"}>
-          {net === 0
-            ? "All settled up"
-            : net > 0
-              ? `You're owed ${formatMoney(net, group.currency)}`
-              : `You owe ${formatMoney(-net, group.currency)}`}
-        </p>
-        <p className="mt-2 text-sm text-muted-foreground">{balanceContext}</p>
-        {net !== 0 && (
-          <Button asChild variant="link" className="mt-3 h-auto px-0 text-primary">
-            <Link href={`/g/${id}/balances`}>Settle up →</Link>
-          </Button>
-        )}
-      </section>
+      <Card className="mb-4">
+        <CardHeader>
+          <CardDescription>Your balance</CardDescription>
+          <CardTitle
+            className={
+              net > 0
+                ? "text-2xl text-balance-positive"
+                : net < 0
+                  ? "text-2xl text-balance-negative"
+                  : "text-2xl"
+            }
+          >
+            {net === 0
+              ? "All settled up"
+              : net > 0
+                ? `You're owed ${formatMoney(net, group.currency)}`
+                : `You owe ${formatMoney(-net, group.currency)}`}
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">{balanceContext}</p>
+        </CardHeader>
+      </Card>
 
       {settleView.showPrompt ? <MarkAsSettledPrompt groupId={id} /> : null}
 
-      <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+      {net !== 0 && (
+        <div className="mb-6 flex justify-center">
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="text-muted-foreground"
+          >
+            <Link href={`/g/${id}/balances`}>Settle up</Link>
+          </Button>
+        </div>
+      )}
+
+      <h2 className="mb-2 text-sm font-medium text-muted-foreground">
         Recent expenses
       </h2>
       <RecentExpensesList

@@ -20,17 +20,19 @@ export function AppShell({
   return (
     <div className="mx-auto flex min-h-full w-full min-w-0 max-w-lg flex-col">
       {(title || backHref || actions) && (
-        <header className="sticky top-0 z-30 flex min-h-16 items-center gap-2 border-b border-border/50 bg-background/95 px-5 py-2 backdrop-blur-xl">
+        <header className="sticky top-0 z-30 flex min-h-16 items-center gap-2 border-b border-border/60 bg-background/90 px-4 py-2 backdrop-blur-xl supports-[backdrop-filter]:bg-background/75">
           {backHref ? (
             <Link
               href={backHref}
-              className="inline-flex size-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="inline-flex size-11 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
               aria-label="Back"
             >
               <ChevronLeft className="size-5" />
             </Link>
-          ) : null}
-          <h1 className="flex-1 truncate text-left text-lg font-semibold tracking-tight">
+          ) : (
+            <div className="size-11 shrink-0" />
+          )}
+          <h1 className="flex-1 truncate text-center text-base font-semibold tracking-tight">
             {title}
           </h1>
           <div className="flex min-w-11 shrink-0 items-center justify-end gap-1">
@@ -40,7 +42,7 @@ export function AppShell({
       )}
       <main
         className={cn(
-          "min-w-0 flex-1 px-5 py-6",
+          "min-w-0 flex-1 px-4 py-5",
           withBottomNav && "pb-24",
           className,
         )}

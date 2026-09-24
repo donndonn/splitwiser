@@ -2,9 +2,14 @@ import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { AppBottomNav } from "@/components/app-bottom-nav";
 import { AppShell } from "@/components/app-shell";
-import { EmptyState } from "@/components/empty-state";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { requireUser } from "@/lib/auth-guards";
@@ -46,16 +51,16 @@ export default async function FriendsPage() {
         withBottomNav
         actions={<FriendSearch hasUsername={hasUsername} />}
       >
-        <div className="space-y-8">
+        <div className="space-y-6">
 
         {incoming.length > 0 && (
           <div className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Friend requests</h3>
-            <ul className="divide-y divide-border/70 border-y border-border/70">
+            <h3 className="text-sm font-medium">Friend requests</h3>
+            <ul className="divide-y divide-border overflow-hidden rounded-2xl bg-card ring-1 ring-foreground/[0.07]">
               {incoming.map((req) => (
                 <li
                   key={req.id}
-                  className="flex items-center gap-3 py-3"
+                  className="flex items-center gap-3 px-4 py-3"
                 >
                   <Avatar>
                     <AvatarImage src={req.user.image ?? undefined} alt="" />
@@ -91,12 +96,12 @@ export default async function FriendsPage() {
 
         {outgoing.length > 0 && (
           <div className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Sent requests</h3>
-            <ul className="divide-y divide-border/70 border-y border-border/70">
+            <h3 className="text-sm font-medium">Sent requests</h3>
+            <ul className="divide-y divide-border overflow-hidden rounded-2xl bg-card ring-1 ring-foreground/[0.07]">
               {outgoing.map((req) => (
                 <li
                   key={req.id}
-                  className="flex items-center gap-3 py-3"
+                  className="flex items-center gap-3 px-4 py-3"
                 >
                   <Avatar>
                     <AvatarImage src={req.user.image ?? undefined} alt="" />
@@ -124,13 +129,18 @@ export default async function FriendsPage() {
         )}
 
         {friends.length === 0 ? (
-          <EmptyState title="No friends yet">
-            Search by email or @username to send a friend request.
-          </EmptyState>
+          <Card>
+            <CardHeader>
+              <CardTitle>No friends yet</CardTitle>
+              <CardDescription>
+                Search by email or @username to send a friend request.
+              </CardDescription>
+            </CardHeader>
+          </Card>
         ) : (
           <div className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Your friends</h3>
-            <ul className="divide-y divide-border/70 border-y border-border/70">
+            <h3 className="text-sm font-medium">Your friends</h3>
+            <ul className="divide-y divide-border overflow-hidden rounded-2xl bg-card shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
               {friends.map((friend) => (
                 <li
                   key={friend.id}
@@ -138,7 +148,7 @@ export default async function FriendsPage() {
                 >
                   <Link
                     href={`/friends/${friend.id}`}
-                    className="flex min-h-24 items-center gap-3 pb-9 pt-3 transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="flex min-h-24 items-center gap-3 rounded-2xl px-4 pb-9 pt-3 transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <Avatar>
                       <AvatarImage src={friend.image ?? undefined} alt="" />
@@ -158,7 +168,7 @@ export default async function FriendsPage() {
                   </Link>
                   <form
                     action={removeFriendAction.bind(null, friend.id)}
-                    className="absolute bottom-2 right-0"
+                    className="absolute bottom-2 right-3"
                   >
                     <Button type="submit" size="sm" variant="ghost">
                       Remove

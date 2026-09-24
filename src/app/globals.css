@@ -52,33 +52,33 @@
 }
 
 :root {
-  --background: #f7f8f6;
-  --foreground: #1d2926;
-  --card: #ffffff;
-  --card-foreground: #1d2926;
-  --popover: #ffffff;
-  --popover-foreground: #1d2926;
-  --primary: #176b5d;
-  --primary-foreground: #ffffff;
-  --secondary: #e9eeeb;
-  --secondary-foreground: #263a33;
-  --muted: #eef1ee;
-  --muted-foreground: #65736c;
-  --accent: #e2f0e9;
-  --accent-foreground: #205d4b;
+  --background: #f8f5ee;
+  --foreground: #1e2a28;
+  --card: #fffefa;
+  --card-foreground: #1e2a28;
+  --popover: #fffefa;
+  --popover-foreground: #1e2a28;
+  --primary: #17796f;
+  --primary-foreground: #fffefa;
+  --secondary: #ece7dc;
+  --secondary-foreground: #283c38;
+  --muted: #efece4;
+  --muted-foreground: #66736f;
+  --accent: #ddeee8;
+  --accent-foreground: #1d5d55;
   --destructive: #b34150;
   --destructive-foreground: #fffefa;
   --balance-positive: #2f7f68;
   --balance-negative: #a45765;
-  --border: #dce3dd;
-  --input: #cbd6cd;
+  --border: #d8d3c7;
+  --input: #cec8bb;
   --ring: #2d8c80;
   --chart-1: #17796f;
   --chart-2: #2f7f68;
   --chart-3: #a45765;
   --chart-4: #c3893a;
   --chart-5: #5558a8;
-  --radius: 0.75rem;
+  --radius: 0.875rem;
   /*
    * Add expense pill pocket, shared by Your groups (fixed to the viewport)
    * and group Home (absolute to the group shell). Both tab bars are
@@ -96,13 +96,13 @@
     var(--tab-bar-height) + 1px + var(--add-expense-fab-gap) +
       env(safe-area-inset-bottom, 0px)
   );
-  --sidebar: #ffffff;
-  --sidebar-foreground: #1d2926;
-  --sidebar-primary: #176b5d;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #e2f0e9;
-  --sidebar-accent-foreground: #205d4b;
-  --sidebar-border: #dce3dd;
+  --sidebar: #fffefa;
+  --sidebar-foreground: #1e2a28;
+  --sidebar-primary: #17796f;
+  --sidebar-primary-foreground: #fffefa;
+  --sidebar-accent: #ddeee8;
+  --sidebar-accent-foreground: #1d5d55;
+  --sidebar-border: #d8d3c7;
   --sidebar-ring: #2d8c80;
 }
 
@@ -149,6 +149,12 @@
   }
   body {
     @apply bg-background text-foreground;
+    background-image: radial-gradient(
+      circle at 50% -10rem,
+      color-mix(in oklch, var(--accent) 48%, transparent),
+      transparent 28rem
+    );
+    background-attachment: fixed;
   }
   html {
     @apply font-sans;
