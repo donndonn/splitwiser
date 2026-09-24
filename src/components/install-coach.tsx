@@ -12,6 +12,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import {
+  CHROME_IOS_INSTALL_STEPS,
   GENERIC_INSTALL_HINT,
   INSTALL_SHEET_BODY,
   INSTALL_SHEET_TITLE,
@@ -257,7 +258,10 @@ export function InstallCoach({ venue }: { venue: "home" | "profile" }) {
   if (view === "silent") return null;
 
   const sheet =
-    view === "native" || view === "ios-steps" || view === "generic-steps" ? (
+    view === "native" ||
+    view === "ios-steps" ||
+    view === "chrome-ios-steps" ||
+    view === "generic-steps" ? (
       <CoachSheet view={view} venue={venue} />
     ) : null;
 
@@ -316,6 +320,7 @@ function CoachSheet({
           <SheetDescription>{INSTALL_SHEET_BODY}</SheetDescription>
         </SheetHeader>
         {view === "ios-steps" ? <IosSteps /> : null}
+        {view === "chrome-ios-steps" ? <ChromeIosSteps /> : null}
         {view === "generic-steps" ? (
           <p className="px-4 text-sm">{GENERIC_INSTALL_HINT}</p>
         ) : null}
@@ -346,6 +351,24 @@ function CoachSheet({
         </SheetFooter>
       </SheetContent>
     </Sheet>
+  );
+}
+
+function ChromeIosSteps() {
+  return (
+    <ol className="list-decimal space-y-3 px-4 pl-9 text-sm">
+      <li>
+        Tap{" "}
+        <span className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 align-middle text-foreground">
+          <Share className="size-3.5" aria-hidden="true" />
+          Share
+        </span>{" "}
+        in the address bar at the top of the screen.
+      </li>
+      <li>{CHROME_IOS_INSTALL_STEPS[1]}</li>
+      <li>{CHROME_IOS_INSTALL_STEPS[2]}</li>
+      <li>{CHROME_IOS_INSTALL_STEPS[3]}</li>
+    </ol>
   );
 }
 

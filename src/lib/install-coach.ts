@@ -10,6 +10,13 @@ export const IOS_INSTALL_STEPS = [
   "Tap Add.",
 ] as const;
 
+export const CHROME_IOS_INSTALL_STEPS = [
+  "Tap Share in the address bar at the top of the screen.",
+  "If Add to Home Screen is not visible, tap View More.",
+  "Tap Add to Home Screen.",
+  "Tap Add on the confirm sheet.",
+] as const;
+
 export const GENERIC_INSTALL_HINT =
   "Open the browser menu and choose Install app or Add to Home Screen.";
 
@@ -18,7 +25,7 @@ export const SNOOZE_MS = 7 * 24 * 60 * 60 * 1000;
 export const STORAGE_KEY = "splitwiser.install-coach";
 export const SESSION_KEY = "splitwiser.install-coach.shot";
 
-export type Surface = "native" | "ios" | "generic";
+export type Surface = "native" | "ios" | "chrome-ios" | "generic";
 
 export type Persisted =
   | { kind: "open" }
@@ -48,6 +55,7 @@ export type CoachView =
   | { view: "profile-row" }
   | { view: "native" }
   | { view: "ios-steps" }
+  | { view: "chrome-ios-steps" }
   | { view: "generic-steps" };
 
 export type EnvSignals = {
@@ -90,6 +98,7 @@ type StoredV1 =
 
 const IOS_UA = /iPad|iPhone|iPod/;
 const MAC_UA = /Macintosh/;
+const CHROME_IOS_UA = /CriOS/;
 
 export function memoryFromStore(raw: string | null, now: number): Persisted {
   if (raw == null) return { kind: "open" };
@@ -157,7 +166,9 @@ export function stepCoach(state: CoachState, event: CoachEvent): CoachState {
 
   if (event.type === "bip-captured") {
     if (state.tag === "home" && state.phase === "resting") return state;
-    if (state.surface === "native") return state;
+    if (state.surface === "native" || state.surface === "chrome-ios") {
+      return state;
+    }
     return { ...state, surface: "native" };
   }
 
@@ -246,6 +257,7 @@ function classify(signals: EnvSignals): Surface | "installed" {
   ) {
     return "installed";
   }
+  if (CHROME_IOS_UA.test(signals.userAgent)) return "chrome-ios";
   if (signals.bipCaptured) return "native";
   if (IOS_UA.test(signals.userAgent)) return "ios";
   if (MAC_UA.test(signals.userAgent) && signals.maxTouchPoints > 1) {
@@ -260,6 +272,8 @@ function viewForSurface(surface: Surface): CoachView {
       return { view: "native" };
     case "ios":
       return { view: "ios-steps" };
+    case "chrome-ios":
+      return { view: "chrome-ios-steps" };
     case "generic":
       return { view: "generic-steps" };
     default: {

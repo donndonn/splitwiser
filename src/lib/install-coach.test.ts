@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  CHROME_IOS_INSTALL_STEPS,
   GENERIC_INSTALL_HINT,
   INSTALL_SHEET_BODY,
   INSTALL_SHEET_TITLE,
@@ -58,6 +59,12 @@ describe("install sheet copy", () => {
       "If Add to Home Screen is not visible, tap View More.",
       "Tap Add to Home Screen.",
       "Tap Add.",
+    ]);
+    expect(CHROME_IOS_INSTALL_STEPS).toEqual([
+      "Tap Share in the address bar at the top of the screen.",
+      "If Add to Home Screen is not visible, tap View More.",
+      "Tap Add to Home Screen.",
+      "Tap Add on the confirm sheet.",
     ]);
     expect(GENERIC_INSTALL_HINT).toContain("Install app");
     expect(GENERIC_INSTALL_HINT).toContain("Add to Home Screen");
@@ -176,6 +183,32 @@ describe("bootCoach", () => {
     ).toEqual({ tag: "installed" });
   });
 
+  it("classifies Chrome on iPhone and iPad as chrome-ios, even with a prompt", () => {
+    const crios =
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/126.0.6478.108 Mobile/15E148 Safari/604.1";
+    expect(boot({ signals: signals({ userAgent: crios }) })).toMatchObject({
+      tag: "home",
+      surface: "chrome-ios",
+    });
+    expect(
+      boot({
+        signals: signals({
+          userAgent: crios,
+          bipCaptured: true,
+          maxTouchPoints: 5,
+        }),
+      }),
+    ).toMatchObject({ surface: "chrome-ios" });
+    expect(
+      boot({
+        signals: signals({
+          userAgent:
+            "Mozilla/5.0 (iPad; CPU OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/126.0.6478.108 Mobile/15E148 Safari/604.1",
+        }),
+      }),
+    ).toMatchObject({ surface: "chrome-ios" });
+  });
+
   it("classifies iPhone, iPad, and iPod as ios", () => {
     for (const device of ["iPhone", "iPad", "iPod"]) {
       expect(
@@ -287,6 +320,31 @@ describe("bootCoach", () => {
 });
 
 describe("stepCoach / viewOf", () => {
+  it("shows chrome-ios steps and ignores a later install prompt", () => {
+    const crios =
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/128.0.6613.98 Mobile/15E148 Safari/604.1";
+    const armed = boot({
+      now: 0,
+      signals: signals({ userAgent: crios, maxTouchPoints: 5 }),
+    });
+    const showing = stepCoach(armed, { type: "tick", now: 2_000 });
+    expect(viewOf(showing)).toEqual({ view: "chrome-ios-steps" });
+    expect(showing).toMatchObject({
+      tag: "home",
+      phase: "visible",
+      surface: "chrome-ios",
+    });
+    expect(stepCoach(showing, { type: "bip-captured" })).toBe(showing);
+    const open: CoachState = {
+      tag: "profile",
+      phase: "open",
+      surface: "chrome-ios",
+      memory: { kind: "open" },
+    };
+    expect(stepCoach(open, { type: "bip-captured" })).toBe(open);
+    expect(viewOf(open)).toEqual({ view: "chrome-ios-steps" });
+  });
+
   it("shows ios steps after the delay and stays silent before it", () => {
     const armed = boot({
       now: 0,
