@@ -3,15 +3,10 @@ import { AddExpenseFab } from "@/components/add-expense-fab";
 import { UsersPlusIcon } from "@/components/users-plus-icon";
 import { AppBottomNav } from "@/components/app-bottom-nav";
 import { AppShell } from "@/components/app-shell";
+import { EmptyState } from "@/components/empty-state";
 import { InstallCoach } from "@/components/install-coach";
 import { SignInProviders } from "@/components/sign-in-providers";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { getOptionalUser } from "@/lib/auth-guards";
 import { listViewerGroupSummaries } from "@/lib/balances";
 import { formatMoney } from "@/lib/money";
@@ -56,35 +51,34 @@ export default async function HomePage() {
       >
         <InstallCoach venue="home" />
         {withBalances.length === 0 ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>No groups yet</CardTitle>
-              <CardDescription>
-                Create a group from the header, or open an invite link someone
-                shared with you.
-              </CardDescription>
-            </CardHeader>
-          </Card>
+          <EmptyState title="No groups yet">
+            Create a group from the header, or open an invite link someone shared
+            with you.
+          </EmptyState>
         ) : (
-          <div className={groupedListClass}>
-            <ul className="divide-y divide-border">
+          <section aria-labelledby="groups-heading">
+            <div className="mb-3 flex items-baseline justify-between">
+              <h2 id="groups-heading" className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">All groups</h2>
+              <span className="text-xs tabular-nums text-muted-foreground">{withBalances.length}</span>
+            </div>
+            <ul className={`${groupedListClass} divide-y divide-border/70`}>
               {withBalances.map((g) => (
                 <li key={g.groupId}>
                   <Link
                     href={`/g/${g.groupId}`}
-                    className="flex min-h-16 items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none"
+                    className="flex min-h-18 items-center justify-between gap-3 py-4 transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none"
                   >
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">
+                      <p className="truncate text-base font-semibold tracking-tight">
                         {g.groupName}
                       </p>
-                      <p className="truncate text-xs text-muted-foreground">
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
                         as {g.displayName}
                       </p>
                     </div>
                     <p
                       className={cn(
-                        "shrink-0 text-sm",
+                        "shrink-0 text-sm tabular-nums",
                         g.netCents > 0
                           ? "font-medium text-balance-positive"
                           : g.netCents < 0
@@ -102,7 +96,7 @@ export default async function HomePage() {
                 </li>
               ))}
             </ul>
-          </div>
+          </section>
         )}
       </AppShell>
       <AddExpenseFab

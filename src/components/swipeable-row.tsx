@@ -209,7 +209,7 @@ export function SwipeableRow({
 
       <div
         className={cn(
-          "relative touch-pan-y bg-card transition-transform duration-200 ease-out motion-reduce:transition-none",
+          "relative touch-pan-y bg-background transition-transform duration-200 ease-out motion-reduce:transition-none",
           dragging && "transition-none",
         )}
         style={{ transform: `translate3d(${displayedOffset}px, 0, 0)` }}

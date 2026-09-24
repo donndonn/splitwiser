@@ -616,7 +616,7 @@ export function ExpenseForm({
       }}
       className="min-w-0 space-y-5"
     >
-      <section className="min-w-0 space-y-4 overflow-hidden rounded-2xl bg-card p-4 shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
+      <section className="min-w-0 space-y-4 border-b border-border/70 pb-5">
         <div className="space-y-2">
           <Label htmlFor="description" className={fieldLabelClassName}>
             What was it for?
@@ -677,7 +677,7 @@ export function ExpenseForm({
         </div>
       </section>
 
-      <section className="min-w-0 space-y-4 overflow-hidden rounded-2xl bg-card p-4 shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
+      <section className="min-w-0 space-y-4 border-b border-border/70 pb-5">
         <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 py-0.5 text-sm">
           <span className="text-muted-foreground">Paid by</span>
           <button
@@ -918,7 +918,7 @@ export function ExpenseForm({
 
               {entryMode === "simple" ? (
         <div className="space-y-4">
-          <div className="overflow-hidden rounded-2xl bg-card shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
+          <div className="overflow-hidden border-y border-border/70">
               {members.map((member) => (
                 <div
                   key={member.id}
@@ -1082,7 +1082,7 @@ export function ExpenseForm({
                 </p>
               </div>
             ) : (
-              <div className="overflow-hidden rounded-2xl bg-card shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
+              <div className="overflow-hidden border-y border-border/70">
                 {items.map((item, index) => {
                   const assigned = assignedMembersFor(item);
                   const visibleAssignees = assigned.slice(0, 4);
@@ -1278,7 +1278,7 @@ export function ExpenseForm({
             </Button>
           </section>
 
-          <section className="overflow-hidden rounded-2xl bg-card shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
+          <section className="overflow-hidden border-y border-border/70">
             <div className="flex min-h-11 items-center gap-2 border-b border-border/65 px-3">
               <Label htmlFor="itemized-tax" className="w-8 shrink-0 text-sm">
                 Tax
@@ -1393,7 +1393,7 @@ export function ExpenseForm({
           {itemizedPreview.ok && (
             <section className="space-y-2">
               <Label className="px-1">Who owes what</Label>
-              <div className="overflow-hidden rounded-2xl bg-card shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
+              <div className="overflow-hidden border-y border-border/70">
                 {itemizedPreview.calculation.splits.map((split) => (
                   <div
                     key={split.memberId}
@@ -1574,7 +1574,7 @@ export function ExpenseForm({
           document.body,
         )}
 
-      <section className="min-w-0 space-y-2 overflow-hidden rounded-2xl bg-card p-4 shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
+      <section className="min-w-0 space-y-2 border-b border-border/70 pb-5">
         <Label htmlFor="notes" className={fieldLabelClassName}>
           Notes (optional)
         </Label>
@@ -1590,7 +1590,7 @@ export function ExpenseForm({
       {children}
 
       {allowReceiptUpload && (
-        <section className="min-w-0 space-y-3 overflow-hidden rounded-2xl bg-card p-4 shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
+        <section className="min-w-0 space-y-3 border-b border-border/70 pb-5">
           <div className="space-y-1">
             <Label className={fieldLabelClassName}>Receipt photo (optional)</Label>
             <p className="text-xs text-muted-foreground">

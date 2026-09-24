@@ -67,6 +67,9 @@ export default async function MembersPage({
 
   return (
     <AppShell title="Members" backHref={`/g/${id}`}>
+      <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        People in this group · {roster.length}
+      </h2>
       <div className={cn(groupedListClass, "mb-6")}>
         <ul className="divide-y divide-border">
           {roster.map((m) => (
@@ -97,7 +100,7 @@ export default async function MembersPage({
         <div className="space-y-6">
           <AddFriendsToGroup groupId={id} friends={friendsToAdd} />
 
-          <div className="space-y-3 rounded-xl border p-4">
+          <div className="space-y-3 border-t border-border/70 pt-6">
             <h3 className="text-sm font-medium">Add people by name</h3>
             <p className="text-xs text-muted-foreground">
               Add everyone you expect on the trip, then share an invite so they
@@ -123,7 +126,7 @@ export default async function MembersPage({
                 {inviteRows.map((inv) => (
                   <li
                     key={inv.id}
-                    className="rounded-lg border px-3 py-2 text-sm"
+                    className="border-t border-border/70 py-3 text-sm"
                   >
                     <p className="break-all font-mono text-xs">
                       /join/{inv.token}

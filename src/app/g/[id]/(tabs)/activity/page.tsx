@@ -2,12 +2,7 @@ import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { desc, eq, inArray } from "drizzle-orm";
 import { AppShell } from "@/components/app-shell";
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { EmptyState } from "@/components/empty-state";
 import { db } from "@/db";
 import {
   expenses,
@@ -73,15 +68,9 @@ export default async function ActivityPage({
   return (
     <AppShell title="Activity" backHref={`/g/${id}`}>
       {activities.length === 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>No activity yet</CardTitle>
-            <CardDescription>
-              Expense changes, payments, and membership updates will show up
-              here.
-            </CardDescription>
-          </CardHeader>
-        </Card>
+        <EmptyState title="No activity yet">
+          Expense changes, payments, and membership updates will show up here.
+        </EmptyState>
       ) : (
         <div className={groupedListClass}>
           <ul className="divide-y divide-border">
@@ -123,12 +112,12 @@ export default async function ActivityPage({
                   {href ? (
                     <Link
                       href={href}
-                      className="block px-4 py-3 transition-colors hover:bg-muted/50"
+                      className="block py-4 transition-colors hover:bg-muted/50"
                     >
                       {content}
                     </Link>
                   ) : (
-                    <div className="px-4 py-3">{content}</div>
+                    <div className="py-4">{content}</div>
                   )}
                 </li>
               );
