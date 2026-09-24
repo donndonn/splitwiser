@@ -51,3 +51,4 @@ Keep implementation details out of the map. Name only user paths, stable handles
 - [Balances](./balances.md) covers owed amounts, recording a payment, swipe-to-undo, and the settled state.
 - [Mark as settled](./mark-as-settled.md) covers the post-$0 prompt, archiving Recent, history, dismiss, and a new open period.
 - [Profile](./profile.md) covers the Venmo username and the Balances pay link (do not complete Venmo).
+- [Install app](./install-app.md) covers the home-screen card on Your groups and the Profile control that opens it again.

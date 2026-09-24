@@ -100,6 +100,8 @@ Stable handles in this repo:
 | Friends search | header button `Find friends`; heading `Find friends`; textbox placeholder `email or @username`; button `Search` |
 | Payment undo | swipe the recent-payment row left; button `Undo` (hidden until open) |
 | Profile Venmo | heading `Profile`; button `Edit profile`; textbox `Venmo`; button `Save` |
+| Install card | on `Your groups`, buttons `Not now` and `Don't show again` |
+| Profile install | heading `Profile`; button `Add to Home Screen` |
 | Venmo pay link | link whose name includes `Pay` and `Venmo` (do not complete Venmo) |
 | Sign out | heading `Profile`; button `Sign out` |
 | Back | link `Back` |
