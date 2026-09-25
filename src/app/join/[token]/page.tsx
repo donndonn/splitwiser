@@ -86,7 +86,11 @@ export default async function JoinPage({
     new Date(),
     await countInviteReservations(db, invite.id, user?.id),
   );
-  if (status !== "live") {
+  // A full link still lets people sign in: a pending account holding one of
+  // its reservations resumes its join, and new accounts are rejected at
+  // admission.
+  const fullForNewAccounts = !user && status === "used_up";
+  if (status !== "live" && !fullForNewAccounts) {
     return (
       <AppShell title="Invite" backHref="/">
         <Card>
@@ -109,8 +113,9 @@ export default async function JoinPage({
           <CardHeader>
             <CardTitle>Join {invite.groupName}</CardTitle>
             <CardDescription>
-              Sign in with Google or Apple to join this group. New to
-              Splitwiser? This link creates your account.
+              {fullForNewAccounts
+                ? "This link has reached its join limit for new accounts. If you already signed up with it, sign in to finish joining."
+                : "Sign in with Google or Apple to join this group. New to Splitwiser? This link creates your account."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">

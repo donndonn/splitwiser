@@ -33,14 +33,17 @@ export async function startInviteSignInAction(
     .where(eq(invites.token, token))
     .limit(1);
   const secret = process.env.AUTH_SECRET;
-  const live =
+  // Full links still start sign-in so a pending account can resume its
+  // reserved join. Account creation rechecks the link and rejects new
+  // accounts once it is full.
+  const status =
     invite &&
     inviteStatus(
       invite,
       new Date(),
       await countInviteReservations(db, invite.id),
-    ) === "live";
-  if (!invite || !live || !secret) {
+    );
+  if (!invite || (status !== "live" && status !== "used_up") || !secret) {
     redirect(joinPath);
   }
 
