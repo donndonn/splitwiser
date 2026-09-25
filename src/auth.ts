@@ -4,16 +4,28 @@ import NextAuth from "next-auth";
 import Apple from "next-auth/providers/apple";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
+import type { Adapter, AdapterUser } from "next-auth/adapters";
 import { accounts, users, verificationTokens } from "@/db/schema";
 import { db } from "@/db";
+import { createUserWithAdmission } from "@/lib/auth-request-context";
+import { safeCallbackPath } from "@/lib/safe-redirect";
 import { isVerifyAuthEnabled, isVerifyEmail } from "@/lib/verify-auth";
 
+const drizzleAdapter = DrizzleAdapter(db, {
+  usersTable: users,
+  accountsTable: accounts,
+  verificationTokensTable: verificationTokens,
+});
+
+const adapter: Adapter = {
+  ...drizzleAdapter,
+  // Matches DrizzleAdapter: the users table allows a null email.
+  createUser: async (profile) =>
+    (await createUserWithAdmission(db, profile)) as AdapterUser,
+};
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: DrizzleAdapter(db, {
-    usersTable: users,
-    accountsTable: accounts,
-    verificationTokensTable: verificationTokens,
-  }),
+  adapter,
   providers: [
     Google({
       clientId: process.env.AUTH_GOOGLE_ID,
@@ -65,8 +77,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
   pages: {
     signIn: "/signin",
+    error: "/signin",
   },
   callbacks: {
+    async redirect({ url, baseUrl }) {
+      return new URL(safeCallbackPath(url, baseUrl), baseUrl).toString();
+    },
     async jwt({ token, user }) {
       if (user?.id) {
         token.sub = user.id;

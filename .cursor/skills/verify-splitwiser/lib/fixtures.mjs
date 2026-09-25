@@ -44,14 +44,17 @@ function connect() {
 async function seed(runId) {
   requireRunId(runId);
   const sql = connect();
+  // Alice and Bob are established (onboarded) accounts. Carol is an
+  // unfinished signup: signed up through an invitation but not yet in a group.
   const roles = [
-    { role: "alice", name: "Alice Verify" },
-    { role: "bob", name: "Bob Verify" },
+    { role: "alice", name: "Alice Verify", onboarded: true },
+    { role: "bob", name: "Bob Verify", onboarded: true },
+    { role: "carol", name: "Carol Verify", onboarded: false },
   ];
 
   try {
     const users = [];
-    for (const { role, name } of roles) {
+    for (const { role, name, onboarded } of roles) {
       const email = emailFor(runId, role);
       const username = usernameFor(runId, role);
       const existing = await sql`
@@ -61,15 +64,24 @@ async function seed(runId) {
         limit 1
       `;
       if (existing[0]) {
-        users.push({ ...existing[0], role });
+        if (onboarded) {
+          await sql`
+            update users set onboarding_completed_at = now()
+            where id = ${existing[0].id} and onboarding_completed_at is null
+          `;
+        }
+        users.push({ ...existing[0], role, onboarded });
         continue;
       }
       const id = randomUUID();
       await sql`
-        insert into users (id, name, username, email)
-        values (${id}, ${name}, ${username}, ${email})
+        insert into users (id, name, username, email, onboarding_completed_at)
+        values (
+          ${id}, ${name}, ${username}, ${email},
+          ${onboarded ? sql`now()` : null}
+        )
       `;
-      users.push({ id, name, username, email, role });
+      users.push({ id, name, username, email, role, onboarded });
     }
 
     const fixtures = {

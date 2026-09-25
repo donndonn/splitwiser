@@ -1,4 +1,4 @@
-import { and, eq, inArray, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   friendRequests,
@@ -85,11 +85,23 @@ export async function listFriends(userId: string): Promise<FriendUser[]> {
       image: users.image,
     })
     .from(users)
-    .where(inArray(users.id, friendIds));
+    .where(
+      and(inArray(users.id, friendIds), isNotNull(users.onboardingCompletedAt)),
+    );
 
   return rows.map(toFriendUser).sort((a, b) =>
     a.displayName.localeCompare(b.displayName),
   );
+}
+
+/** Unfinished signups are hidden from discovery and cannot be added. */
+export async function isOnboardedUser(userId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.id, userId), isNotNull(users.onboardingCompletedAt)))
+    .limit(1);
+  return row != null;
 }
 
 export async function areFriends(
@@ -240,7 +252,12 @@ export async function findUserByEmailOrUsername(
         image: users.image,
       })
       .from(users)
-      .where(sql`lower(${users.email}) = ${q.toLowerCase()}`)
+      .where(
+        and(
+          sql`lower(${users.email}) = ${q.toLowerCase()}`,
+          isNotNull(users.onboardingCompletedAt),
+        ),
+      )
       .limit(1);
     row = found;
   } else {
@@ -255,7 +272,12 @@ export async function findUserByEmailOrUsername(
         image: users.image,
       })
       .from(users)
-      .where(sql`lower(${users.username}) = ${username}`)
+      .where(
+        and(
+          sql`lower(${users.username}) = ${username}`,
+          isNotNull(users.onboardingCompletedAt),
+        ),
+      )
       .limit(1);
     row = found;
   }

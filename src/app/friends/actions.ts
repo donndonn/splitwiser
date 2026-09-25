@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { friendRequests, friendships } from "@/db/schema";
 import { requireUser } from "@/lib/auth-guards";
-import { areFriends, orderedPair } from "@/lib/friends";
+import { areFriends, isOnboardedUser, orderedPair } from "@/lib/friends";
 
 function revalidateFriendViews() {
   revalidatePath("/friends");
@@ -17,6 +17,10 @@ export async function sendFriendRequestAction(toUserId: string) {
   const user = await requireUser("/friends");
   if (toUserId === user.id) {
     throw new Error("You cannot add yourself");
+  }
+
+  if (!(await isOnboardedUser(toUserId))) {
+    throw new Error("User not found");
   }
 
   if (await areFriends(user.id, toUserId)) {

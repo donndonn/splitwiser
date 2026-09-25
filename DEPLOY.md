@@ -86,3 +86,45 @@ npm run db:migrate
 
 - **iOS Safari**: Share → Add to Home Screen
 - **Android Chrome**: menu → Install app / Add to Home screen
+
+## 7. Invitations and the account cap
+
+New accounts can only be created by opening a group invitation link and continuing with Google or Apple. Each group has one current link, valid for 30 days or 15 joins. An account counts toward the cap from its first successful sign-in, before it joins a group; until it joins, it can only see invitation and onboarding pages. Existing accounts always keep signing in, even when the app is full.
+
+The cap lives in the singleton `app_settings` row and is read on every signup (no redeploy needed). Run these against the production database (Neon SQL editor or `psql "$DATABASE_URL_UNPOOLED"`).
+
+Inspect accounts:
+
+```sql
+select
+  count(*)                                              as total_accounts,
+  count(*) filter (where onboarding_completed_at is null) as pending_signups,
+  (select max_users from app_settings where id = 1)     as max_users
+from users;
+```
+
+Change the cap (`0` pauses new accounts; lowering it below the current count removes no one, it only blocks new signups):
+
+```sql
+update app_settings set max_users = 750, updated_at = now() where id = 1;
+```
+
+If the `app_settings` row is missing, new signups are refused and existing accounts still sign in. Restore it with `insert into app_settings (id, max_users) values (1, 500);`.
+
+Rejected signups are logged as `[admission] new account rejected` with a `reason` (`invite_required`, `invite_unavailable`, `full`, `closed`). Link resets and disables are logged as `[invites] invitation replaced`. Tokens and provider credentials are never logged.
+
+### First owner on an empty database
+
+There is no public signup bypass. To bootstrap a fresh database, insert the owner's account directly, using the email of their Google account:
+
+```sql
+insert into users (id, name, email, onboarding_completed_at)
+values (gen_random_uuid()::text, 'Owner Name', 'owner@example.com', now());
+```
+
+Then sign in with Google using that email. Auth.js links the Google identity to this row by email, so no invitation is required. Apple "Hide My Email" addresses will not match; use Google or the real Apple ID email. After that, the owner creates a group and shares its invitation link.
+
+### Rollout of invitation-only signup (migration `0011`)
+
+`npm run db:migrate` creates `app_settings` with a 500-account cap, marks every existing account as onboarded, and revokes all existing invitation links (admins create new ones from Members). Memberships are unchanged. Run the migration, then deploy.
+

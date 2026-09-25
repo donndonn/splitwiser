@@ -2,6 +2,7 @@ import Link from "next/link";
 import { and, eq, isNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { SignInProviders } from "@/components/sign-in-providers";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -15,26 +16,12 @@ import { Label } from "@/components/ui/label";
 import { db } from "@/db";
 import { groups, invites, members } from "@/db/schema";
 import { getOptionalUser } from "@/lib/auth-guards";
+import { inviteStatus, inviteUnavailableMessage } from "@/lib/invites";
+import { isVerifyAuthEnabled } from "@/lib/verify-auth";
 import {
   claimPlaceholderAction,
   joinAsNewMemberAction,
 } from "./actions";
-
-function inviteStatus(invite: {
-  revokedAt: Date | null;
-  expiresAt: Date | null;
-  maxUses: number | null;
-  uses: number;
-}) {
-  if (invite.revokedAt) return "revoked" as const;
-  if (invite.expiresAt && invite.expiresAt.getTime() < Date.now()) {
-    return "expired" as const;
-  }
-  if (invite.maxUses != null && invite.uses >= invite.maxUses) {
-    return "used_up" as const;
-  }
-  return "live" as const;
-}
 
 export default async function JoinPage({
   params,
@@ -73,27 +60,40 @@ export default async function JoinPage({
     );
   }
 
+  const user = await getOptionalUser();
+
+  // Members reach their group from any of its links, old or new, without
+  // consuming a join.
+  if (user) {
+    const [existing] = await db
+      .select({ id: members.id })
+      .from(members)
+      .where(
+        and(eq(members.groupId, invite.groupId), eq(members.userId, user.id)),
+      )
+      .limit(1);
+    if (existing) {
+      redirect(`/g/${invite.groupId}`);
+    }
+  }
+
   const status = inviteStatus(invite);
   if (status !== "live") {
-    const message =
-      status === "expired"
-        ? "This invite has expired."
-        : status === "used_up"
-          ? "This invite has reached its use limit."
-          : "This invite was revoked.";
     return (
       <AppShell title="Invite" backHref="/">
         <Card>
           <CardHeader>
             <CardTitle>Invite unavailable</CardTitle>
-            <CardDescription>{message}</CardDescription>
+            <CardDescription>
+              {inviteUnavailableMessage(status)} Ask a group admin for a new
+              link.
+            </CardDescription>
           </CardHeader>
         </Card>
       </AppShell>
     );
   }
 
-  const user = await getOptionalUser();
   if (!user) {
     return (
       <AppShell title="Join group" backHref="/">
@@ -101,33 +101,25 @@ export default async function JoinPage({
           <CardHeader>
             <CardTitle>Join {invite.groupName}</CardTitle>
             <CardDescription>
-              Sign in with Google to join this group.
+              Sign in with Google or Apple to join this group. New to
+              Splitwiser? This link creates your account.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <Button asChild className="w-full" size="lg">
-              <Link
-                href={`/signin?callbackUrl=${encodeURIComponent(`/join/${token}`)}`}
-              >
-                Sign in with Google
-              </Link>
-            </Button>
+          <CardContent className="space-y-3">
+            <SignInProviders redirectTo={`/join/${token}`} inviteToken={token} />
+            {isVerifyAuthEnabled() ? (
+              <Button asChild variant="ghost" className="w-full">
+                <Link
+                  href={`/signin?callbackUrl=${encodeURIComponent(`/join/${token}`)}`}
+                >
+                  Verification sign-in
+                </Link>
+              </Button>
+            ) : null}
           </CardContent>
         </Card>
       </AppShell>
     );
-  }
-
-  const [existing] = await db
-    .select()
-    .from(members)
-    .where(
-      and(eq(members.groupId, invite.groupId), eq(members.userId, user.id)),
-    )
-    .limit(1);
-
-  if (existing) {
-    redirect(`/g/${invite.groupId}`);
   }
 
   const placeholders = await db

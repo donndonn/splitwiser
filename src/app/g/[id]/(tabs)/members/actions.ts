@@ -1,56 +1,36 @@
 "use server";
 
 import { and, eq, ne, sql } from "drizzle-orm";
-import { nanoid } from "nanoid";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
-import { invites, members, users } from "@/db/schema";
+import { members, users } from "@/db/schema";
 import { logGroupActivity } from "@/lib/activity";
 import { requireAdmin, requireMember } from "@/lib/auth-guards";
 import { areFriends, displayNameForUser } from "@/lib/friends";
+import { changeGroupInviteLink, type InviteLinkChange } from "@/lib/invites";
 
-export async function createInviteAction(groupId: string, formData: FormData) {
-  await requireAdmin(groupId);
-
-  const expiresIn = String(formData.get("expiresIn") ?? "7d");
-  const maxUsesRaw = String(formData.get("maxUses") ?? "").trim();
-
-  let expiresAt: Date | null = null;
-  if (expiresIn === "1d") {
-    expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  } else if (expiresIn === "7d") {
-    expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  } else if (expiresIn === "30d") {
-    expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+/**
+ * Create (or reuse), reset, or disable the group's single invitation link.
+ * Returns the current token, or null after disabling.
+ */
+export async function changeInviteLinkAction(
+  groupId: string,
+  change: InviteLinkChange,
+): Promise<string | null> {
+  if (change !== "create" && change !== "reset" && change !== "disable") {
+    throw new Error("Unknown invite change");
   }
-
-  const maxUses = maxUsesRaw === "" ? null : Number(maxUsesRaw);
-  if (maxUses != null && (!Number.isInteger(maxUses) || maxUses < 1)) {
-    throw new Error("Max uses must be a positive integer");
-  }
-
   const { member } = await requireAdmin(groupId);
-  const token = nanoid(24);
-
-  await db.insert(invites).values({
+  const { token, replaced } = await changeGroupInviteLink(db, {
     groupId,
-    token,
-    expiresAt,
-    maxUses,
-    createdByMemberId: member.id,
+    actorMemberId: member.id,
+    change,
   });
-
+  if (replaced) {
+    console.info("[invites] invitation replaced", { groupId, change });
+  }
   revalidatePath(`/g/${groupId}/members`);
   return token;
-}
-
-export async function revokeInviteAction(groupId: string, inviteId: string) {
-  await requireAdmin(groupId);
-  await db
-    .update(invites)
-    .set({ revokedAt: new Date() })
-    .where(and(eq(invites.id, inviteId), eq(invites.groupId, groupId)));
-  revalidatePath(`/g/${groupId}/members`);
 }
 
 export async function addPlaceholderAction(
@@ -112,7 +92,7 @@ export async function addFriendAsMemberAction(
     .where(eq(users.id, friendUserId))
     .limit(1);
 
-  if (!friend) {
+  if (!friend || friend.onboardingCompletedAt == null) {
     throw new Error("User not found");
   }
 
