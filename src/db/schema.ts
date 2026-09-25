@@ -2,6 +2,7 @@ import { relations, sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -50,11 +51,23 @@ export const users = pgTable(
     email: text("email").unique(),
     emailVerified: timestamp("emailVerified", { mode: "date" }),
     image: text("image"),
+    /** Null until the account joins its first group. Pending accounts only
+     * reach invitation and onboarding pages. */
+    onboardingCompletedAt: timestamp("onboarding_completed_at", {
+      mode: "date",
+    }),
+    /** Invitation that admitted this account, so an unfinished signup can
+     * resume. Soft reference: invite rows are never deleted by the app. */
+    signupInviteId: text("signup_invite_id"),
   },
   (table) => [
     uniqueIndex("users_username_unique")
       .on(sql`lower(${table.username})`)
       .where(sql`${table.username} is not null`),
+    /** Pending signups reserve joins on their invitation. */
+    index("users_pending_signup_invite_idx")
+      .on(table.signupInviteId)
+      .where(sql`${table.onboardingCompletedAt} is null`),
   ],
 );
 
@@ -148,7 +161,31 @@ export const invites = pgTable(
       .references(() => members.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   },
-  (table) => [index("invites_group_id_idx").on(table.groupId)],
+  (table) => [
+    index("invites_group_id_idx").on(table.groupId),
+    /** One current (non-revoked) invitation per group. */
+    uniqueIndex("invites_group_current_unique")
+      .on(table.groupId)
+      .where(sql`${table.revokedAt} is null`),
+  ],
+);
+
+/**
+ * Singleton application settings (id is always 1). Edit directly in the
+ * database; see DEPLOY.md.
+ */
+export const appSettings = pgTable(
+  "app_settings",
+  {
+    id: integer("id").primaryKey().default(1),
+    /** Maximum registered accounts. 0 pauses new account creation. */
+    maxUsers: integer("max_users").notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("app_settings_singleton", sql`${table.id} = 1`),
+    check("app_settings_max_users_nonnegative", sql`${table.maxUsers} >= 0`),
+  ],
 );
 
 export const expenses = pgTable(
@@ -612,6 +649,7 @@ export type User = typeof users.$inferSelect;
 export type Group = typeof groups.$inferSelect;
 export type Member = typeof members.$inferSelect;
 export type Invite = typeof invites.$inferSelect;
+export type AppSettings = typeof appSettings.$inferSelect;
 export type Friendship = typeof friendships.$inferSelect;
 export type FriendRequest = typeof friendRequests.$inferSelect;
 export type Expense = typeof expenses.$inferSelect;

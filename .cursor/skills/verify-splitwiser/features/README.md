@@ -46,7 +46,8 @@ Keep implementation details out of the map. Name only user paths, stable handles
 - [Create a group](./create-group.md) covers creating a named group from the home list.
 - [Add an expense](./add-expense.md) covers manual expense entry, equal split, and persistence on group home.
 - [Expense detail](./expense-detail.md) covers opening a saved expense and expanding split math.
-- [Members](./members.md) covers placeholder names, adding a friend, and creating an invite link.
+- [Members](./members.md) covers placeholder names, adding a friend, and the invite link panel (create, reset, disable).
+- [Onboarding](./onboarding.md) covers invitation-only signup messages, an unfinished signup joining through a link, and the recovery page.
 - [Friends](./friends.md) covers search, request, accept, and the friends list.
 - [Balances](./balances.md) covers owed amounts, recording a payment, swipe-to-undo, and the settled state.
 - [Mark as settled](./mark-as-settled.md) covers the post-$0 prompt, archiving Recent, history, dismiss, and a new open period.

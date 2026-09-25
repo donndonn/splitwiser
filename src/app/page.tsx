@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { AddExpenseFab } from "@/components/add-expense-fab";
 import { UsersPlusIcon } from "@/components/users-plus-icon";
 import { AppBottomNav } from "@/components/app-bottom-nav";
@@ -34,8 +35,16 @@ export default async function HomePage() {
           </p>
         </div>
         <SignInProviders redirectTo="/" />
+        <p className="text-center text-sm text-muted-foreground">
+          New to Splitwiser? You&apos;ll need a group invitation link to sign
+          up.
+        </p>
       </div>
     );
+  }
+
+  if (!sessionUser.onboarded) {
+    redirect("/onboarding");
   }
 
   const withBalances = await listViewerGroupSummaries(sessionUser.id);

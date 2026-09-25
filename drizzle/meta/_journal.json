@@ -78,6 +78,13 @@
       "when": 1790136214924,
       "tag": "0010_venmo_username",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790359640208,
+      "tag": "0011_invite_only_signup",
+      "breakpoints": true
     }
   ]
 }

@@ -1,10 +1,9 @@
 import { get } from "@vercel/blob";
 import { eq } from "drizzle-orm";
 import { NextResponse, type NextRequest } from "next/server";
-import { auth } from "@/auth";
 import { db } from "@/db";
 import { expenses } from "@/db/schema";
-import { getMembership } from "@/lib/auth-guards";
+import { getMembership, getOptionalUser } from "@/lib/auth-guards";
 import { receiptImageHttpResult } from "@/lib/receipt-blob";
 
 export const dynamic = "force-dynamic";
@@ -23,9 +22,12 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ expenseId: string }> },
 ) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const user = await getOptionalUser();
+  if (!user) {
     return errorResponse(401, "Unauthorized");
+  }
+  if (!user.onboarded) {
+    return errorResponse(403, "Forbidden");
   }
 
   const { expenseId } = await params;
@@ -44,7 +46,7 @@ export async function GET(
     return errorResponse(404, "Not found");
   }
 
-  const member = await getMembership(expense.groupId, session.user.id);
+  const member = await getMembership(expense.groupId, user.id);
   if (!member) {
     return errorResponse(403, "Forbidden");
   }

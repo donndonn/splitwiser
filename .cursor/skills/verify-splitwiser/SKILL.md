@@ -34,7 +34,7 @@ Then seed Alice and Bob (emails `@splitwiser.invalid`) and confirm the instance 
 .cursor/skills/verify-splitwiser/bin/verify-splitwiser show
 ```
 
-`show` prints `URL`, `SPLITWISER_VERIFY_SECRET`, `VERIFY_ALICE_EMAIL`, `VERIFY_BOB_EMAIL`, and `GROUP_NAME_PREFIX`. Use those values as literals in the browser. Group names created during a run must start with `GROUP_NAME_PREFIX` (example: `swv-a1b2c3d4 Cabin`).
+`show` prints `URL`, `SPLITWISER_VERIFY_SECRET`, `VERIFY_ALICE_EMAIL`, `VERIFY_BOB_EMAIL`, `VERIFY_CAROL_EMAIL` (an unfinished signup, not yet onboarded), and `GROUP_NAME_PREFIX`. Use those values as literals in the browser. Group names created during a run must start with `GROUP_NAME_PREFIX` (example: `swv-a1b2c3d4 Cabin`).
 
 Preconditions the helper does not create: `.env.local` must exist with `DATABASE_URL` and `AUTH_SECRET`. That database is the same Neon instance as local development — not an isolated data dir. Isolation is by `swv-<RUN_ID>` prefixes, not by a throwaway database.
 

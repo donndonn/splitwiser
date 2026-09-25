@@ -3,13 +3,14 @@ import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { db } from "@/db";
-import { invites, members, users, type Invite } from "@/db/schema";
+import { invites, members, users } from "@/db/schema";
 import { requireMember } from "@/lib/auth-guards";
 import { listFriends, listFriendStatuses } from "@/lib/friends";
+import { countInviteReservations, inviteStatus } from "@/lib/invites";
 import { cn, groupedListClass } from "@/lib/utils";
 import { AddFriendsToGroup } from "./add-friends-to-group";
-import { addPlaceholderAction, revokeInviteAction } from "./actions";
-import { CreateInviteForm } from "./create-invite-form";
+import { addPlaceholderAction } from "./actions";
+import { InvitePanel, type InvitePanelInvite } from "./invite-panel";
 import { MemberRow } from "./member-row";
 
 export default async function MembersPage({
@@ -20,7 +21,7 @@ export default async function MembersPage({
   const { id } = await params;
   const { user, member: me } = await requireMember(id);
 
-  const [roster, activeInvites, friends] = await Promise.all([
+  const [roster, latestInvites, friends] = await Promise.all([
     db
       .select({
         id: members.id,
@@ -35,13 +36,16 @@ export default async function MembersPage({
       .leftJoin(users, eq(members.userId, users.id))
       .where(eq(members.groupId, id))
       .orderBy(members.createdAt),
+    // The newest link is the current one; after disabling, it shows as
+    // disabled so admins can create a new link.
     me.isAdmin
       ? db
           .select()
           .from(invites)
           .where(eq(invites.groupId, id))
           .orderBy(desc(invites.createdAt))
-      : Promise.resolve([] as Invite[]),
+          .limit(1)
+      : Promise.resolve([]),
     me.isAdmin ? listFriends(user.id) : Promise.resolve([]),
   ]);
 
@@ -55,15 +59,18 @@ export default async function MembersPage({
   );
   const friendsToAdd = friends.filter((f) => !linkedUserIds.has(f.id));
 
-  const inviteRows = activeInvites.map((inv) => ({
-    ...inv,
-    inactive:
-      inv.revokedAt != null ||
-      // Expiry is displayed to admins; treat past expiresAt as inactive.
-      // eslint-disable-next-line react-hooks/purity -- server request clock
-      (inv.expiresAt != null && inv.expiresAt.getTime() < Date.now()) ||
-      (inv.maxUses != null && inv.uses >= inv.maxUses),
-  }));
+  const latest = latestInvites[0];
+  const reserved = latest ? await countInviteReservations(db, latest.id) : 0;
+  const currentInvite: InvitePanelInvite | null = latest
+    ? {
+        token: latest.token,
+        status: inviteStatus(latest, new Date(), reserved),
+        reserved,
+        expiresAt: latest.expiresAt?.toISOString() ?? null,
+        uses: latest.uses,
+        maxUses: latest.maxUses,
+      }
+    : null;
 
   return (
     <AppShell title="Members" backHref={`/g/${id}`}>
@@ -114,43 +121,7 @@ export default async function MembersPage({
             </form>
           </div>
 
-          <CreateInviteForm groupId={id} />
-
-          {inviteRows.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-medium">Invite links</h3>
-              <ul className="space-y-2">
-                {inviteRows.map((inv) => (
-                  <li
-                    key={inv.id}
-                    className="rounded-lg border px-3 py-2 text-sm"
-                  >
-                    <p className="break-all font-mono text-xs">
-                      /join/{inv.token}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Uses {inv.uses}
-                      {inv.maxUses != null ? ` / ${inv.maxUses}` : ""}
-                      {inv.expiresAt
-                        ? ` · expires ${inv.expiresAt.toLocaleDateString()}`
-                        : " · no expiry"}
-                      {inv.inactive ? " · inactive" : ""}
-                    </p>
-                    {!inv.revokedAt && (
-                      <form
-                        action={revokeInviteAction.bind(null, id, inv.id)}
-                        className="mt-2"
-                      >
-                        <Button type="submit" size="sm" variant="ghost">
-                          Revoke
-                        </Button>
-                      </form>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <InvitePanel groupId={id} invite={currentInvite} />
         </div>
       ) : (
         <p className="text-sm text-muted-foreground">

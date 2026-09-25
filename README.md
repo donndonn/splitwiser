@@ -65,7 +65,20 @@ npm run dev
 | `npm run db:generate` | Generate Drizzle migrations |
 | `npm run db:migrate` | Apply migrations |
 | `npm run db:studio` | Open Drizzle Studio |
-| `npm test` | Run unit tests |
+| `npm test` | Run unit tests (database tests skip without `TEST_DATABASE_URL`) |
+
+### Database tests
+
+Concurrency and migration tests need a dedicated Postgres server. Each suite creates and drops its own database there; never point `TEST_DATABASE_URL` at a shared or production database.
+
+```bash
+docker run -d --name splitwiser-test-db -e POSTGRES_PASSWORD=postgres -p 54329:5432 postgres:16-alpine
+TEST_DATABASE_URL=postgres://postgres:postgres@localhost:54329/postgres npm test
+```
+
+## Signup and the account cap
+
+New accounts require a group invitation link, and total accounts are capped (500 by default). See [DEPLOY.md](./DEPLOY.md#7-invitations-and-the-account-cap) for how to inspect and change the cap.
 
 ## Deploy to Vercel
 

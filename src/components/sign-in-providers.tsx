@@ -1,13 +1,28 @@
 import { signIn } from "@/auth";
 import { Button } from "@/components/ui/button";
+import { startInviteSignInAction } from "@/lib/invite-sign-in";
 
-export function SignInProviders({ redirectTo }: { redirectTo: string }) {
+/**
+ * With `inviteToken`, sign-in starts from that invitation so a new account
+ * can be created; otherwise only existing accounts can sign in.
+ */
+export function SignInProviders({
+  redirectTo,
+  inviteToken,
+}: {
+  redirectTo: string;
+  inviteToken?: string;
+}) {
   return (
     <div className="flex flex-col gap-3">
       <form
         action={async () => {
           "use server";
-          await signIn("google", { redirectTo });
+          if (inviteToken) {
+            await startInviteSignInAction(inviteToken, "google");
+          } else {
+            await signIn("google", { redirectTo });
+          }
         }}
       >
         <Button type="submit" size="lg" className="w-full">
@@ -17,7 +32,11 @@ export function SignInProviders({ redirectTo }: { redirectTo: string }) {
       <form
         action={async () => {
           "use server";
-          await signIn("apple", { redirectTo });
+          if (inviteToken) {
+            await startInviteSignInAction(inviteToken, "apple");
+          } else {
+            await signIn("apple", { redirectTo });
+          }
         }}
       >
         <Button
