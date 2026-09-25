@@ -91,7 +91,7 @@ npm run db:migrate
 
 New accounts can only be created by opening a group invitation link and continuing with Google or Apple. Each group has one current link, valid for 30 days or 15 joins. An account counts toward the cap from its first successful sign-in, before it joins a group; until it joins, it can only see invitation and onboarding pages. It also reserves one of its link's 15 joins, so one link can never create more than 15 accounts; the reservation becomes a join when the account joins through that link (Members shows these as pending signups). Existing accounts always keep signing in, even when the app is full.
 
-The cap lives in the singleton `app_settings` row and is read on every signup (no redeploy needed). Run these against the production database (Neon SQL editor or `psql "$DATABASE_URL_UNPOOLED"`).
+The cap lives in the singleton `app_settings` row and is read on every signup (no redeploy needed). Change it from `/admin` (see below), or run these against the production database (Neon SQL editor or `psql "$DATABASE_URL_UNPOOLED"`).
 
 Inspect accounts:
 
@@ -112,6 +112,18 @@ update app_settings set max_users = 750, updated_at = now() where id = 1;
 If the `app_settings` row is missing, new signups are refused and existing accounts still sign in. Restore it with `insert into app_settings (id, max_users) values (1, 500);`.
 
 Rejected signups are logged as `[admission] new account rejected` with a `reason` (`invite_required`, `invite_unavailable`, `full`, `closed`). Link resets and disables are logged as `[invites] invitation replaced`. Tokens and provider credentials are never logged.
+
+### Site admin (`/admin`)
+
+Set `ADMIN_EMAILS` (comma-separated, case-insensitive) in the Vercel project's environment variables and redeploy. An onboarded account whose email is listed can open `/admin`; everyone else, signed out included, gets a 404. The page is not linked from the app.
+
+- **Overview**: accounts against the cap, pending signups, recent admin actions.
+- **Account cap**: set `max_users` (`0` pauses signups). Lowering it below the current count removes no one.
+- **Unfinished signups**: delete pending accounts older than 7 days, freeing their cap slots and their invite links' reserved joins.
+- **Users** (`/admin/users`): search by name, email, or username; filter active/pending; open a user to see their groups. Accounts created before migration `0012` show no signup date.
+- **Invite links** (`/admin/invites`): every group's current link; revoke any of them.
+
+Every change is recorded in the `admin_actions` table (actor email, action, details) and logged as `[admin] …`.
 
 ### First owner on an empty database
 

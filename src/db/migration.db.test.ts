@@ -84,3 +84,49 @@ describe.skipIf(!hasTestDatabase)("0011_invite_only_signup migration", () => {
     ).rejects.toThrow(/app_settings_singleton/);
   });
 });
+
+describe.skipIf(!hasTestDatabase)("0012_site_admin migration", () => {
+  let t: TestDatabase;
+
+  beforeAll(async () => {
+    t = await createTestDatabase();
+    const journal = JSON.parse(
+      await readFile(
+        path.resolve(__dirname, "../../drizzle/meta/_journal.json"),
+        "utf8",
+      ),
+    );
+    const index = journal.entries.findIndex(
+      (e: { tag: string }) => e.tag === "0012_site_admin",
+    );
+    await t.migrate(index);
+
+    await t.sql`
+      insert into users (id, email, onboarding_completed_at) values
+        ('active', 'a@example.test', now()),
+        ('pending', 'p@example.test', null)
+    `;
+
+    await t.migrate();
+  });
+
+  afterAll(async () => {
+    await t?.drop();
+  });
+
+  it("leaves existing accounts' signup date unknown", async () => {
+    const [row] = await t.sql`select created_at from users where id = 'active'`;
+    expect(row.created_at).toBeNull();
+  });
+
+  it("starts unfinished signups' cleanup window at rollout", async () => {
+    const [row] = await t.sql`select created_at from users where id = 'pending'`;
+    expect(row.created_at).not.toBeNull();
+  });
+
+  it("dates new accounts", async () => {
+    await t.sql`insert into users (id, email) values ('new', 'n@example.test')`;
+    const [row] = await t.sql`select created_at from users where id = 'new'`;
+    expect(row.created_at).not.toBeNull();
+  });
+});

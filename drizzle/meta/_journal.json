@@ -85,6 +85,13 @@
       "when": 1790359640208,
       "tag": "0011_invite_only_signup",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790363949239,
+      "tag": "0012_site_admin",
+      "breakpoints": true
     }
   ]
 }

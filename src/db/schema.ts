@@ -59,6 +59,8 @@ export const users = pgTable(
     /** Invitation that admitted this account, so an unfinished signup can
      * resume. Soft reference: invite rows are never deleted by the app. */
     signupInviteId: text("signup_invite_id"),
+    /** Null for accounts created before signup dates were recorded. */
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
   },
   (table) => [
     uniqueIndex("users_username_unique")
@@ -395,6 +397,38 @@ export const groupActivities = pgTable(
   ],
 );
 
+export type AdminActionType =
+  | "set_max_users"
+  | "delete_stale_pending_users"
+  | "revoke_invite";
+
+export type AdminActionDetails = {
+  fromMaxUsers?: number | null;
+  toMaxUsers?: number;
+  deletedUserIds?: string[];
+  olderThanDays?: number;
+  inviteId?: string;
+  groupId?: string;
+  groupName?: string;
+};
+
+/** Audit log of site admin changes, newest shown first on /admin. */
+export const adminActions = pgTable(
+  "admin_actions",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    /** Soft reference so the log outlives the account. */
+    actorUserId: text("actor_user_id").notNull(),
+    actorEmail: text("actor_email").notNull(),
+    action: text("action").$type<AdminActionType>().notNull(),
+    details: jsonb("details").$type<AdminActionDetails>().notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [index("admin_actions_created_idx").on(table.createdAt)],
+);
+
 /** Tracks Gemini expense-parse calls for per-user rate limiting. */
 export const aiParseRequests = pgTable(
   "ai_parse_requests",
@@ -662,6 +696,7 @@ export type GroupSettlePromptDismissal =
   typeof groupSettlePromptDismissals.$inferSelect;
 export type GroupActivity = typeof groupActivities.$inferSelect;
 export type AiParseRequest = typeof aiParseRequests.$inferSelect;
+export type AdminAction = typeof adminActions.$inferSelect;
 export type SplitMode = (typeof splitModeEnum.enumValues)[number];
 export type ExpenseEntryMode = (typeof expenseEntryModeEnum.enumValues)[number];
 export type GroupActivityType =
