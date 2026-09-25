@@ -236,6 +236,16 @@ export async function listAdminUsers(
   const q = input.query?.trim();
   const pattern = q ? `%${escapeLike(q)}%` : null;
 
+  // A joined aggregate, not a correlated subquery: Drizzle leaves columns
+  // unqualified in single-table selects, so users.id would resolve to
+  // members.id inside the subquery.
+  const groupCounts = client
+    .select({ userId: members.userId, groupCount: count().as("group_count") })
+    .from(members)
+    .where(isNotNull(members.userId))
+    .groupBy(members.userId)
+    .as("group_counts");
+
   const rows = await client
     .select({
       id: users.id,
@@ -245,9 +255,10 @@ export async function listAdminUsers(
       image: users.image,
       createdAt: users.createdAt,
       onboardingCompletedAt: users.onboardingCompletedAt,
-      groupCount: sql<number>`(select count(*)::int from ${members} where ${members.userId} = ${users.id})`,
+      groupCount: sql<number>`coalesce(${groupCounts.groupCount}, 0)::int`,
     })
     .from(users)
+    .leftJoin(groupCounts, eq(groupCounts.userId, users.id))
     .where(
       and(
         pattern

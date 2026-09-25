@@ -211,5 +211,24 @@ describe.skipIf(!hasTestDatabase)("site admin", () => {
       const byUsername = await listAdminUsers(t.db, { query: "PATTY" });
       expect(byUsername.users.map((u) => u.id)).toEqual(["p1"]);
     });
+
+    it("counts each user's groups", async () => {
+      const { adminUserId, groupId } = await seedGroupWithInvite(t.sql);
+      const second = await seedGroupWithInvite(t.sql);
+      await t.sql`
+        insert into members (id, group_id, user_id, display_name)
+        values ('extra-1', ${second.groupId}, ${adminUserId}, 'Also admin'),
+               ('extra-2', ${groupId}, null, 'Placeholder')
+      `;
+      await seedUsers(t.sql, 1, "lonely");
+
+      const { users } = await listAdminUsers(t.db, {});
+      const counts = Object.fromEntries(users.map((u) => [u.id, u.groupCount]));
+      expect(counts).toEqual({
+        [adminUserId]: 2,
+        [second.adminUserId]: 1,
+        "lonely-1": 0,
+      });
+    });
   });
 });
