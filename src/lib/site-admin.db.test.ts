@@ -10,7 +10,9 @@ import {
 import { admitNewUser } from "./admission";
 import {
   deleteStalePendingUsers,
+  getAdminGroup,
   getAdminOverview,
+  listAdminGroups,
   listAdminUsers,
   listCurrentInvites,
   revokeInvite,
@@ -179,6 +181,7 @@ describe.skipIf(!hasTestDatabase)("site admin", () => {
 
       expect(await getAdminOverview(t.db)).toEqual({
         total: 5,
+        groups: 1,
         pending: 1,
         stalePending: 0,
         maxUsers: 10,
@@ -210,6 +213,63 @@ describe.skipIf(!hasTestDatabase)("site admin", () => {
 
       const byUsername = await listAdminUsers(t.db, { query: "PATTY" });
       expect(byUsername.users.map((u) => u.id)).toEqual(["p1"]);
+    });
+
+    it("summarizes each group", async () => {
+      const trip = await seedGroupWithInvite(t.sql);
+      const empty = await seedGroupWithInvite(t.sql);
+      await t.sql`update groups set name = 'Empty 50%' where id = ${empty.groupId}`;
+      await t.sql`
+        insert into members (id, group_id, user_id, display_name) values
+          ('ph-1', ${trip.groupId}, null, 'Placeholder A'),
+          ('ph-2', ${trip.groupId}, null, 'Placeholder B')
+      `;
+      await t.sql`
+        insert into expenses (id, group_id, description, amount_cents, paid_by_member_id, created_by_member_id, spent_at)
+        values
+          ('e1', ${trip.groupId}, 'Dinner', 12345, ${trip.adminMemberId}, ${trip.adminMemberId}, '2026-09-01'),
+          ('e2', ${trip.groupId}, 'Taxi', 655, 'ph-1', ${trip.adminMemberId}, '2026-09-03')
+      `;
+      await t.sql`
+        insert into group_activities (id, group_id, type, payload, created_at)
+        values ('a1', ${trip.groupId}, 'member_joined', '{"actorName":"A"}', '2026-09-04')
+      `;
+      const { adminUserId } = trip;
+
+      const { groups } = await listAdminGroups(t.db, {});
+      const byId = Object.fromEntries(groups.map((g) => [g.id, g]));
+      expect(byId[trip.groupId]).toMatchObject({
+        accounts: 1,
+        placeholders: 2,
+        expenseCount: 2,
+        totalCents: 13000,
+        lastActivityAt: new Date("2026-09-04T00:00:00Z"),
+      });
+      expect(byId[empty.groupId]).toMatchObject({
+        accounts: 1,
+        placeholders: 0,
+        expenseCount: 0,
+        totalCents: 0,
+        lastActivityAt: null,
+      });
+
+      const search = await listAdminGroups(t.db, { query: "50%" });
+      expect(search.groups.map((g) => g.id)).toEqual([empty.groupId]);
+
+      const detail = await getAdminGroup(t.db, trip.groupId);
+      expect(detail).toMatchObject({
+        expenseCount: 2,
+        totalCents: 13000,
+        lastSpentAt: new Date("2026-09-03T00:00:00Z"),
+        lastActivityAt: new Date("2026-09-04T00:00:00Z"),
+        invite: { uses: 0, maxUses: 15, reserved: 0, status: "live" },
+      });
+      expect(detail?.members.map((m) => [m.displayName, m.email])).toEqual([
+        ["Admin", `${adminUserId}@example.test`],
+        ["Placeholder A", null],
+        ["Placeholder B", null],
+      ]);
+      expect(await getAdminGroup(t.db, "missing")).toBeNull();
     });
 
     it("counts each user's groups", async () => {

@@ -121,6 +121,7 @@ Set `ADMIN_EMAILS` (comma-separated, case-insensitive) in the Vercel project's e
 - **Account cap**: set `max_users` (`0` pauses signups). Lowering it below the current count removes no one.
 - **Unfinished signups**: delete pending accounts older than 7 days, freeing their cap slots and their invite links' reserved joins.
 - **Users** (`/admin/users`): search by name, email, or username; filter active/pending; open a user to see their groups. Accounts created before migration `0012` show no signup date.
+- **Groups** (`/admin/groups`): every group with members, placeholders, expense count and total, newest first; search by name. Open a group to see its members (linked to their user pages), last expense and activity, and its invite link (with revoke).
 - **Invite links** (`/admin/invites`): every group's current link; revoke any of them.
 
 Every change is recorded in the `admin_actions` table (actor email, action, details) and logged as `[admin] …`.

@@ -58,7 +58,8 @@ export default async function AdminPage() {
       <div className={cn(groupedListClass, "mb-6")}>
         <ul className="divide-y divide-border">
           {[
-            { href: "/admin/users", label: "Users" },
+            { href: "/admin/users", label: "Users", count: total },
+            { href: "/admin/groups", label: "Groups", count: overview.groups },
             { href: "/admin/invites", label: "Invite links" },
           ].map((item) => (
             <li key={item.href}>
@@ -67,7 +68,12 @@ export default async function AdminPage() {
                 className="flex min-h-12 items-center justify-between px-4 text-sm font-medium hover:bg-muted/50"
               >
                 {item.label}
-                <ChevronRight className="size-4 text-muted-foreground" />
+                <span className="flex items-center gap-1 text-muted-foreground">
+                  {item.count != null ? (
+                    <span className="tabular-nums">{item.count}</span>
+                  ) : null}
+                  <ChevronRight className="size-4" />
+                </span>
               </Link>
             </li>
           ))}
