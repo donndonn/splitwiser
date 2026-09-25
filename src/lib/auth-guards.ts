@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { members, users, type Member } from "@/db/schema";
+import { isSiteAdminEmail, type SiteAdminActor } from "@/lib/site-admin";
 
 export type SessionUser = {
   id: string;
@@ -111,4 +112,18 @@ export async function requireAdmin(groupId: string): Promise<{
     notFound();
   }
   return result;
+}
+
+/**
+ * An onboarded account whose email is listed in ADMIN_EMAILS. Everyone else,
+ * signed out included, gets a 404 so /admin is not discoverable.
+ */
+export async function requireSiteAdmin(): Promise<
+  SessionUser & SiteAdminActor
+> {
+  const user = await getSessionUser();
+  if (!user?.onboarded || !user.email || !isSiteAdminEmail(user.email)) {
+    notFound();
+  }
+  return { ...user, email: user.email };
 }
