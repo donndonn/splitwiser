@@ -55,7 +55,7 @@ describe.skipIf(!hasTestDatabase)("account admission", () => {
     expect(await userCount()).toBe(before);
   }
 
-  it("creates a pending account for a live invitation without consuming a join", async () => {
+  it("creates a pending account that reserves, but does not use, a join", async () => {
     const { inviteId } = await seedGroupWithInvite(t.sql);
     const user = await admitNewUser(t.db, {
       inviteId,
@@ -65,6 +65,46 @@ describe.skipIf(!hasTestDatabase)("account admission", () => {
     expect(user.signupInviteId).toBe(inviteId);
     const [invite] = await t.sql`select uses from invites where id = ${inviteId}`;
     expect(invite.uses).toBe(0);
+  });
+
+  it("admits at most the link's allowance of accounts, counting pending signups", async () => {
+    const { inviteId } = await seedGroupWithInvite(t.sql, { uses: 10 });
+    for (let i = 0; i < 5; i++) {
+      await admitNewUser(t.db, {
+        inviteId,
+        profile: { email: `pending-${i}@example.test` },
+      });
+    }
+    // 10 joins + 5 pending reservations fill the 15-join allowance.
+    await expectRejected(inviteId, "invite_unavailable");
+
+    // A pending signup that finishes joining elsewhere frees its reservation.
+    await t.sql`
+      update users set onboarding_completed_at = now()
+      where email = 'pending-0@example.test'
+    `;
+    await admitNewUser(t.db, {
+      inviteId,
+      profile: { email: "late@example.test" },
+    });
+  });
+
+  it("admits exactly one of many concurrent signups for the last free join", async () => {
+    const { inviteId } = await seedGroupWithInvite(t.sql, { uses: 14 });
+    const results = await Promise.allSettled(
+      Array.from({ length: 6 }, (_, i) =>
+        admitNewUser(t.connect(1).db, {
+          inviteId,
+          profile: { email: `link-racer-${i}@example.test` },
+        }),
+      ),
+    );
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    for (const r of results) {
+      if (r.status === "rejected") {
+        expect(r.reason.reason).toBe("invite_unavailable");
+      }
+    }
   });
 
   it("rejects signup without invitation context", async () => {

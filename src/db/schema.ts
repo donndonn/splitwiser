@@ -64,6 +64,10 @@ export const users = pgTable(
     uniqueIndex("users_username_unique")
       .on(sql`lower(${table.username})`)
       .where(sql`${table.username} is not null`),
+    /** Pending signups reserve joins on their invitation. */
+    index("users_pending_signup_invite_idx")
+      .on(table.signupInviteId)
+      .where(sql`${table.onboardingCompletedAt} is null`),
   ],
 );
 

@@ -1,5 +1,5 @@
 {
-  "id": "e0024b13-8cfb-4088-a478-acd412ab0cc1",
+  "id": "4748b595-8d91-4128-b97e-63c722eb3384",
   "prevId": "9d22cf77-c920-4932-a4df-3628af8c7160",
   "version": "7",
   "dialect": "postgresql",
@@ -1714,6 +1714,22 @@
           ],
           "isUnique": true,
           "where": "\"users\".\"username\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "users_pending_signup_invite_idx": {
+          "name": "users_pending_signup_invite_idx",
+          "columns": [
+            {
+              "expression": "signup_invite_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"users\".\"onboarding_completed_at\" is null",
           "concurrently": false,
           "method": "btree",
           "with": {}

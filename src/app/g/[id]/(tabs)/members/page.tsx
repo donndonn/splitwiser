@@ -6,7 +6,7 @@ import { db } from "@/db";
 import { invites, members, users } from "@/db/schema";
 import { requireMember } from "@/lib/auth-guards";
 import { listFriends, listFriendStatuses } from "@/lib/friends";
-import { inviteStatus } from "@/lib/invites";
+import { countInviteReservations, inviteStatus } from "@/lib/invites";
 import { cn, groupedListClass } from "@/lib/utils";
 import { AddFriendsToGroup } from "./add-friends-to-group";
 import { addPlaceholderAction } from "./actions";
@@ -60,10 +60,12 @@ export default async function MembersPage({
   const friendsToAdd = friends.filter((f) => !linkedUserIds.has(f.id));
 
   const latest = latestInvites[0];
+  const reserved = latest ? await countInviteReservations(db, latest.id) : 0;
   const currentInvite: InvitePanelInvite | null = latest
     ? {
         token: latest.token,
-        status: inviteStatus(latest),
+        status: inviteStatus(latest, new Date(), reserved),
+        reserved,
         expiresAt: latest.expiresAt?.toISOString() ?? null,
         uses: latest.uses,
         maxUses: latest.maxUses,

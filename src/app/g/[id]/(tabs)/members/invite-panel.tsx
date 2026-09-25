@@ -22,6 +22,8 @@ export type InvitePanelInvite = {
   status: InviteStatus;
   expiresAt: string | null;
   uses: number;
+  /** Unfinished signups holding one of this link's joins. */
+  reserved: number;
   maxUses: number | null;
 };
 
@@ -55,7 +57,7 @@ function statusLabel(status: InviteStatus) {
     case "expired":
       return "This link has expired.";
     case "used_up":
-      return "This link has reached its join limit.";
+      return "This link has reached its join limit (including pending signups).";
     case "revoked":
       return "This link is disabled.";
     case "live":
@@ -132,6 +134,9 @@ export function InvitePanel({
           </p>
           <p className="text-xs text-muted-foreground">
             {invite.uses} of {invite.maxUses ?? "∞"} joins used
+            {invite.reserved > 0
+              ? ` · ${invite.reserved} pending signup${invite.reserved === 1 ? "" : "s"}`
+              : ""}
             {expires ? ` · ${live ? "expires" : "expired"} ${expires}` : ""}
           </p>
           {!live ? (

@@ -1,7 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { appSettings, invites, users, type User } from "@/db/schema";
 import type { Db } from "@/db/types";
-import { inviteStatus } from "@/lib/invites";
+import { countInviteReservations, inviteStatus } from "@/lib/invites";
 
 export const ADMISSION_FAILURES = [
   "invite_required",
@@ -37,7 +37,8 @@ export type NewUserProfile = {
  * The settings row lock serializes competing registrations across app
  * instances, so the count check cannot be raced. Existing-account lookup and
  * provider linking happen before Auth.js calls this, so they never consume a
- * slot. The invitation is only checked here; joins are consumed on joining.
+ * slot. The new account reserves one of the invitation's joins until it
+ * joins the group, when the reservation becomes a use.
  */
 export async function admitNewUser(
   client: Db,
@@ -62,7 +63,16 @@ export async function admitNewUser(
       .where(eq(invites.id, inviteId))
       .limit(1)
       .for("update");
-    if (!invite || inviteStatus(invite, now) !== "live") {
+    // Each pending signup reserves one of the link's joins, so one link
+    // admits at most its allowance of accounts.
+    if (
+      !invite ||
+      inviteStatus(
+        invite,
+        now,
+        await countInviteReservations(tx, invite.id),
+      ) !== "live"
+    ) {
       throw new AdmissionError("invite_unavailable");
     }
 

@@ -173,6 +173,47 @@ describe.skipIf(!hasTestDatabase)("group invitations", () => {
       expect(await onboarded(userId)).toBe(false);
     });
 
+    it("converts the joiner's own reservation into the use", async () => {
+      const g = await seedGroupWithInvite(t.sql, { uses: 14 });
+      await t.sql`
+        insert into users (id, email, signup_invite_id)
+        values ('reserved', 'reserved@example.test', ${g.inviteId})
+      `;
+      await joinGroupWithInvite(t.db, {
+        token: g.token,
+        userId: "reserved",
+        choice: { kind: "new", displayName: "Res" },
+      });
+      expect(await uses(g.inviteId)).toBe(15);
+      expect(await onboarded("reserved")).toBe(true);
+    });
+
+    it("keeps other pending signups' reserved joins from other joiners", async () => {
+      const g = await seedGroupWithInvite(t.sql, { uses: 14 });
+      await t.sql`
+        insert into users (id, email, signup_invite_id)
+        values ('reserved', 'reserved@example.test', ${g.inviteId})
+      `;
+      await t.sql`
+        insert into users (id, email, onboarding_completed_at)
+        values ('veteran', 'veteran@example.test', now())
+      `;
+      await expect(
+        joinGroupWithInvite(t.db, {
+          token: g.token,
+          userId: "veteran",
+          choice: { kind: "new", displayName: "Vet" },
+        }),
+      ).rejects.toBeInstanceOf(InviteUnavailableError);
+      await expect(
+        joinGroupWithInvite(t.db, {
+          token: g.token,
+          userId: "reserved",
+          choice: { kind: "new", displayName: "Res" },
+        }),
+      ).resolves.toMatchObject({ joined: true });
+    });
+
     it("treats the expiry instant as expired", async () => {
       const expiresAt = new Date("2026-10-01T00:00:00Z");
       const g = await seedGroupWithInvite(t.sql, { expiresAt });
@@ -288,6 +329,21 @@ describe.skipIf(!hasTestDatabase)("group invitations", () => {
       const [current] = await currentInvites(g.groupId);
       expect(current.max_uses).toBe(15);
       expect(current.ttl_seconds).toBe(30 * 24 * 60 * 60);
+    });
+
+    it("replaces a link filled by pending signups on create", async () => {
+      const g = await seedGroupWithInvite(t.sql, { uses: 13 });
+      await t.sql`
+        insert into users (id, email, signup_invite_id) values
+          ('p1', 'p1@example.test', ${g.inviteId}),
+          ('p2', 'p2@example.test', ${g.inviteId})
+      `;
+      const { token } = await changeGroupInviteLink(t.db, {
+        groupId: g.groupId,
+        actorMemberId: g.adminMemberId,
+        change: "create",
+      });
+      expect(token).not.toBe(g.token);
     });
 
     it("replaces an exhausted link on create", async () => {

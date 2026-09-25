@@ -16,7 +16,11 @@ import { Label } from "@/components/ui/label";
 import { db } from "@/db";
 import { groups, invites, members } from "@/db/schema";
 import { getOptionalUser } from "@/lib/auth-guards";
-import { inviteStatus, inviteUnavailableMessage } from "@/lib/invites";
+import {
+  countInviteReservations,
+  inviteStatus,
+  inviteUnavailableMessage,
+} from "@/lib/invites";
 import { isVerifyAuthEnabled } from "@/lib/verify-auth";
 import {
   claimPlaceholderAction,
@@ -77,7 +81,11 @@ export default async function JoinPage({
     }
   }
 
-  const status = inviteStatus(invite);
+  const status = inviteStatus(
+    invite,
+    new Date(),
+    await countInviteReservations(db, invite.id, user?.id),
+  );
   if (status !== "live") {
     return (
       <AppShell title="Invite" backHref="/">

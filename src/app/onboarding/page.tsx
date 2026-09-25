@@ -13,7 +13,7 @@ import {
 import { db } from "@/db";
 import { invites } from "@/db/schema";
 import { requireSignedIn } from "@/lib/auth-guards";
-import { inviteStatus } from "@/lib/invites";
+import { countInviteReservations, inviteStatus } from "@/lib/invites";
 
 /**
  * Where unfinished signups land. Resumes the signup invitation while it is
@@ -29,7 +29,14 @@ export default async function OnboardingPage() {
       .from(invites)
       .where(eq(invites.id, user.signupInviteId))
       .limit(1);
-    if (invite && inviteStatus(invite) === "live") {
+    if (
+      invite &&
+      inviteStatus(
+        invite,
+        new Date(),
+        await countInviteReservations(db, invite.id, user.id),
+      ) === "live"
+    ) {
       redirect(`/join/${encodeURIComponent(invite.token)}`);
     }
   }

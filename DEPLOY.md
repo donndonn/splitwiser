@@ -89,7 +89,7 @@ npm run db:migrate
 
 ## 7. Invitations and the account cap
 
-New accounts can only be created by opening a group invitation link and continuing with Google or Apple. Each group has one current link, valid for 30 days or 15 joins. An account counts toward the cap from its first successful sign-in, before it joins a group; until it joins, it can only see invitation and onboarding pages. Existing accounts always keep signing in, even when the app is full.
+New accounts can only be created by opening a group invitation link and continuing with Google or Apple. Each group has one current link, valid for 30 days or 15 joins. An account counts toward the cap from its first successful sign-in, before it joins a group; until it joins, it can only see invitation and onboarding pages. It also reserves one of its link's 15 joins, so one link can never create more than 15 accounts; the reservation becomes a join when the account joins through that link (Members shows these as pending signups). Existing accounts always keep signing in, even when the app is full.
 
 The cap lives in the singleton `app_settings` row and is read on every signup (no redeploy needed). Run these against the production database (Neon SQL editor or `psql "$DATABASE_URL_UNPOOLED"`).
 

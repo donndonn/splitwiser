@@ -13,4 +13,5 @@ ALTER TABLE "users" ADD COLUMN "signup_invite_id" text;--> statement-breakpoint
 UPDATE "users" SET "onboarding_completed_at" = now() WHERE "onboarding_completed_at" IS NULL;--> statement-breakpoint
 -- Invalidate all previous invitation links before enforcing one current link per group.
 UPDATE "invites" SET "revoked_at" = now() WHERE "revoked_at" IS NULL;--> statement-breakpoint
-CREATE UNIQUE INDEX "invites_group_current_unique" ON "invites" USING btree ("group_id") WHERE "invites"."revoked_at" is null;
+CREATE UNIQUE INDEX "invites_group_current_unique" ON "invites" USING btree ("group_id") WHERE "invites"."revoked_at" is null;--> statement-breakpoint
+CREATE INDEX "users_pending_signup_invite_idx" ON "users" USING btree ("signup_invite_id") WHERE "users"."onboarding_completed_at" is null;

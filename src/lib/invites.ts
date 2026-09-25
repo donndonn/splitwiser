@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, isNull, ne, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { groups, invites, members, users, type Invite } from "@/db/schema";
 import type { Db } from "@/db/types";
@@ -10,18 +10,47 @@ export const INVITE_MAX_USES = 15;
 
 export type InviteStatus = "live" | "expired" | "used_up" | "revoked";
 
+/**
+ * `reserved` is the number of unfinished signups admitted by this link
+ * (see countInviteReservations). Each holds one of the link's joins until it
+ * joins, so a link can never admit more accounts than its allowance.
+ */
 export function inviteStatus(
   invite: Pick<Invite, "revokedAt" | "expiresAt" | "maxUses" | "uses">,
   now: Date = new Date(),
+  reserved: number = 0,
 ): InviteStatus {
   if (invite.revokedAt) return "revoked";
   if (invite.expiresAt && invite.expiresAt.getTime() <= now.getTime()) {
     return "expired";
   }
-  if (invite.maxUses != null && invite.uses >= invite.maxUses) {
+  if (invite.maxUses != null && invite.uses + reserved >= invite.maxUses) {
     return "used_up";
   }
   return "live";
+}
+
+/**
+ * Pending accounts that signed up through this invitation and have not
+ * joined yet. When one joins through the link, its reservation becomes a
+ * use. Pass `excludeUserId` to leave out the caller's own reservation.
+ */
+export async function countInviteReservations(
+  client: Pick<Db, "select">,
+  inviteId: string,
+  excludeUserId?: string,
+): Promise<number> {
+  const [{ count }] = await client
+    .select({ count: sql<number>`count(*)::int` })
+    .from(users)
+    .where(
+      and(
+        eq(users.signupInviteId, inviteId),
+        isNull(users.onboardingCompletedAt),
+        excludeUserId ? ne(users.id, excludeUserId) : undefined,
+      ),
+    );
+  return count;
 }
 
 export function inviteUnavailableMessage(status: InviteStatus): string {
@@ -78,7 +107,11 @@ export async function changeGroupInviteLink(
     if (
       input.change === "create" &&
       current &&
-      inviteStatus(current, now) === "live"
+      inviteStatus(
+        current,
+        now,
+        await countInviteReservations(tx, current.id),
+      ) === "live"
     ) {
       return { token: current.token, replaced: false };
     }
@@ -122,8 +155,9 @@ export type JoinChoice =
  * Join a group through an invitation link and complete onboarding.
  *
  * Existing members return their group without consuming a join, even on an
- * old link. Otherwise the invitation must be live; one join is consumed for
- * each new or claimed membership.
+ * old link. Otherwise the invitation must have a free join, counting other
+ * pending signups' reservations; one join is consumed for each new or
+ * claimed membership.
  */
 export async function joinGroupWithInvite(
   client: Db,
@@ -166,7 +200,14 @@ export async function joinGroupWithInvite(
       return { groupId: invite.groupId, joined: false };
     }
 
-    const status = inviteStatus(invite, now);
+    // Serialized with admissions by the invite row lock. The joiner's own
+    // reservation (if this link admitted them) converts into this use.
+    const reserved = await countInviteReservations(
+      tx,
+      invite.id,
+      input.userId,
+    );
+    const status = inviteStatus(invite, now, reserved);
     if (status !== "live") {
       throw new InviteUnavailableError(inviteUnavailableMessage(status));
     }

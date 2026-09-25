@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { signIn } from "@/auth";
 import { db } from "@/db";
 import { invites } from "@/db/schema";
-import { inviteStatus } from "@/lib/invites";
+import { countInviteReservations, inviteStatus } from "@/lib/invites";
 import {
   SIGNUP_INVITE_COOKIE,
   encodeSignupInvite,
@@ -33,7 +33,14 @@ export async function startInviteSignInAction(
     .where(eq(invites.token, token))
     .limit(1);
   const secret = process.env.AUTH_SECRET;
-  if (!invite || inviteStatus(invite) !== "live" || !secret) {
+  const live =
+    invite &&
+    inviteStatus(
+      invite,
+      new Date(),
+      await countInviteReservations(db, invite.id),
+    ) === "live";
+  if (!invite || !live || !secret) {
     redirect(joinPath);
   }
 

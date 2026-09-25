@@ -39,5 +39,6 @@ Preconditions:
 - Only admins see invite and placeholder controls. Alice is the creator, so she is an admin.
 - `Add` on this page is not the friend-search `Add`. The placeholder form has its own `Add` button with the same name. Use the button on Bob’s row under `Add from friends`.
 - `Create link`, `Reset link`, and `Share / Copy link` call the browser share sheet when `navigator.share` exists, and copy to the clipboard otherwise. A cancelled share sheet still creates the link without the copied toast. The panel is the proof either way.
+- Unfinished signups admitted by the link hold one of its joins; the panel shows them as `N pending signups`, and they count toward the 15.
 - Each group has at most one current link. Existing links from before the invite-only rollout show as disabled.
 - Placeholder `Sam` cannot sign in. Bob can. Adding Bob is what the profile Venmo recipe needs.

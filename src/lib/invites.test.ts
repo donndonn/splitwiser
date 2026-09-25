@@ -24,6 +24,12 @@ describe("inviteStatus", () => {
     );
   });
 
+  it("counts pending signups' reservations toward the join limit", () => {
+    const invite = { ...base, maxUses: 15, uses: 10 };
+    expect(inviteStatus(invite, now, 4)).toBe("live");
+    expect(inviteStatus(invite, now, 5)).toBe("used_up");
+  });
+
   it("reports revocation first", () => {
     expect(
       inviteStatus({ ...base, revokedAt: now, maxUses: 1, uses: 1 }, now),
