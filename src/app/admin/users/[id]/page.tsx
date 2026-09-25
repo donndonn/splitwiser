@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { AppShell } from "@/components/app-shell";
@@ -81,18 +82,24 @@ export default async function AdminUserPage({
           <div className={groupedListClass}>
             <ul className="divide-y divide-border">
               {memberships.map((m) => (
-                <li
-                  key={m.groupId}
-                  className="flex items-center justify-between gap-3 px-4 py-2.5"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{m.groupName}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      as {m.displayName} · since{" "}
-                      {format(m.joinedAt, "MMM d, yyyy")}
-                    </p>
-                  </div>
-                  {m.isAdmin ? <Badge variant="secondary">Admin</Badge> : null}
+                <li key={m.groupId}>
+                  <Link
+                    href={`/admin/groups/${encodeURIComponent(m.groupId)}`}
+                    className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-muted/50"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">
+                        {m.groupName}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        as {m.displayName} · since{" "}
+                        {format(m.joinedAt, "MMM d, yyyy")}
+                      </p>
+                    </div>
+                    {m.isAdmin ? (
+                      <Badge variant="secondary">Admin</Badge>
+                    ) : null}
+                  </Link>
                 </li>
               ))}
             </ul>

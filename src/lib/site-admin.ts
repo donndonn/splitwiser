@@ -14,6 +14,8 @@ import {
 import {
   adminActions,
   appSettings,
+  expenses,
+  groupActivities,
   groups,
   invites,
   members,
@@ -22,7 +24,11 @@ import {
   type AdminActionType,
 } from "@/db/schema";
 import type { Db } from "@/db/types";
-import { inviteStatus, type InviteStatus } from "@/lib/invites";
+import {
+  countInviteReservations,
+  inviteStatus,
+  type InviteStatus,
+} from "@/lib/invites";
 
 /**
  * Site admins are named by the ADMIN_EMAILS env var (comma-separated,
@@ -51,6 +57,7 @@ export type SiteAdminActor = { id: string; email: string };
 export const STALE_PENDING_DAYS = 7;
 export const MAX_USERS_LIMIT = 100_000;
 export const ADMIN_USERS_PAGE_SIZE = 50;
+export const ADMIN_GROUPS_PAGE_SIZE = 50;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -198,7 +205,7 @@ export async function revokeInvite(
 
 export async function getAdminOverview(client: Db, now: Date = new Date()) {
   const cutoff = stalePendingCutoff(now);
-  const [[counts], [settings]] = await Promise.all([
+  const [[counts], [settings], [groupTotals]] = await Promise.all([
     client
       .select({
         total: count(),
@@ -212,9 +219,11 @@ export async function getAdminOverview(client: Db, now: Date = new Date()) {
       .from(appSettings)
       .where(eq(appSettings.id, 1))
       .limit(1),
+    client.select({ groups: count() }).from(groups),
   ]);
   return {
     total: counts.total,
+    groups: groupTotals.groups,
     pending: counts.pending,
     stalePending: counts.stalePending,
     /** Null when the settings row is missing, which refuses all signups. */
@@ -380,6 +389,161 @@ export async function listCurrentInvites(
       status: inviteStatus({ ...row, revokedAt }, now, reserved),
     };
   });
+}
+
+/**
+ * Per-group aggregates as joined subqueries. Correlated subqueries are
+ * avoided: Drizzle leaves columns unqualified in single-table selects.
+ */
+function groupAggregates(client: Db) {
+  const memberStats = client
+    .select({
+      groupId: members.groupId,
+      accounts: sql<number>`count(${members.userId})::int`.as("accounts"),
+      placeholders:
+        sql<number>`(count(*) - count(${members.userId}))::int`.as(
+          "placeholders",
+        ),
+    })
+    .from(members)
+    .groupBy(members.groupId)
+    .as("member_stats");
+  const expenseStats = client
+    .select({
+      groupId: expenses.groupId,
+      expenseCount: count().as("expense_count"),
+      totalCents:
+        sql<number>`coalesce(sum(${expenses.amountCents}), 0)::bigint`
+          .mapWith(Number)
+          .as("total_cents"),
+    })
+    .from(expenses)
+    .groupBy(expenses.groupId)
+    .as("expense_stats");
+  const activityStats = client
+    .select({
+      groupId: groupActivities.groupId,
+      lastActivityAt: sql<Date>`max(${groupActivities.createdAt})`
+        .mapWith(groupActivities.createdAt)
+        .as("last_activity_at"),
+    })
+    .from(groupActivities)
+    .groupBy(groupActivities.groupId)
+    .as("activity_stats");
+  return { memberStats, expenseStats, activityStats };
+}
+
+export async function listAdminGroups(
+  client: Db,
+  input: { query?: string; page?: number },
+) {
+  const page = Math.max(1, Math.floor(input.page ?? 1));
+  const q = input.query?.trim();
+  const { memberStats, expenseStats, activityStats } = groupAggregates(client);
+
+  const rows = await client
+    .select({
+      id: groups.id,
+      name: groups.name,
+      currency: groups.currency,
+      createdAt: groups.createdAt,
+      accounts: sql<number>`coalesce(${memberStats.accounts}, 0)::int`,
+      placeholders: sql<number>`coalesce(${memberStats.placeholders}, 0)::int`,
+      expenseCount: sql<number>`coalesce(${expenseStats.expenseCount}, 0)::int`,
+      totalCents: sql<number>`coalesce(${expenseStats.totalCents}, 0)`.mapWith(
+        Number,
+      ),
+      lastActivityAt: activityStats.lastActivityAt,
+    })
+    .from(groups)
+    .leftJoin(memberStats, eq(memberStats.groupId, groups.id))
+    .leftJoin(expenseStats, eq(expenseStats.groupId, groups.id))
+    .leftJoin(activityStats, eq(activityStats.groupId, groups.id))
+    .where(q ? ilike(groups.name, `%${escapeLike(q)}%`) : undefined)
+    .orderBy(desc(groups.createdAt), groups.id)
+    .limit(ADMIN_GROUPS_PAGE_SIZE + 1)
+    .offset((page - 1) * ADMIN_GROUPS_PAGE_SIZE);
+
+  return {
+    page,
+    hasNext: rows.length > ADMIN_GROUPS_PAGE_SIZE,
+    groups: rows.slice(0, ADMIN_GROUPS_PAGE_SIZE),
+  };
+}
+
+export async function getAdminGroup(
+  client: Db,
+  groupId: string,
+  now: Date = new Date(),
+) {
+  const [group] = await client
+    .select()
+    .from(groups)
+    .where(eq(groups.id, groupId))
+    .limit(1);
+  if (!group) return null;
+
+  const [roster, [expenseSummary], [activity], [invite]] = await Promise.all([
+    client
+      .select({
+        id: members.id,
+        displayName: members.displayName,
+        isAdmin: members.isAdmin,
+        joinedAt: members.createdAt,
+        userId: members.userId,
+        email: users.email,
+      })
+      .from(members)
+      .leftJoin(users, eq(users.id, members.userId))
+      .where(eq(members.groupId, groupId))
+      .orderBy(desc(members.isAdmin), members.displayName),
+    client
+      .select({
+        expenseCount: count(),
+        totalCents: sql<number>`coalesce(sum(${expenses.amountCents}), 0)`.mapWith(
+          Number,
+        ),
+        lastSpentAt: sql<Date | null>`max(${expenses.spentAt})`.mapWith(
+          expenses.spentAt,
+        ),
+      })
+      .from(expenses)
+      .where(eq(expenses.groupId, groupId)),
+    client
+      .select({
+        lastActivityAt: sql<Date | null>`max(${groupActivities.createdAt})`.mapWith(
+          groupActivities.createdAt,
+        ),
+      })
+      .from(groupActivities)
+      .where(eq(groupActivities.groupId, groupId)),
+    client
+      .select()
+      .from(invites)
+      .where(and(eq(invites.groupId, groupId), isNull(invites.revokedAt)))
+      .limit(1),
+  ]);
+
+  const reserved = invite ? await countInviteReservations(client, invite.id) : 0;
+
+  return {
+    group,
+    members: roster,
+    expenseCount: expenseSummary.expenseCount,
+    totalCents: expenseSummary.totalCents,
+    lastSpentAt: expenseSummary.lastSpentAt,
+    lastActivityAt: activity.lastActivityAt,
+    invite: invite
+      ? {
+          id: invite.id,
+          uses: invite.uses,
+          maxUses: invite.maxUses,
+          expiresAt: invite.expiresAt,
+          reserved,
+          status: inviteStatus(invite, now, reserved),
+        }
+      : null,
+  };
 }
 
 export async function listAdminActions(client: Db, limit = 20) {
