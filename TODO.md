@@ -12,8 +12,8 @@ Until the three `TWILIO_*` variables are set, the profile page hides the
 Phone section and search finds no one by phone. The top-sheet fix for the
 keyboard covering Find friends ships regardless.
 
-- [ ] Upgrade the Twilio account (prepaid balance, about $20; turn auto-recharge off or cap it)
-- [ ] Create a Verify service (Verify → Services → Create, SMS on); copy the `VA…` Service SID
+- [x] Upgrade the Twilio account (prepaid balance, about $20; turn auto-recharge off or cap it)
+- [x] Create a Verify service (Verify → Services → Create, SMS on); copy the `VA…` Service SID
 - [ ] Twilio: limit Verify Geo Permissions to US and Taiwan (matches `SMS_COUNTRIES` in `src/lib/phone.ts`); turn on Fraud Guard
 - [ ] Set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_VERIFY_SERVICE_SID` in `.env.local`
 - [ ] `npm run db:migrate` (applies `drizzle/0013_phone_verification.sql`)
