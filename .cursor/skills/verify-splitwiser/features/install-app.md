@@ -13,7 +13,7 @@ Signed-in home opens a bottom sheet that explains how to add Splitwiser to the h
 
 - Sign in, land on Your groups, and wait. A bottom sheet covers the lower part of the screen, including the tab bar.
 - Choose `Close`, `Not now`, or `Don't show again` on that sheet.
-- In navigation `App navigation`, choose `Profile`. Under the name, the section `Home screen` has `Add to Home Screen`.
+- In navigation `App navigation`, choose `Profile`. Under `Preferences`, below `Appearance`, the row `Add to Home Screen` opens the install sheet.
 
 ## Driving it with Cursor browser
 
