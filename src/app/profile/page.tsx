@@ -11,7 +11,6 @@ import { users } from "@/db/schema";
 import { requireUser } from "@/lib/auth-guards";
 import { displayNameForUser } from "@/lib/friends";
 import { isTwilioVerifyConfigured } from "@/lib/twilio-verify";
-import { PhoneSection } from "./phone-section";
 import { ProfileForm } from "./profile-form";
 
 export default async function ProfilePage() {
@@ -66,22 +65,18 @@ export default async function ProfilePage() {
           </div>
         </div>
 
-        <InstallCoach venue="profile" />
-
-        <ThemeSelector />
-
         <ProfileForm
           name={dbUser?.name?.trim() || name}
           username={username}
           email={email}
           venmoUsername={dbUser?.venmoUsername ?? null}
+          phone={phone}
+          smsEnabled={smsEnabled}
         />
 
-        {smsEnabled || phone ? (
-          <div className="mt-6">
-            <PhoneSection phone={phone} enabled={smsEnabled} />
-          </div>
-        ) : null}
+        <InstallCoach venue="profile" />
+
+        <ThemeSelector />
       </AppShell>
       <AppBottomNav />
     </>

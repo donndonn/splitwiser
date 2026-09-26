@@ -34,5 +34,6 @@ Preconditions:
 - Other open debts are netted into that suggestion. If Snacks is still unpaid, the link amount can be a few cents (this run: `Pay Bob Verify $0.34`) rather than half of Taxi. Proof is the link name, `txn=pay`, `amount`, and a note starting with `Splitwiser`, not a specific half.
 - The visible name is `Pay {display name} {amount}` plus the word `Venmo`. It is not the phrase `Pay on Venmo`.
 - Opening the link leaves Splitwiser for Venmo. Abort that page; do not log into Venmo. Reading `href` is enough.
+- `Edit profile` is a small pencil `Edit` button beside the `Account` heading (its accessible name is still `Edit profile`). Phone `Change`/`Remove` only appear after choosing it; a verified phone saves on its own, not with `Save`.
 - Clearing Venmo back to empty shows `Not set`. This recipe leaves `swvbobpay` in place. Cleanup deletes the verify user.
 - `Sign out` on this screen is the sign-in feature. Do not treat theme changes as part of this proof.
