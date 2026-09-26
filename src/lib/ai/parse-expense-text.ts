@@ -36,6 +36,8 @@ export type ParsedSimpleExpenseDefaults = {
   splitMode: SplitMode;
   included: string[];
   weights?: Record<string, number>;
+  /** Names in the text that match no one in the group. */
+  unmatchedNames?: string[];
 };
 
 export type ParsedItemizedExpenseDefaults = {
@@ -53,6 +55,8 @@ export type ParsedItemizedExpenseDefaults = {
     quantity: number;
     memberIds: string[];
   }[];
+  /** Names in the text that match no one in the group. */
+  unmatchedNames?: string[];
 };
 
 export type ParsedExpenseDefaults =
@@ -302,11 +306,46 @@ function resolveSpentAt(spentAt: string | null): string {
   return spentAt && isValidDateString(spentAt) ? spentAt : today;
 }
 
+/**
+ * Names the text mentions that match no roster member, in first-seen order.
+ * Ambiguous names count as unmatched too, since they can't be placed either.
+ */
+export function collectUnmatchedNames(
+  draft: Pick<ExpenseDraft, "paidByName" | "participants" | "items">,
+  roster: RosterMember[],
+  defaultPaidById: string,
+): string[] {
+  const names = [
+    ...(draft.paidByName ? [draft.paidByName] : []),
+    ...draft.participants.map((participant) => participant.name),
+    ...draft.items.flatMap((item) => item.assigneeNames),
+  ];
+  const seen = new Set<string>();
+  const unmatched: string[] = [];
+  for (const name of names) {
+    const clipped = clip(name, L.nameLength);
+    const key = clipped.toLowerCase();
+    if (!clipped || seen.has(key)) continue;
+    seen.add(key);
+    if (matchMemberName(clipped, roster, defaultPaidById) == null) {
+      unmatched.push(clipped);
+    }
+  }
+  return unmatched;
+}
+
+/**
+ * `selectedMemberIds` is who the user picked to split with. Names in the
+ * text still match the whole roster; the selection only replaces "everyone"
+ * when the text names no one.
+ */
 export function draftToExpenseDefaults(
   draft: ExpenseDraft,
   roster: RosterMember[],
   defaultPaidById: string,
+  selectedMemberIds?: string[],
 ): ParsedExpenseDefaults {
+  const unmatchedNames = collectUnmatchedNames(draft, roster, defaultPaidById);
   const paidByMemberId = resolvePaidBy(
     draft.paidByName,
     roster,
@@ -319,6 +358,7 @@ export function draftToExpenseDefaults(
     paidByMemberId,
     spentAt,
     notes: (draft.notes && clip(draft.notes, L.notesLength)) || undefined,
+    unmatchedNames: unmatchedNames.length > 0 ? unmatchedNames : undefined,
   };
 
   if (draft.entryMode === "itemized") {
@@ -347,6 +387,7 @@ export function draftToExpenseDefaults(
         { ...draft, entryMode: "simple", items: [] },
         roster,
         defaultPaidById,
+        selectedMemberIds,
       );
     }
 
@@ -398,7 +439,12 @@ export function draftToExpenseDefaults(
   }
 
   if (included.length === 0) {
-    included.push(...roster.map((member) => member.id));
+    const selected = selectedMemberIds?.filter((id) =>
+      roster.some((member) => member.id === id),
+    );
+    included.push(
+      ...(selected?.length ? selected : roster.map((member) => member.id)),
+    );
   }
 
   return {
@@ -473,6 +519,7 @@ export async function parseExpenseTextWithGemini(input: {
   currency: string;
   roster: RosterMember[];
   defaultPaidById: string;
+  selectedMemberIds?: string[];
 }): Promise<ParsedExpenseDefaults> {
   const apiKey = process.env.GOOGLE_API_KEY?.trim();
   if (!apiKey) {
@@ -524,5 +571,10 @@ export async function parseExpenseTextWithGemini(input: {
   assertIsExpense(parsedJson);
 
   const draft = expenseDraftSchema.parse(parsedJson);
-  return draftToExpenseDefaults(draft, input.roster, input.defaultPaidById);
+  return draftToExpenseDefaults(
+    draft,
+    input.roster,
+    input.defaultPaidById,
+    input.selectedMemberIds,
+  );
 }

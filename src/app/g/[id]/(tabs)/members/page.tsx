@@ -9,7 +9,7 @@ import { listFriends, listFriendStatuses } from "@/lib/friends";
 import { countInviteReservations, inviteStatus } from "@/lib/invites";
 import { cn, groupedListClass } from "@/lib/utils";
 import { AddFriendsToGroup } from "./add-friends-to-group";
-import { addPlaceholderAction } from "./actions";
+import { addPlaceholderFormAction } from "./actions";
 import { InvitePanel, type InvitePanelInvite } from "./invite-panel";
 import { MemberRow } from "./member-row";
 
@@ -111,7 +111,7 @@ export default async function MembersPage({
               can pick their name when they join.
             </p>
             <form
-              action={addPlaceholderAction.bind(null, id)}
+              action={addPlaceholderFormAction.bind(null, id)}
               className="flex gap-2"
             >
               <Input name="displayName" placeholder="Name" required />
