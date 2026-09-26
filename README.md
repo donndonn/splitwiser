@@ -56,11 +56,32 @@ npm run dev
 
 7. Open [http://localhost:3000](http://localhost:3000).
 
+### Local mode (no Neon, no Google sign-in)
+
+For UI work you can run the app against a throwaway Postgres in Docker, signed in as a seeded user. It needs Docker, plus `AUTH_SECRET` in `.env.local` (a default is used if it's missing). It never touches the Neon database in `.env.local`.
+
+```bash
+npm run local:db    # start Postgres on :54330, migrate, seed demo data
+npm run local:dev   # http://localhost:3100/signin → Verify sign-in (prefilled)
+```
+
+The seed signs you in as Vince. It includes a group "Tahoe trip" (you, Alex, and a placeholder Bob), a solo group "Just me", and friends Sam and Kim who aren't in any group. `npm run local:db:reset` wipes the data and reseeds. `local:dev` uses its own port and `.next-local`, so it can run next to `npm run dev`.
+
+To screenshot a page at phone size (uses your installed Chrome):
+
+```bash
+npm run local:shot -- /g/local-group-trip/expenses/new \
+  --click "Enter manually" --fill "Amount=24" --out form.png [--light]
+```
+
 ## Scripts
 
 | Script | Description |
 | --- | --- |
 | `npm run dev` | Start Next.js |
+| `npm run local:db` | Start the local Docker Postgres, migrate, and seed |
+| `npm run local:dev` | Start Next.js against the local database with one-tap sign-in |
+| `npm run local:shot` | Screenshot a local page at phone size |
 | `npm run build` | Production build |
 | `npm run db:generate` | Generate Drizzle migrations |
 | `npm run db:migrate` | Apply migrations |

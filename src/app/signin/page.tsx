@@ -39,6 +39,10 @@ export default async function SignInPage({
     redirect(user.onboarded ? callbackUrl : "/onboarding");
   }
   const errorMessage = signInErrorMessage(error);
+  // `npm run local:dev` prefills the seeded account so sign-in is one tap.
+  const localSignIn = isVerifyAuthEnabled()
+    ? process.env.SPLITWISER_LOCAL_SIGN_IN_EMAIL
+    : undefined;
 
   return (
     <AppShell title="Sign in" backHref="/">
@@ -81,6 +85,7 @@ export default async function SignInPage({
                 name="email"
                 type="email"
                 autoComplete="off"
+                defaultValue={localSignIn}
                 required
               />
             </div>
@@ -91,6 +96,9 @@ export default async function SignInPage({
                 name="secret"
                 type="password"
                 autoComplete="off"
+                defaultValue={
+                  localSignIn ? process.env.SPLITWISER_VERIFY_SECRET : undefined
+                }
                 required
               />
             </div>
