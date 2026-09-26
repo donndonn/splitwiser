@@ -4,6 +4,7 @@ import {
   EXPENSE_DRAFT_LIMITS,
   assertIsExpense,
   buildSystemInstruction,
+  collectUnmatchedNames,
   draftToExpenseDefaults,
   expenseDraftSchema,
   matchMemberName,
@@ -77,6 +78,50 @@ describe("draftToExpenseDefaults", () => {
     if (defaults.entryMode !== "simple") return;
     expect(defaults.paidByMemberId).toBe("m3");
     expect(defaults.included).toEqual(["m1", "m2", "m3", "m4"]);
+  });
+
+  it("falls back to the selected members, not the whole roster", () => {
+    const defaults = draftToExpenseDefaults(
+      { ...simpleDraft, participants: [] },
+      roster,
+      "m1",
+      ["m1", "m4", "not-a-member"],
+    );
+    expect(defaults.entryMode).toBe("simple");
+    if (defaults.entryMode !== "simple") return;
+    expect(defaults.included).toEqual(["m1", "m4"]);
+  });
+
+  it("still matches named people outside the selection", () => {
+    const defaults = draftToExpenseDefaults(simpleDraft, roster, "m1", [
+      "m1",
+      "m4",
+    ]);
+    expect(defaults.entryMode).toBe("simple");
+    if (defaults.entryMode !== "simple") return;
+    expect(defaults.included).toEqual(["m1", "m2"]);
+  });
+
+  it("reports names that match no one in the group", () => {
+    const defaults = draftToExpenseDefaults(
+      {
+        ...simpleDraft,
+        participants: [
+          { name: "me", weight: null },
+          { name: "Zoe", weight: null },
+        ],
+      },
+      roster,
+      "m1",
+    );
+    expect(defaults.unmatchedNames).toEqual(["Zoe"]);
+    if (defaults.entryMode !== "simple") return;
+    expect(defaults.included).toEqual(["m1"]);
+  });
+
+  it("leaves unmatchedNames unset when everyone matches", () => {
+    const defaults = draftToExpenseDefaults(simpleDraft, roster, "m1");
+    expect(defaults.unmatchedNames).toBeUndefined();
   });
 
   it("stores exact-mode weights in cents", () => {
@@ -368,5 +413,32 @@ describe("itemized total cap", () => {
     expect(defaults.amount).toBe(
       formatCents(EXPENSE_DRAFT_LIMITS.amount * 100),
     );
+  });
+});
+
+describe("collectUnmatchedNames", () => {
+  it("skips me/I, known members, and repeats across payer, participants, and items", () => {
+    expect(
+      collectUnmatchedNames(
+        {
+          paidByName: "Zoe",
+          participants: [
+            { name: "I", weight: null },
+            { name: "zoe", weight: null },
+            { name: "Alex", weight: null },
+          ],
+          items: [
+            {
+              description: "Tacos",
+              amount: 10,
+              quantity: 1,
+              assigneeNames: ["me", "Kim", "ZOE"],
+            },
+          ],
+        },
+        roster,
+        "m1",
+      ),
+    ).toEqual(["Zoe", "Kim"]);
   });
 });

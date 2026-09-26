@@ -398,3 +398,13 @@ export async function listOutgoingRequests(
     }),
   }));
 }
+
+/** Your friends who aren't linked to any member of this roster yet. */
+export async function listFriendsNotInGroup(
+  userId: string,
+  roster: readonly { userId: string | null }[],
+): Promise<FriendUser[]> {
+  const linked = new Set(roster.map((member) => member.userId));
+  const friends = await listFriends(userId);
+  return friends.filter((friend) => !linked.has(friend.id));
+}

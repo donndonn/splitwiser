@@ -33,21 +33,56 @@ export async function changeInviteLinkAction(
   return token;
 }
 
+export type AddedMember = { id: string; displayName: string };
+
+async function assertNameFree(groupId: string, displayName: string) {
+  const [nameTaken] = await db
+    .select({ id: members.id })
+    .from(members)
+    .where(
+      and(
+        eq(members.groupId, groupId),
+        sql`lower(${members.displayName}) = lower(${displayName})`,
+      ),
+    )
+    .limit(1);
+
+  if (nameTaken) {
+    throw new Error(
+      `Someone in this group is already named "${displayName}". Rename them first, then try again.`,
+    );
+  }
+}
+
+function revalidateMemberPaths(groupId: string) {
+  revalidatePath(`/g/${groupId}/members`);
+  revalidatePath(`/g/${groupId}`);
+  revalidatePath(`/g/${groupId}/activity`);
+  revalidatePath(`/g/${groupId}/expenses/new`);
+  revalidatePath(`/g/${groupId}/expenses/scan`);
+  revalidatePath("/");
+}
+
 export async function addPlaceholderAction(
   groupId: string,
   formData: FormData,
-) {
+): Promise<AddedMember> {
   const { member: actor } = await requireAdmin(groupId);
   const displayName = String(formData.get("displayName") ?? "").trim();
   if (!displayName) throw new Error("Name is required");
 
-  await db.transaction(async (tx) => {
-    await tx.insert(members).values({
-      groupId,
-      displayName,
-      userId: null,
-      isAdmin: false,
-    });
+  await assertNameFree(groupId, displayName);
+
+  const added = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .insert(members)
+      .values({
+        groupId,
+        displayName,
+        userId: null,
+        isAdmin: false,
+      })
+      .returning({ id: members.id, displayName: members.displayName });
 
     await logGroupActivity(tx, {
       groupId,
@@ -58,16 +93,26 @@ export async function addPlaceholderAction(
         memberName: displayName,
       },
     });
+
+    return row;
   });
 
-  revalidatePath(`/g/${groupId}/members`);
-  revalidatePath(`/g/${groupId}/activity`);
+  revalidateMemberPaths(groupId);
+  return added;
+}
+
+/** `<form action>` wrapper; forms need a void result. */
+export async function addPlaceholderFormAction(
+  groupId: string,
+  formData: FormData,
+): Promise<void> {
+  await addPlaceholderAction(groupId, formData);
 }
 
 export async function addFriendAsMemberAction(
   groupId: string,
   friendUserId: string,
-) {
+): Promise<AddedMember> {
   const { user, member: actor } = await requireAdmin(groupId);
 
   if (!(await areFriends(user.id, friendUserId))) {
@@ -97,31 +142,18 @@ export async function addFriendAsMemberAction(
   }
 
   const displayName = displayNameForUser(friend);
+  await assertNameFree(groupId, displayName);
 
-  const [nameTaken] = await db
-    .select({ id: members.id })
-    .from(members)
-    .where(
-      and(
-        eq(members.groupId, groupId),
-        sql`lower(${members.displayName}) = lower(${displayName})`,
-      ),
-    )
-    .limit(1);
-
-  if (nameTaken) {
-    throw new Error(
-      `Someone in this group is already named "${displayName}". Rename them first, then try again.`,
-    );
-  }
-
-  await db.transaction(async (tx) => {
-    await tx.insert(members).values({
-      groupId,
-      userId: friendUserId,
-      displayName,
-      isAdmin: false,
-    });
+  const added = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .insert(members)
+      .values({
+        groupId,
+        userId: friendUserId,
+        displayName,
+        isAdmin: false,
+      })
+      .returning({ id: members.id, displayName: members.displayName });
 
     await logGroupActivity(tx, {
       groupId,
@@ -132,12 +164,12 @@ export async function addFriendAsMemberAction(
         memberName: displayName,
       },
     });
+
+    return row;
   });
 
-  revalidatePath(`/g/${groupId}/members`);
-  revalidatePath(`/g/${groupId}`);
-  revalidatePath(`/g/${groupId}/activity`);
-  revalidatePath("/");
+  revalidateMemberPaths(groupId);
+  return added;
 }
 
 export async function renameMemberAction(

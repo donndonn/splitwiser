@@ -18,6 +18,7 @@ export type ParseExpenseTextResult =
 export async function parseExpenseTextAction(
   groupId: string,
   text: string,
+  selectedMemberIds?: string[],
 ): Promise<ParseExpenseTextResult> {
   try {
     const { user, member } = await requireMember(groupId);
@@ -46,6 +47,15 @@ export async function parseExpenseTextAction(
       };
     }
 
+    // Only roster ids count; the current member is always in the split.
+    const selected = Array.isArray(selectedMemberIds)
+      ? roster
+          .filter(
+            (m) => m.id === member.id || selectedMemberIds.includes(m.id),
+          )
+          .map((m) => m.id)
+      : undefined;
+
     const quota = await consumeAiParseQuota(user.id);
     if (!quota.ok) {
       return { ok: false, error: quota.error };
@@ -56,6 +66,7 @@ export async function parseExpenseTextAction(
       currency: group.currency,
       roster,
       defaultPaidById: member.id,
+      selectedMemberIds: selected,
     });
 
     return { ok: true, defaults };

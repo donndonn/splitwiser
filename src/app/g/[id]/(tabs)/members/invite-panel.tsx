@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import type { InviteStatus } from "@/lib/invites";
+import { inviteUrl, shareOrCopyInvite } from "@/lib/share-invite";
 import { changeInviteLinkAction } from "./actions";
 
 export type InvitePanelInvite = {
@@ -26,31 +27,6 @@ export type InvitePanelInvite = {
   reserved: number;
   maxUses: number | null;
 };
-
-async function shareOrCopyInvite(url: string, groupTitle: string) {
-  if (typeof navigator.share === "function") {
-    try {
-      await navigator.share({
-        title: groupTitle,
-        text: "Join this Splitwiser group",
-        url,
-      });
-      return "shared" as const;
-    } catch (err) {
-      // User cancelled the share sheet — don't fall through to clipboard.
-      if (err instanceof DOMException && err.name === "AbortError") {
-        return "cancelled" as const;
-      }
-    }
-  }
-
-  await navigator.clipboard.writeText(url);
-  return "copied" as const;
-}
-
-function inviteUrl(token: string) {
-  return `${window.location.origin}/join/${token}`;
-}
 
 function statusLabel(status: InviteStatus) {
   switch (status) {

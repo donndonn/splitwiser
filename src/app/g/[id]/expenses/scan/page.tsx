@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { groups, members } from "@/db/schema";
 import { requireMember } from "@/lib/auth-guards";
 import { eq } from "drizzle-orm";
+import { redirect } from "next/navigation";
 import { createExpenseAction } from "../actions";
 
 export default async function ScanReceiptPage({
@@ -24,6 +25,8 @@ export default async function ScanReceiptPage({
   ]);
 
   if (!group) return null;
+  // The new-expense page asks a solo member to add someone first.
+  if (roster.length === 1) redirect(`/g/${id}/expenses/new`);
 
   const action = createExpenseAction.bind(null, id);
 
