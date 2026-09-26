@@ -108,13 +108,32 @@ describe.skipIf(!hasTestDatabase)("onboarding guards", () => {
     });
   });
 
+  it("finds onboarded users by phone in the searcher's region", async () => {
+    await t.sql`update users set phone = '+886912345678' where id = 'done'`;
+    await t.sql`update users set phone = '+14155550123' where id = 'pending'`;
+    await t.sql`
+      insert into users (id, email, phone, onboarding_completed_at) values
+        ('tw', 'tw@example.test', '+886987654321', now()),
+        ('us', 'us@example.test', null, now())
+    `;
+
+    expect(
+      await friends.findUserBySearchQuery("+886 912 345 678", "us"),
+    ).toMatchObject({ id: "done" });
+    expect(
+      await friends.findUserBySearchQuery("0912-345-678", "tw"),
+    ).toMatchObject({ id: "done" });
+    expect(await friends.findUserBySearchQuery("0912-345-678", "us")).toBeNull();
+    expect(await friends.findUserBySearchQuery("(415) 555-0123", "us")).toBeNull();
+  });
+
   it("hides pending accounts from friend discovery and additions", async () => {
     expect(
-      await friends.findUserByEmailOrUsername("pending@example.test", "done"),
+      await friends.findUserBySearchQuery("pending@example.test", "done"),
     ).toBeNull();
-    expect(await friends.findUserByEmailOrUsername("@pending_user", "done")).toBeNull();
+    expect(await friends.findUserBySearchQuery("@pending_user", "done")).toBeNull();
     expect(
-      await friends.findUserByEmailOrUsername("@done_user", "pending"),
+      await friends.findUserBySearchQuery("@done_user", "pending"),
     ).toMatchObject({ id: "done" });
     expect(await friends.isOnboardedUser("pending")).toBe(false);
     expect(await friends.isOnboardedUser("done")).toBe(true);

@@ -59,6 +59,16 @@ npx vercel env add GOOGLE_API_KEY
 
 The app runs without `GOOGLE_API_KEY`; scan/parse fail with a clear error if it is missing.
 
+Optional — phone number verification by text message ([Twilio Verify](https://console.twilio.com/)):
+
+```bash
+npx vercel env add TWILIO_ACCOUNT_SID
+npx vercel env add TWILIO_AUTH_TOKEN
+npx vercel env add TWILIO_VERIFY_SERVICE_SID   # Verify → Services, starts with VA
+```
+
+Without all three, the profile page hides the phone field. In the Twilio console, limit Verify **Geo Permissions** to the United States and Taiwan (the app's `SMS_COUNTRIES`) and turn on **Fraud Guard**. The app also caps codes at 5/hour and 10/day per user and 200/day site-wide.
+
 Optional for preview deployments:
 
 ```bash

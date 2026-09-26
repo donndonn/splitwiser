@@ -49,6 +49,9 @@ export const users = pgTable(
     /** Venmo handle without a leading @. Visible to group peers on settle. */
     venmoUsername: text("venmo_username"),
     email: text("email").unique(),
+    /** Optional, E.164 (+14155550123). Set only after an SMS code check.
+     * Used for exact-match friend search; never shown to other users. */
+    phone: text("phone").unique(),
     emailVerified: timestamp("emailVerified", { mode: "date" }),
     image: text("image"),
     /** Null until the account joins its first group. Pending accounts only
@@ -446,6 +449,28 @@ export const aiParseRequests = pgTable(
       table.userId,
       table.createdAt,
     ),
+  ],
+);
+
+/** SMS verification codes sent, for per-user and site-wide send limits. */
+export const phoneVerificationRequests = pgTable(
+  "phone_verification_requests",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    phone: text("phone").notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("phone_verification_requests_user_created_idx").on(
+      table.userId,
+      table.createdAt,
+    ),
+    index("phone_verification_requests_created_idx").on(table.createdAt),
   ],
 );
 

@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import {
   friendRequests,
@@ -6,6 +6,12 @@ import {
   users,
   type User,
 } from "@/db/schema";
+import {
+  DEFAULT_PHONE_COUNTRY,
+  looksLikePhone,
+  normalizePhone,
+  phoneCountry,
+} from "@/lib/phone";
 
 export function orderedPair(
   userId1: string,
@@ -229,8 +235,40 @@ export async function listFriendStatuses(
   );
 }
 
-/** Exact match on email or @username (case-insensitive). */
-export async function findUserByEmailOrUsername(
+type SearchRow = Pick<User, "id" | "name" | "username" | "email" | "image">;
+
+const searchColumns = {
+  id: users.id,
+  name: users.name,
+  username: users.username,
+  email: users.email,
+  image: users.image,
+};
+
+async function findOnboardedUser(where: SQL): Promise<SearchRow | undefined> {
+  const [found] = await db
+    .select(searchColumns)
+    .from(users)
+    .where(and(where, isNotNull(users.onboardingCompletedAt)))
+    .limit(1);
+  return found;
+}
+
+/** Local-format numbers are read in the searcher's own phone region. */
+async function viewerPhoneCountry(viewerId: string) {
+  const [viewer] = await db
+    .select({ phone: users.phone })
+    .from(users)
+    .where(eq(users.id, viewerId))
+    .limit(1);
+  return phoneCountry(viewer?.phone) ?? DEFAULT_PHONE_COUNTRY;
+}
+
+/**
+ * Exact match on email, phone number, or @username (case-insensitive).
+ * A digits-only query tries phone first, then falls back to a username.
+ */
+export async function findUserBySearchQuery(
   query: string,
   viewerId: string,
 ): Promise<SearchHit | null> {
@@ -238,48 +276,23 @@ export async function findUserByEmailOrUsername(
   if (!q) return null;
 
   const isEmail = q.includes("@") && !q.startsWith("@");
-  let row:
-    | Pick<User, "id" | "name" | "username" | "email" | "image">
-    | undefined;
+  let row: SearchRow | undefined;
 
   if (isEmail) {
-    const [found] = await db
-      .select({
-        id: users.id,
-        name: users.name,
-        username: users.username,
-        email: users.email,
-        image: users.image,
-      })
-      .from(users)
-      .where(
-        and(
-          sql`lower(${users.email}) = ${q.toLowerCase()}`,
-          isNotNull(users.onboardingCompletedAt),
-        ),
-      )
-      .limit(1);
-    row = found;
+    row = await findOnboardedUser(
+      sql`lower(${users.email}) = ${q.toLowerCase()}`,
+    );
   } else {
+    if (looksLikePhone(q)) {
+      const phone = normalizePhone(q, await viewerPhoneCountry(viewerId));
+      if (phone) row = await findOnboardedUser(eq(users.phone, phone));
+    }
     const username = normalizeUsername(q);
-    if (!username) return null;
-    const [found] = await db
-      .select({
-        id: users.id,
-        name: users.name,
-        username: users.username,
-        email: users.email,
-        image: users.image,
-      })
-      .from(users)
-      .where(
-        and(
-          sql`lower(${users.username}) = ${username}`,
-          isNotNull(users.onboardingCompletedAt),
-        ),
-      )
-      .limit(1);
-    row = found;
+    if (!row && USERNAME_RE.test(username)) {
+      row = await findOnboardedUser(
+        sql`lower(${users.username}) = ${username}`,
+      );
+    }
   }
 
   if (!row || row.id === viewerId) return null;

@@ -10,6 +10,8 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { requireUser } from "@/lib/auth-guards";
 import { displayNameForUser } from "@/lib/friends";
+import { isTwilioVerifyConfigured } from "@/lib/twilio-verify";
+import { PhoneSection } from "./phone-section";
 import { ProfileForm } from "./profile-form";
 
 export default async function ProfilePage() {
@@ -26,6 +28,8 @@ export default async function ProfilePage() {
   const email = dbUser?.email ?? sessionUser.email ?? null;
   const image = dbUser?.image ?? sessionUser.image ?? null;
   const username = dbUser?.username ?? null;
+  const phone = dbUser?.phone ?? null;
+  const smsEnabled = isTwilioVerifyConfigured();
 
   return (
     <>
@@ -72,6 +76,12 @@ export default async function ProfilePage() {
           email={email}
           venmoUsername={dbUser?.venmoUsername ?? null}
         />
+
+        {smsEnabled || phone ? (
+          <div className="mt-6">
+            <PhoneSection phone={phone} enabled={smsEnabled} />
+          </div>
+        ) : null}
       </AppShell>
       <AppBottomNav />
     </>
