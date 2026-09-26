@@ -38,5 +38,5 @@ Preconditions:
 - Friend search is exact email or @username, not a substring. Do not type `Bob`.
 - Alice may see a profile hint to set a username. Seed already sets `swv<RUN_ID>a` / `swv<RUN_ID>b`. Searching `@swv<RUN_ID>b` is valid.
 - `Add` on an incoming search result accepts instead of sending. That is why the recipe searches from Alice, not from Bob.
-- Do not choose `Remove` during proof. Cleanup deletes the users.
+- `Remove friend` is at the bottom of a friend’s page (not on the list row) and asks to confirm. Do not confirm it during proof. Cleanup deletes the users.
 - Switching accounts requires a full sign-out. Using two browser profiles is unnecessary; one profile, sequential sessions, is the intended path.
