@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
+import { settingsLabelClass, settingsRowClass } from "@/components/settings-list";
 import { cn } from "@/lib/utils";
 
 const options = [
@@ -18,19 +19,14 @@ export function ThemeSelector() {
   const { theme, setTheme } = useTheme();
 
   return (
-    <section className="mb-6 space-y-2" aria-labelledby="appearance-heading">
-      <div>
-        <h2 id="appearance-heading" className="text-sm font-medium">
-          Appearance
-        </h2>
-        <p className="text-xs text-muted-foreground">
-          Choose how Splitwiser looks on this device.
-        </p>
-      </div>
+    <div className={cn(settingsRowClass, "py-2 pr-2")}>
+      <span id="appearance-label" className={settingsLabelClass}>
+        Appearance
+      </span>
       <div
-        className="grid grid-cols-3 gap-1 rounded-xl bg-muted p-1"
+        className="ml-auto grid grid-cols-3 gap-0.5 rounded-lg bg-muted p-0.5"
         role="group"
-        aria-label="Color theme"
+        aria-labelledby="appearance-label"
       >
         {options.map((option) => {
           const active = mounted
@@ -46,18 +42,18 @@ export function ThemeSelector() {
               disabled={!mounted}
               onClick={() => setTheme(option.value)}
               className={cn(
-                "inline-flex h-10 items-center justify-center gap-1.5 rounded-lg px-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/30 disabled:opacity-70",
+                "inline-flex h-8 items-center justify-center gap-1 rounded-md px-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/30 disabled:opacity-70",
                 active
                   ? "bg-card text-foreground shadow-sm ring-1 ring-border/70"
                   : "text-muted-foreground hover:bg-card/50 hover:text-foreground",
               )}
             >
-              <Icon className="size-4" />
+              <Icon className="size-3.5" />
               <span>{option.label}</span>
             </button>
           );
         })}
       </div>
-    </section>
+    </div>
   );
 }
