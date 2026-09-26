@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
+  CalendarDays,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -10,6 +11,7 @@ import {
   CircleCheck,
   ImageIcon,
   Minus,
+  NotebookPen,
   Plus,
   ReceiptText,
   Scale,
@@ -53,7 +55,7 @@ import {
   parseAmountToCents,
   type SplitMode,
 } from "@/lib/money";
-import { cn } from "@/lib/utils";
+import { cn, groupedListClass } from "@/lib/utils";
 
 export type MemberOption = {
   id: string;
@@ -111,12 +113,20 @@ type SplitStatus = "idle" | "incomplete" | "invalid" | "balanced";
 
 const TIP_PERCENT_PRESETS = [15, 18, 20] as const;
 const fieldLabelClassName = "text-xs font-medium text-muted-foreground";
+const rowButtonClassName =
+  "flex min-h-16 w-full min-w-0 items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none disabled:opacity-60";
 
 function memberInitials(displayName: string) {
   const parts = displayName.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "?";
   if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
   return `${parts[0].slice(0, 1)}${parts[1].slice(0, 1)}`.toUpperCase();
+}
+
+function amountFieldWidth(value: string) {
+  const separators = value.replace(/[0-9]/g, "").length;
+  const digits = value.length - separators;
+  return `calc(${digits}ch + ${separators * 0.45}ch + 0.1em)`;
 }
 
 function parseMoneyField(value: string): number {
@@ -388,12 +398,6 @@ export function ExpenseForm({
 
   const canSubmit =
     entryMode === "simple" ? !!simplePreview?.ok : itemizedPreview.ok;
-  const splitModeLabel: Record<SplitMode, string> = {
-    equal: "Equally",
-    exact: "Exact amounts",
-    percent: "By percentage",
-    shares: "By shares",
-  };
   const currencySymbol =
     new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -481,8 +485,36 @@ export function ExpenseForm({
     }
     return "invalid";
   })();
-  const splitNeedsAttention =
-    splitStatus === "incomplete" || splitStatus === "invalid";
+  const splitTitle =
+    entryMode === "itemized"
+      ? "Split by item"
+      : {
+          equal: "Split equally",
+          exact: "Split by exact amounts",
+          percent: "Split by percentage",
+          shares: "Split by shares",
+        }[mode];
+  const splitMembers =
+    entryMode === "itemized"
+      ? members.filter((member) =>
+          items.some((item) => item.memberIds.includes(member.id)),
+        )
+      : selectedMembers;
+  const splitCaption = (() => {
+    if (splitStatus === "invalid") return "Check the split details";
+    if (splitStatus === "incomplete") return "Finish setting up this split";
+    if (entryMode === "simple" && mode === "equal" && simplePreview?.ok) {
+      const shares = simplePreview.splits.map((split) => split.amountCents);
+      if (shares.length === 0) return null;
+      const low = Math.min(...shares);
+      const high = Math.max(...shares);
+      return low === high
+        ? `${formatMoney(low, currency)} each`
+        : `${formatMoney(low, currency)}–${formatMoney(high, currency)} each`;
+    }
+    if (splitStatus === "balanced") return "Tap to review each share";
+    return null;
+  })();
 
   function assignmentSummary(item: ItemDraft) {
     const assigned = members.filter((member) =>
@@ -616,120 +648,144 @@ export function ExpenseForm({
       }}
       className="min-w-0 space-y-5"
     >
-      <section className="min-w-0 space-y-4 overflow-hidden rounded-2xl bg-card p-4 shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
-        <div className="space-y-2">
-          <Label htmlFor="description" className={fieldLabelClassName}>
-            What was it for?
-          </Label>
+      <section
+        className={cn(
+          groupedListClass,
+          "flex min-w-0 flex-col items-center gap-1 px-4 pt-5 pb-4 text-center",
+        )}
+      >
+        <Label htmlFor="amount" className={fieldLabelClassName}>
+          {entryMode === "itemized" ? "Receipt total" : "Amount"} · {currency}
+        </Label>
+        <div className="flex max-w-full min-w-0 items-baseline justify-center gap-1">
+          <span className="shrink-0 text-3xl font-semibold tracking-tight text-muted-foreground">
+            {currencySymbol}
+          </span>
           <Input
-            id="description"
-            name="description"
+            id="amount"
+            name="amount"
+            inputMode="decimal"
             required
-            defaultValue={defaultValues?.description}
-            placeholder="Dinner, groceries, tickets..."
-            className="border-0 bg-transparent px-0 text-lg font-semibold shadow-none focus-visible:ring-0 md:text-lg"
+            readOnly={entryMode === "itemized"}
+            value={amount}
+            onChange={(event) => setAmount(event.target.value)}
+            placeholder="0.00"
+            // Size to the text so the amount stays centred. Digits are 1ch
+            // wide with tabular-nums; separators are narrower.
+            style={{ width: amountFieldWidth(amount || "0.00") }}
+            className="h-auto max-w-full min-w-0 border-0 bg-transparent px-0 py-0 text-5xl font-semibold tracking-tight tabular-nums shadow-none placeholder:text-muted-foreground/35 focus-visible:ring-0 md:text-5xl dark:bg-transparent"
           />
         </div>
+        {entryMode === "itemized" && (
+          <p className="text-xs text-muted-foreground">
+            Items + tax + tip. Adjust them in the split.
+          </p>
+        )}
 
-        <div className="min-w-0 space-y-1.5">
-          <Label htmlFor="spentAt" className={fieldLabelClassName}>
-            Date
-          </Label>
-          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)]">
-            <Input
-              id="spentAt"
-              name="spentAt"
-              type="date"
-              required
-              defaultValue={
-                defaultValues?.spentAt ?? new Date().toISOString().slice(0, 10)
-              }
-              className="box-border h-10 w-full max-w-full min-w-0 appearance-none overflow-hidden px-3 py-1 text-base leading-tight md:text-sm"
-            />
-          </div>
-        </div>
+        <Label htmlFor="description" className="sr-only">
+          What was it for?
+        </Label>
+        <Input
+          id="description"
+          name="description"
+          required
+          defaultValue={defaultValues?.description}
+          placeholder="What was it for?"
+          className="mt-3 h-10 border-0 bg-transparent px-0 text-center text-lg font-medium shadow-none placeholder:text-muted-foreground/60 focus-visible:ring-0 md:text-lg dark:bg-transparent"
+        />
 
-        <div className="min-w-0 rounded-2xl bg-accent/55 px-3 py-2.5">
-          <Label htmlFor="amount" className="text-accent-foreground/75">
-            {entryMode === "itemized" ? "Receipt total" : "Amount"} · {currency}
-          </Label>
-          <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
-            <span className="shrink-0 text-2xl font-semibold tracking-tight text-accent-foreground">
-              {currencySymbol}
-            </span>
-            <Input
-              id="amount"
-              name="amount"
-              inputMode="decimal"
-              required
-              readOnly={entryMode === "itemized"}
-              value={amount}
-              onChange={(event) => setAmount(event.target.value)}
-              placeholder="0.00"
-              className="h-auto min-w-0 flex-1 border-0 bg-transparent px-0 py-0 text-2xl font-semibold tracking-tight text-accent-foreground shadow-none placeholder:text-accent-foreground/35 focus-visible:ring-0 md:text-2xl"
-            />
-          </div>
-          {entryMode === "itemized" && (
-            <p className="mt-1.5 text-xs text-accent-foreground/75">
-              Items + tax + tip. Adjust tax and tip in split options.
-            </p>
-          )}
+        <Label htmlFor="spentAt" className="sr-only">
+          Date
+        </Label>
+        <div className="mt-1 flex items-center gap-1.5 rounded-full bg-secondary pl-3 text-secondary-foreground">
+          <CalendarDays className="size-4 shrink-0 text-muted-foreground" />
+          <Input
+            id="spentAt"
+            name="spentAt"
+            type="date"
+            required
+            defaultValue={
+              defaultValues?.spentAt ?? new Date().toISOString().slice(0, 10)
+            }
+            // The pill has its own icon; open the picker from anywhere on it.
+            onClick={(event) => event.currentTarget.showPicker?.()}
+            className="h-9 w-auto border-0 bg-transparent py-0 pr-3 pl-0 text-sm font-medium shadow-none focus-visible:ring-0 md:text-sm dark:bg-transparent [&::-webkit-calendar-picker-indicator]:hidden"
+          />
         </div>
       </section>
 
-      <section className="min-w-0 space-y-4 overflow-hidden rounded-2xl bg-card p-4 shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 py-0.5 text-sm">
-          <span className="text-muted-foreground">Paid by</span>
-          <button
-            type="button"
-            className="inline-flex h-7 max-w-full min-w-0 items-center gap-1.5 rounded-lg border border-primary/20 bg-accent px-2 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent/75 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/20"
-            onClick={() => setPayerPickerOpen(true)}
-          >
-            <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
-              {paidByName.slice(0, 1).toUpperCase()}
-            </span>
-            <span className="min-w-0 truncate">{paidByName}</span>
-          </button>
-          <span className="text-muted-foreground">and split</span>
-          <button
-            type="button"
-            className={cn(
-              "inline-flex h-7 max-w-full min-w-0 items-center gap-1.5 rounded-lg border px-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/20",
-              splitStatus === "invalid"
-                ? "border-destructive/20 bg-destructive/10 text-destructive"
-                : splitStatus === "balanced"
-                  ? "border-primary/20 bg-accent text-accent-foreground hover:bg-accent/75"
-                  : "border-border bg-secondary text-secondary-foreground hover:bg-muted",
-            )}
-            onClick={() => setSplitEditorOpen(true)}
-          >
-            <Scale className="size-3.5 shrink-0" />
-            {entryMode === "itemized"
-              ? "by item"
-              : mode === "equal"
-                ? "equally"
-                : splitModeLabel[mode].toLowerCase()}
-          </button>
-        </div>
+      <section className={cn(groupedListClass, "min-w-0")}>
+        <button
+          type="button"
+          className={rowButtonClassName}
+          onClick={() => setPayerPickerOpen(true)}
+        >
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+            {memberInitials(paidByName)}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-xs text-muted-foreground">Paid by</span>
+            <span className="block truncate font-medium">{paidByName}</span>
+          </span>
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+        </button>
 
-        {splitNeedsAttention && (
-          <button
-            type="button"
+        <button
+          type="button"
+          className={cn(
+            rowButtonClassName,
+            "border-t border-border/65",
+            splitStatus === "invalid" && "bg-destructive/5",
+          )}
+          onClick={() => setSplitEditorOpen(true)}
+        >
+          <span
             className={cn(
-              "flex min-h-10 w-full items-center justify-center gap-2 rounded-xl px-3 text-sm font-medium transition-colors",
+              "flex size-9 shrink-0 items-center justify-center rounded-full",
               splitStatus === "invalid"
-                ? "bg-destructive/10 text-destructive hover:bg-destructive/15"
-                : "bg-secondary text-secondary-foreground hover:bg-muted",
+                ? "bg-destructive/10 text-destructive"
+                : "bg-accent text-accent-foreground",
             )}
-            onClick={() => setSplitEditorOpen(true)}
           >
-            <Users className="size-4" />
-            {splitStatus === "invalid"
-              ? "Check the split details"
-              : "Finish setting up this split"}
-            <ChevronRight className="size-4" />
-          </button>
-        )}
+            <Scale className="size-4" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-xs text-muted-foreground">
+              {splitTitle}
+            </span>
+            <span className="block truncate font-medium">
+              {splitMembers.length > 0
+                ? splitMembers.map((member) => member.displayName).join(", ")
+                : "No one yet"}
+            </span>
+            <span
+              className={cn(
+                "block truncate text-xs",
+                splitStatus === "invalid"
+                  ? "text-destructive"
+                  : "text-muted-foreground",
+              )}
+            >
+              {splitCaption}
+            </span>
+          </span>
+          <span className="flex shrink-0 -space-x-2">
+            {splitMembers.slice(0, 3).map((member) => (
+              <span
+                key={member.id}
+                className="flex size-7 items-center justify-center rounded-full bg-secondary text-[10px] font-bold ring-2 ring-card"
+              >
+                {memberInitials(member.displayName)}
+              </span>
+            ))}
+            {splitMembers.length > 3 && (
+              <span className="flex size-7 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground ring-2 ring-card">
+                +{splitMembers.length - 3}
+              </span>
+            )}
+          </span>
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+        </button>
       </section>
 
       <input type="hidden" name="paidByMemberId" value={paidByMemberId} />
@@ -1574,108 +1630,129 @@ export function ExpenseForm({
           document.body,
         )}
 
-      <section className="min-w-0 space-y-2 overflow-hidden rounded-2xl bg-card p-4 shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
-        <Label htmlFor="notes" className={fieldLabelClassName}>
-          Notes (optional)
-        </Label>
-        <Textarea
-          id="notes"
-          name="notes"
-          rows={2}
-          defaultValue={defaultValues?.notes}
-          placeholder="Add a note for the group"
-        />
+      <section className={cn(groupedListClass, "min-w-0")}>
+        <div className="flex items-start gap-3 px-4 py-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground">
+            <NotebookPen className="size-4" />
+          </span>
+          <Label htmlFor="notes" className="sr-only">
+            Notes
+          </Label>
+          <Textarea
+            id="notes"
+            name="notes"
+            rows={1}
+            defaultValue={defaultValues?.notes}
+            placeholder="Add a note (optional)"
+            className="min-h-9 flex-1 resize-none border-0 bg-transparent px-0 py-1.5 shadow-none focus-visible:ring-0 dark:bg-transparent"
+          />
+        </div>
+
+        {allowReceiptUpload && (
+          <div className="border-t border-border/65">
+            <input
+              ref={receiptInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/*"
+              className="hidden"
+              disabled={receiptBusy}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                if (!file) return;
+                void (async () => {
+                  setReceiptBusy(true);
+                  setError(null);
+                  try {
+                    const compressed = await compressReceiptImage(file);
+                    setAttachedReceipt(compressedReceiptToFile(compressed));
+                  } catch (receiptError) {
+                    setError(
+                      receiptError instanceof Error
+                        ? receiptError.message
+                        : "Could not attach that photo.",
+                    );
+                  } finally {
+                    setReceiptBusy(false);
+                  }
+                })();
+              }}
+            />
+            {receiptPreviewUrl ? (
+              <div className="flex items-center gap-3 px-4 py-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={receiptPreviewUrl}
+                  alt="Receipt preview"
+                  className="size-9 shrink-0 rounded-lg object-cover"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium">
+                    Receipt photo attached
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    Only group members can view it
+                  </span>
+                </span>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  aria-label="Remove receipt photo"
+                  onClick={() => {
+                    setAttachedReceipt(null);
+                    if (receiptInputRef.current) {
+                      receiptInputRef.current.value = "";
+                    }
+                  }}
+                >
+                  <X className="size-4" />
+                </Button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className={rowButtonClassName}
+                disabled={receiptBusy}
+                onClick={() => receiptInputRef.current?.click()}
+              >
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground">
+                  <ImageIcon className="size-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm">
+                    {receiptBusy
+                      ? "Compressing photo…"
+                      : "Attach receipt photo (optional)"}
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    Stored privately for group members
+                  </span>
+                </span>
+                <Plus className="size-4 shrink-0 text-muted-foreground" />
+              </button>
+            )}
+          </div>
+        )}
       </section>
 
       {children}
 
-      {allowReceiptUpload && (
-        <section className="min-w-0 space-y-3 overflow-hidden rounded-2xl bg-card p-4 shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
-          <div className="space-y-1">
-            <Label className={fieldLabelClassName}>Receipt photo (optional)</Label>
-            <p className="text-xs text-muted-foreground">
-              Compressed and stored privately. Only group members can view it.
-            </p>
-          </div>
-          <input
-            ref={receiptInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/*"
-            className="hidden"
-            disabled={receiptBusy}
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              event.target.value = "";
-              if (!file) return;
-              void (async () => {
-                setReceiptBusy(true);
-                setError(null);
-                try {
-                  const compressed = await compressReceiptImage(file);
-                  setAttachedReceipt(compressedReceiptToFile(compressed));
-                } catch (receiptError) {
-                  setError(
-                    receiptError instanceof Error
-                      ? receiptError.message
-                      : "Could not attach that photo.",
-                  );
-                } finally {
-                  setReceiptBusy(false);
-                }
-              })();
-            }}
-          />
-          {receiptPreviewUrl ? (
-            <div className="relative overflow-hidden rounded-xl bg-muted">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={receiptPreviewUrl}
-                alt="Receipt preview"
-                className="mx-auto max-h-56 w-full object-contain"
-              />
-              <Button
-                type="button"
-                size="icon"
-                variant="secondary"
-                className="absolute top-2 right-2"
-                aria-label="Remove receipt photo"
-                onClick={() => {
-                  setAttachedReceipt(null);
-                  if (receiptInputRef.current) receiptInputRef.current.value = "";
-                }}
-              >
-                <X className="size-4" />
-              </Button>
-            </div>
-          ) : (
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full gap-2"
-              disabled={receiptBusy}
-              onClick={() => receiptInputRef.current?.click()}
-            >
-              <ImageIcon className="size-4" />
-              {receiptBusy ? "Compressing photo…" : "Attach receipt photo"}
-            </Button>
-          )}
-        </section>
-      )}
-
-      {error && (
-        <p className="rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {error}
-        </p>
-      )}
-
-      <Button
-        type="submit"
-        size="lg"
-        className="w-full"
-        disabled={!canSubmit || receiptBusy}
-      >
-        {submitLabel}
-      </Button>
+      <div className="sticky bottom-0 z-10 -mx-4 space-y-3 bg-gradient-to-t from-background from-70% to-background/0 px-4 pt-6 pb-3">
+        {error && (
+          <p className="rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {error}
+          </p>
+        )}
+        <Button
+          type="submit"
+          size="lg"
+          className="w-full"
+          disabled={!canSubmit || receiptBusy}
+        >
+          {submitLabel}
+        </Button>
+      </div>
     </form>
   );
 }
