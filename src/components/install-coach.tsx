@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useSyncExternalStore } from "react";
-import { Ellipsis, Share } from "lucide-react";
+import { ChevronRight, Ellipsis, Share } from "lucide-react";
+import { settingsRowClass } from "@/components/settings-list";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -30,6 +31,7 @@ import {
   type EnvSignals,
   type Persisted,
 } from "@/lib/install-coach";
+import { cn } from "@/lib/utils";
 
 const BLANK: CoachState = { tag: "blank" };
 const DISPLAY_MODES = [
@@ -268,19 +270,20 @@ export function InstallCoach({ venue }: { venue: "home" | "profile" }) {
   if (venue === "profile") {
     return (
       <>
-        <section className="mb-6 space-y-2" aria-labelledby="home-screen-heading">
-          <h2 id="home-screen-heading" className="text-sm font-medium">
-            Home screen
-          </h2>
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            onClick={() => dispatch({ type: "expand" })}
-          >
-            Add to Home Screen
-          </Button>
-        </section>
+        <button
+          type="button"
+          className={cn(
+            settingsRowClass,
+            "w-full text-left font-medium transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none",
+          )}
+          onClick={() => dispatch({ type: "expand" })}
+        >
+          Add to Home Screen
+          <ChevronRight
+            className="ml-auto size-4 text-muted-foreground"
+            aria-hidden="true"
+          />
+        </button>
         {sheet}
       </>
     );

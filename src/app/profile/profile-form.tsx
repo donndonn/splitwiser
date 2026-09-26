@@ -1,13 +1,24 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type FormEvent } from "react";
 import { Pencil } from "lucide-react";
 import { toast } from "sonner";
+import {
+  SettingsSection,
+  settingsEditRowClass as editRowClass,
+  settingsInputClass as inputClass,
+  settingsLabelClass,
+  settingsRowClass,
+  settingsValueClass,
+} from "@/components/settings-list";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { parseVenmoUsername } from "@/lib/venmo";
+import { cn } from "@/lib/utils";
 import { updateProfileAction } from "./actions";
 import { PhoneSection } from "./phone-section";
+
+/** Grows with its text so a leading "@" stays right next to it. */
+const prefixedInputClass = "field-sizing-content min-w-[4ch] max-w-full pl-0.5";
 
 export function ProfileForm({
   name,
@@ -52,65 +63,60 @@ export function ProfileForm({
     }
   }
 
+  function onSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    let venmo: string | null;
+    try {
+      venmo = parseVenmoUsername(venmoValue);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not save profile");
+      return;
+    }
+    const formData = new FormData();
+    formData.set("name", nameValue);
+    formData.set("username", usernameValue);
+    formData.set("venmo", venmo ?? "");
+    startTransition(async () => {
+      try {
+        await updateProfileAction(formData);
+        setSavedName(nameValue.trim());
+        setSavedUsername(usernameValue.trim().replace(/^@+/, "").toLowerCase());
+        setSavedVenmo(venmo);
+        toast.success("Profile saved");
+        setEditing(false);
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : "Could not save profile",
+        );
+      }
+    });
+  }
+
   return (
-    <section className="mb-6 space-y-3" aria-labelledby="account-heading">
-      <div className="flex h-8 items-center justify-between">
-        <h2
-          id="account-heading"
-          className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-        >
-          Account
-        </h2>
-        {editing ? null : (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            aria-label="Edit profile"
-            onClick={startEditing}
-          >
-            <Pencil />
-            Edit
-          </Button>
-        )}
-      </div>
-      <form
-        className="space-y-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          let venmo: string | null;
-          try {
-            venmo = parseVenmoUsername(venmoValue);
-          } catch (err) {
-            toast.error(
-              err instanceof Error ? err.message : "Could not save profile",
-            );
-            return;
-          }
-          const formData = new FormData();
-          formData.set("name", nameValue);
-          formData.set("username", usernameValue);
-          formData.set("venmo", venmo ?? "");
-          startTransition(async () => {
-            try {
-              await updateProfileAction(formData);
-              setSavedName(nameValue.trim());
-              setSavedUsername(
-                usernameValue.trim().replace(/^@+/, "").toLowerCase(),
-              );
-              setSavedVenmo(venmo);
-              toast.success("Profile saved");
-              setEditing(false);
-            } catch (err) {
-              toast.error(
-                err instanceof Error ? err.message : "Could not save profile",
-              );
-            }
-          });
-        }}
+    <form className="mb-6" onSubmit={onSubmit}>
+      <SettingsSection
+        id="account-heading"
+        title="Account"
+        className="mb-3"
+        action={
+          editing ? null : (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label="Edit profile"
+              onClick={startEditing}
+            >
+              <Pencil />
+              Edit
+            </Button>
+          )
+        }
       >
-        <div className="space-y-2">
-          <Label htmlFor={editing ? "name" : undefined}>Display name</Label>
+        <div className={cn(settingsRowClass, editing && editRowClass)}>
+          <label htmlFor={editing ? "name" : undefined} className={settingsLabelClass}>
+            Display name
+          </label>
           {editing ? (
             <input
               id="name"
@@ -119,22 +125,23 @@ export function ProfileForm({
               onChange={(e) => setNameValue(e.target.value)}
               maxLength={50}
               required
-              className="flex h-11 w-full rounded-xl border border-input bg-card px-3.5 text-base shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 md:text-sm"
+              className={cn(inputClass, "flex-1")}
             />
           ) : (
-            <div className="flex h-11 items-center rounded-xl border bg-muted/40 px-3.5 text-sm font-medium">
-              {savedName}
-            </div>
+            <span className={settingsValueClass}>{savedName}</span>
           )}
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor={editing ? "username" : undefined}>Username</Label>
+        <div className={cn(settingsRowClass, editing && editRowClass)}>
+          <label
+            htmlFor={editing ? "username" : undefined}
+            className={settingsLabelClass}
+          >
+            Username
+          </label>
           {editing ? (
-            <div className="flex h-11 items-center rounded-xl border border-input bg-card px-3.5 shadow-xs focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/20">
-              <span className="select-none text-sm leading-none text-muted-foreground">
-                @
-              </span>
+            <span className="ml-auto flex min-w-0 flex-1 items-center justify-end">
+              <span className="select-none text-muted-foreground">@</span>
               <input
                 id="username"
                 name="username"
@@ -145,35 +152,35 @@ export function ProfileForm({
                 maxLength={20}
                 pattern="[A-Za-z0-9_]+"
                 required
-                className="h-full min-w-0 flex-1 bg-transparent pl-0.5 text-base outline-none placeholder:text-muted-foreground/70 md:text-sm"
+                className={cn(inputClass, prefixedInputClass)}
               />
-            </div>
+            </span>
           ) : (
-            <div className="flex h-11 items-center rounded-xl border bg-muted/40 px-3.5 text-sm font-medium tracking-tight">
+            <span className={settingsValueClass}>
               <span className="text-muted-foreground">@</span>
-              <span>{savedUsername}</span>
-            </div>
+              {savedUsername}
+            </span>
           )}
         </div>
 
-        <div className="space-y-2">
-          <Label>Email</Label>
-          <div className="flex h-11 items-center rounded-xl border bg-muted/40 px-3.5 text-sm text-muted-foreground">
+        <div className={settingsRowClass}>
+          <span className={settingsLabelClass}>Email</span>
+          <span className={cn(settingsValueClass, "font-normal text-muted-foreground")}>
             {email}
-          </div>
+          </span>
         </div>
 
         {smsEnabled || phone ? (
           <PhoneSection phone={phone} enabled={smsEnabled} editing={editing} />
         ) : null}
 
-        <div className="space-y-2">
-          <Label htmlFor={editing ? "venmo" : undefined}>Venmo</Label>
+        <div className={cn(settingsRowClass, editing && editRowClass)}>
+          <label htmlFor={editing ? "venmo" : undefined} className={settingsLabelClass}>
+            Venmo
+          </label>
           {editing ? (
-            <div className="flex h-11 items-center rounded-xl border border-input bg-card px-3.5 shadow-xs focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/20">
-              <span className="select-none text-sm leading-none text-muted-foreground">
-                @
-              </span>
+            <span className="ml-auto flex min-w-0 flex-1 items-center justify-end">
+              <span className="select-none text-muted-foreground">@</span>
               <input
                 id="venmo"
                 name="venmo"
@@ -187,42 +194,42 @@ export function ProfileForm({
                 autoCapitalize="off"
                 autoCorrect="off"
                 spellCheck={false}
-                className="h-full min-w-0 flex-1 bg-transparent pl-0.5 text-base outline-none placeholder:text-muted-foreground/70 md:text-sm"
+                className={cn(inputClass, prefixedInputClass)}
               />
-            </div>
+            </span>
           ) : (
-            <div className="flex h-11 items-center rounded-xl border bg-muted/40 px-3.5 text-sm font-medium tracking-tight">
+            <span className={settingsValueClass}>
               {savedVenmo ? (
                 <>
                   <span className="text-muted-foreground">@</span>
-                  <span>{savedVenmo}</span>
+                  {savedVenmo}
                 </>
               ) : (
                 <span className="font-normal text-muted-foreground">
                   Not set
                 </span>
               )}
-            </div>
+            </span>
           )}
         </div>
+      </SettingsSection>
 
-        {editing ? (
-          <div className="grid grid-cols-2 gap-2">
-            <Button type="submit" size="lg" disabled={pending}>
-              {pending ? "Saving…" : "Save"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="lg"
-              disabled={pending}
-              onClick={cancelEditing}
-            >
-              Cancel
-            </Button>
-          </div>
-        ) : null}
-      </form>
-    </section>
+      {editing ? (
+        <div className="grid grid-cols-2 gap-2">
+          <Button type="submit" size="lg" disabled={pending}>
+            {pending ? "Saving…" : "Save"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            disabled={pending}
+            onClick={cancelEditing}
+          >
+            Cancel
+          </Button>
+        </div>
+      ) : null}
+    </form>
   );
 }
