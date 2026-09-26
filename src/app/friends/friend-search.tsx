@@ -37,17 +37,19 @@ export function FriendSearch({ hasUsername }: { hasUsername: boolean }) {
           <UserPlus className="size-5" />
         </Button>
       </SheetTrigger>
+      {/* Top sheet: a bottom sheet sits under the iOS keyboard, which does
+          not resize the layout viewport. */}
       <SheetContent
-        side="bottom"
+        side="top"
         className={cn(
-          "mx-auto max-h-[min(32rem,85vh)] max-w-lg gap-3 rounded-t-3xl border-border/70",
-          "pb-[max(1.25rem,env(safe-area-inset-bottom))]",
+          "mx-auto max-h-[min(32rem,85vh)] max-w-lg gap-3 rounded-b-3xl border-border/70 pb-5",
+          "pt-[env(safe-area-inset-top)] [&>[data-slot=sheet-close]]:top-[calc(env(safe-area-inset-top)+0.75rem)]",
         )}
       >
         <SheetHeader className="pr-12">
           <SheetTitle>Find friends</SheetTitle>
           <SheetDescription>
-            Search by exact email or @username.
+            Search by exact email, phone number, or @username.
             {!hasUsername ? (
               <>
                 {" "}
@@ -85,9 +87,13 @@ export function FriendSearch({ hasUsername }: { hasUsername: boolean }) {
               setQuery(e.target.value);
               setResult(undefined);
             }}
-            placeholder="email or @username"
+            placeholder="email, phone, or @username"
             autoComplete="off"
-            aria-label="email or @username"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+            enterKeyHint="search"
+            aria-label="email, phone, or @username"
           />
           <Button type="submit" disabled={pending} variant="secondary">
             {pending ? "…" : "Search"}
