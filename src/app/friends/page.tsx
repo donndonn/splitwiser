@@ -28,7 +28,6 @@ import {
   acceptFriendRequestAction,
   cancelFriendRequestAction,
   declineFriendRequestAction,
-  removeFriendAction,
 } from "./actions";
 import { FriendSearch } from "./friend-search";
 
@@ -142,13 +141,10 @@ export default async function FriendsPage() {
             <h3 className="text-sm font-medium">Your friends</h3>
             <ul className="divide-y divide-border overflow-hidden rounded-2xl bg-card shadow-sm shadow-foreground/[0.04] ring-1 ring-foreground/[0.07]">
               {friends.map((friend) => (
-                <li
-                  key={friend.id}
-                  className="relative"
-                >
+                <li key={friend.id}>
                   <Link
                     href={`/friends/${friend.id}`}
-                    className="flex min-h-24 items-center gap-3 rounded-2xl px-4 pb-9 pt-3 transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="flex min-h-16 items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                   >
                     <Avatar>
                       <AvatarImage src={friend.image ?? undefined} alt="" />
@@ -166,14 +162,6 @@ export default async function FriendsPage() {
                     </div>
                     <FriendBalance nets={balanceNets.get(friend.id) ?? []} />
                   </Link>
-                  <form
-                    action={removeFriendAction.bind(null, friend.id)}
-                    className="absolute bottom-2 right-3"
-                  >
-                    <Button type="submit" size="sm" variant="ghost">
-                      Remove
-                    </Button>
-                  </form>
                 </li>
               ))}
             </ul>

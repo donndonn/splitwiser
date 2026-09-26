@@ -14,6 +14,7 @@ import {
 } from "@/lib/friend-balances";
 import { areFriends, displayNameForUser } from "@/lib/friends";
 import { cn, groupedListClass } from "@/lib/utils";
+import { RemoveFriendButton } from "./remove-friend-button";
 
 export default async function FriendDetailPage({
   params,
@@ -148,6 +149,10 @@ export default async function FriendDetailPage({
             </div>
           )}
         </section>
+
+        <div className="mt-10 flex justify-center">
+          <RemoveFriendButton friendId={id} name={name} />
+        </div>
       </AppShell>
       <AppBottomNav />
     </>
