@@ -3,7 +3,10 @@
 import { useOptimistic, useState, useTransition } from "react";
 import { ChevronDown } from "lucide-react";
 import { toast } from "sonner";
-import { removeExpenseAction } from "@/app/g/[id]/expenses/actions";
+import {
+  removeExpenseAction,
+  restoreExpenseAction,
+} from "@/app/g/[id]/expenses/actions";
 import { SwipeableExpenseRow } from "@/components/swipeable-expense-row";
 import {
   AlertDialog,
@@ -49,15 +52,39 @@ export function RecentExpensesList({
   archivedExpenses?: RecentExpenseItem[];
   settleMarkerLabel?: string | null;
 }) {
-  const [items, removeOptimistic] = useOptimistic(
+  const [items, updateItems] = useOptimistic(
     initialExpenses,
-    (current, deletedId: string) =>
-      current.filter((expense) => expense.id !== deletedId),
+    (
+      current,
+      action:
+        | { op: "remove"; id: string }
+        | { op: "add"; expense: RecentExpenseItem },
+    ) => {
+      if (action.op === "remove") {
+        return current.filter((expense) => expense.id !== action.id);
+      }
+      if (current.some((expense) => expense.id === action.expense.id)) {
+        return current;
+      }
+      return [action.expense, ...current];
+    },
   );
-  const [archived, removeArchivedOptimistic] = useOptimistic(
+  const [archived, updateArchived] = useOptimistic(
     archivedExpenses,
-    (current, deletedId: string) =>
-      current.filter((expense) => expense.id !== deletedId),
+    (
+      current,
+      action:
+        | { op: "remove"; id: string }
+        | { op: "add"; expense: RecentExpenseItem },
+    ) => {
+      if (action.op === "remove") {
+        return current.filter((expense) => expense.id !== action.id);
+      }
+      if (current.some((expense) => expense.id === action.expense.id)) {
+        return current;
+      }
+      return [action.expense, ...current];
+    },
   );
   const [openId, setOpenId] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -106,15 +133,38 @@ export function RecentExpensesList({
   function confirmDelete() {
     if (!pendingDelete) return;
     const target = pendingDelete;
+    const fromArchive = archived.some((expense) => expense.id === target.id);
     setPendingDelete(null);
     setOpenId(null);
 
     startTransition(async () => {
-      removeOptimistic(target.id);
-      removeArchivedOptimistic(target.id);
+      updateItems({ op: "remove", id: target.id });
+      updateArchived({ op: "remove", id: target.id });
       try {
         await removeExpenseAction(groupId, target.id);
-        toast.success("Expense deleted");
+        toast.success("Expense deleted", {
+          action: {
+            label: "Undo",
+            onClick: () => {
+              startTransition(async () => {
+                if (fromArchive) {
+                  updateArchived({ op: "add", expense: target });
+                } else {
+                  updateItems({ op: "add", expense: target });
+                }
+                try {
+                  await restoreExpenseAction(groupId, target.id);
+                } catch (err) {
+                  toast.error(
+                    err instanceof Error
+                      ? err.message
+                      : "Could not restore expense",
+                  );
+                }
+              });
+            },
+          },
+        });
       } catch (err) {
         toast.error(
           err instanceof Error ? err.message : "Could not delete expense",
@@ -184,11 +234,15 @@ export function RecentExpensesList({
       >
         <AlertDialogContent size="sm">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete expense?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {pendingDelete
+                ? `Delete “${pendingDelete.description}”?`
+                : "Delete expense?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {pendingDelete
-                ? `“${pendingDelete.description}” will be permanently deleted.`
-                : "This expense will be permanently deleted."}
+                ? `“${pendingDelete.description}” will be deleted.`
+                : "This expense will be deleted."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

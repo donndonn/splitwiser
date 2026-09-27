@@ -228,8 +228,10 @@ describe.skipIf(!hasTestDatabase)("site admin", () => {
         insert into expenses (id, group_id, description, amount_cents, paid_by_member_id, created_by_member_id, spent_at)
         values
           ('e1', ${trip.groupId}, 'Dinner', 12345, ${trip.adminMemberId}, ${trip.adminMemberId}, '2026-09-01'),
-          ('e2', ${trip.groupId}, 'Taxi', 655, 'ph-1', ${trip.adminMemberId}, '2026-09-03')
+          ('e2', ${trip.groupId}, 'Taxi', 655, 'ph-1', ${trip.adminMemberId}, '2026-09-03'),
+          ('e3', ${trip.groupId}, 'Void', 999, ${trip.adminMemberId}, ${trip.adminMemberId}, '2026-09-02')
       `;
+      await t.sql`update expenses set deleted_at = now() where id = 'e3'`;
       await t.sql`
         insert into group_activities (id, group_id, type, payload, created_at)
         values ('a1', ${trip.groupId}, 'member_joined', '{"actorName":"A"}', '2026-09-04')

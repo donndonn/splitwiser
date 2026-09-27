@@ -12,8 +12,10 @@ import {
   Undo2,
   type LucideIcon,
 } from "lucide-react";
+import { restoreExpenseAction } from "@/app/g/[id]/expenses/actions";
 import { ActivityTime } from "@/components/activity-time";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardDescription,
@@ -28,6 +30,7 @@ const kindStyle: Record<ActivityKind, { icon: LucideIcon; tile: string }> = {
   expense_created: { icon: Receipt, tile: "bg-primary/15 text-primary" },
   expense_updated: { icon: Pencil, tile: "bg-muted text-muted-foreground" },
   expense_deleted: { icon: Trash2, tile: "bg-destructive/10 text-destructive" },
+  expense_restored: { icon: Undo2, tile: "bg-primary/15 text-primary" },
   comment_added: {
     icon: MessageCircle,
     tile: "bg-sky-500/15 text-sky-600 dark:text-sky-400",
@@ -122,17 +125,37 @@ function ActivityRow({ item }: { item: ActivityFeedItem }) {
     </div>
   );
 
+  const restore = item.restoreExpenseId ? (
+    <form
+      action={restoreExpenseAction.bind(
+        null,
+        item.groupId,
+        item.restoreExpenseId,
+      )}
+      className="mt-2 pl-14"
+    >
+      <Button type="submit" size="sm" variant="outline">
+        Restore
+      </Button>
+    </form>
+  ) : null;
+
+  const rowHref = item.restoreExpenseId ? null : item.href;
+
   return (
     <li>
-      {item.href ? (
+      {rowHref ? (
         <Link
-          href={item.href}
+          href={rowHref}
           className="block px-4 py-3 transition-colors hover:bg-muted/50"
         >
           {content}
         </Link>
       ) : (
-        <div className="px-4 py-3">{content}</div>
+        <div className="px-4 py-3">
+          {content}
+          {restore}
+        </div>
       )}
     </li>
   );

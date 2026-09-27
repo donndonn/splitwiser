@@ -9,6 +9,7 @@ export function AppShell({
   actions,
   className,
   withBottomNav = false,
+  lockViewport = false,
 }: {
   children: React.ReactNode;
   title?: string;
@@ -16,11 +17,19 @@ export function AppShell({
   actions?: React.ReactNode;
   className?: string;
   withBottomNav?: boolean;
+  /** Column locked to the dynamic viewport. The page does not scroll; main does. */
+  lockViewport?: boolean;
 }) {
   return (
-    <div className="mx-auto flex min-h-full w-full min-w-0 max-w-lg flex-col">
+    <div
+      data-viewport-column={lockViewport ? "" : undefined}
+      className={cn(
+        "mx-auto flex w-full min-w-0 max-w-lg flex-col",
+        lockViewport ? "h-dvh max-h-dvh overflow-hidden" : "min-h-full",
+      )}
+    >
       {(title || backHref || actions) && (
-        <header className="sticky top-0 z-30 flex min-h-16 items-center gap-2 border-b border-border/60 bg-background/90 px-4 py-2 backdrop-blur-xl supports-[backdrop-filter]:bg-background/75">
+        <header className="sticky top-0 z-30 flex min-h-16 shrink-0 items-center gap-2 border-b border-border/60 bg-background/90 px-4 py-2 backdrop-blur-xl supports-[backdrop-filter]:bg-background/75">
           {backHref ? (
             <Link
               href={backHref}
@@ -42,8 +51,10 @@ export function AppShell({
       )}
       <main
         className={cn(
-          "min-w-0 flex-1 px-4 py-5",
-          withBottomNav && "pb-24",
+          "min-w-0 flex-1",
+          lockViewport
+            ? "flex min-h-0 flex-col overflow-hidden"
+            : cn("px-4 py-5", withBottomNav && "pb-24"),
           className,
         )}
       >

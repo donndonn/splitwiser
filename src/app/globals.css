@@ -85,16 +85,22 @@
    * --tab-bar-height plus a 1px top border and the home-indicator inset.
    * The pill sits --add-expense-fab-gap above that border and
    * --add-expense-fab-right in from the column edge.
-   * --add-expense-fab-bottom is that offset: bar + border + gap + inset.
+   * --bottom-nav-offset is bar + border + inset. --add-expense-fab-bottom
+   * adds the gap. Use the nav offset only when a tab bar is on the page.
    * The group shell is the viewport column, so the same offset matches.
    * The group tab bar stays an in-flow footer.
    */
   --tab-bar-height: 4rem;
   --add-expense-fab-gap: 1.75rem;
   --add-expense-fab-right: 1rem;
+  /* Height of a tab bar that is actually on screen: bar + border + home
+     indicator. Floating pills add the gap. A page with no tab bar uses only
+     env(safe-area-inset-bottom). */
+  --bottom-nav-offset: calc(
+    var(--tab-bar-height) + 1px + env(safe-area-inset-bottom, 0px)
+  );
   --add-expense-fab-bottom: calc(
-    var(--tab-bar-height) + 1px + var(--add-expense-fab-gap) +
-      env(safe-area-inset-bottom, 0px)
+    var(--bottom-nav-offset) + var(--add-expense-fab-gap)
   );
   --sidebar: #fffefa;
   --sidebar-foreground: #1e2a28;
@@ -186,7 +192,9 @@
  * fixed bottom bar.
  */
 html:has([data-group-tabs]),
-body:has([data-group-tabs]) {
+body:has([data-group-tabs]),
+html:has([data-viewport-column]),
+body:has([data-viewport-column]) {
   height: 100dvh;
   max-height: 100dvh;
   min-height: 0;

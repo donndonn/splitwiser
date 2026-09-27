@@ -1,7 +1,9 @@
 import { cache } from "react";
-import { type SQL, eq, inArray, sql } from "drizzle-orm";
+import { type SQL, and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { expenseSplits, expenses, groups, members, settlements } from "@/db/schema";
+import type { Db } from "@/db/types";
+import { activeExpense } from "@/lib/expenses";
 
 export type MemberBalance = {
   memberId: string;
@@ -28,19 +30,20 @@ type NetRow = {
  * Positive delta = money the member is owed.
  */
 function netDeltaSource(expenseWhere: SQL, settlementWhere: SQL) {
+  const liveExpense = and(expenseWhere, activeExpense()) ?? expenseWhere;
   return sql`
     select ${expenses.groupId} as group_id,
            ${expenses.paidByMemberId} as member_id,
            ${expenses.amountCents} as delta
     from ${expenses}
-    where ${expenseWhere}
+    where ${liveExpense}
     union all
     select ${expenses.groupId},
            ${expenseSplits.memberId},
            (0 - ${expenseSplits.amountCents})
     from ${expenseSplits}
     inner join ${expenses} on ${expenseSplits.expenseId} = ${expenses.id}
-    where ${expenseWhere}
+    where ${liveExpense}
     union all
     select ${settlements.groupId},
            ${settlements.fromMemberId},
@@ -59,8 +62,9 @@ function netDeltaSource(expenseWhere: SQL, settlementWhere: SQL) {
 async function queryNets(
   expenseWhere: SQL,
   settlementWhere: SQL,
+  client: Db = db,
 ): Promise<NetRow[]> {
-  const rows = await db.execute<NetRow>(sql`
+  const rows = await client.execute<NetRow>(sql`
     select group_id, member_id, sum(delta)::bigint as net_cents
     from (${netDeltaSource(expenseWhere, settlementWhere)}) as deltas
     group by group_id, member_id
@@ -75,6 +79,7 @@ function toCents(value: NetRow["net_cents"]): number {
 /** Nets for many groups in one round trip. Missing groups map to []. */
 export async function getBalancesByGroup(
   groupIds: readonly string[],
+  client: Db = db,
 ): Promise<Map<string, MemberBalance[]>> {
   const grouped = new Map<string, MemberBalance[]>();
   const ids = [...new Set(groupIds)];
@@ -84,6 +89,7 @@ export async function getBalancesByGroup(
   const rows = await queryNets(
     inArray(expenses.groupId, ids),
     inArray(settlements.groupId, ids),
+    client,
   );
   for (const row of rows) {
     const list = grouped.get(row.group_id);
@@ -126,11 +132,12 @@ export async function getMemberNet(
  */
 export async function listViewerGroupSummaries(
   userId: string,
+  client: Db = db,
 ): Promise<ViewerGroupSummary[]> {
   const expenseInMine = sql`${expenses.groupId} in (select group_id from mine)`;
   const settlementInMine = sql`${settlements.groupId} in (select group_id from mine)`;
 
-  const rows = await db.execute<{
+  const rows = await client.execute<{
     group_id: string;
     group_name: string;
     currency: string;

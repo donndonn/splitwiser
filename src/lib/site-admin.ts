@@ -24,6 +24,7 @@ import {
   type AdminActionType,
 } from "@/db/schema";
 import type { Db } from "@/db/types";
+import { activeExpense } from "@/lib/expenses";
 import {
   countInviteReservations,
   inviteStatus,
@@ -418,6 +419,7 @@ function groupAggregates(client: Db) {
           .as("total_cents"),
     })
     .from(expenses)
+    .where(activeExpense())
     .groupBy(expenses.groupId)
     .as("expense_stats");
   const activityStats = client
@@ -508,7 +510,7 @@ export async function getAdminGroup(
         ),
       })
       .from(expenses)
-      .where(eq(expenses.groupId, groupId)),
+      .where(and(eq(expenses.groupId, groupId), activeExpense())),
     client
       .select({
         lastActivityAt: sql<Date | null>`max(${groupActivities.createdAt})`.mapWith(

@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
@@ -20,6 +20,7 @@ import {
   calculateItemizedExpense,
   type ItemizedExpenseItemInput,
 } from "@/lib/itemized-expense";
+import { activeExpense } from "@/lib/expenses";
 import { allocateSplits, parseAmountToCents } from "@/lib/money";
 import { readReceiptImageFromFormData } from "@/lib/receipt-blob";
 import {
@@ -346,7 +347,13 @@ export async function updateExpenseAction(
       receiptBlobPathname: expenses.receiptBlobPathname,
     })
     .from(expenses)
-    .where(and(eq(expenses.id, expenseId), eq(expenses.groupId, groupId)))
+    .where(
+      and(
+        eq(expenses.id, expenseId),
+        eq(expenses.groupId, groupId),
+        activeExpense(),
+      ),
+    )
     .limit(1);
   if (!existing) throw new Error("Expense not found");
 
@@ -389,7 +396,13 @@ export async function updateExpenseAction(
             }
           : {}),
       })
-      .where(and(eq(expenses.id, expenseId), eq(expenses.groupId, groupId)))
+      .where(
+        and(
+          eq(expenses.id, expenseId),
+          eq(expenses.groupId, groupId),
+          activeExpense(),
+        ),
+      )
       .returning({ id: expenses.id });
 
     if (updated.length === 0) {
@@ -482,7 +495,13 @@ export async function attachReceiptAction(
       receiptBlobPathname: expenses.receiptBlobPathname,
     })
     .from(expenses)
-    .where(and(eq(expenses.id, expenseId), eq(expenses.groupId, groupId)))
+    .where(
+      and(
+        eq(expenses.id, expenseId),
+        eq(expenses.groupId, groupId),
+        activeExpense(),
+      ),
+    )
     .limit(1);
   if (!existing) throw new Error("Expense not found");
   if (existing.receiptBlobPathname) {
@@ -504,7 +523,13 @@ export async function attachReceiptAction(
         receiptBlobPathname: uploaded.pathname,
         receiptContentType: receiptImage.contentType,
       })
-      .where(and(eq(expenses.id, expenseId), eq(expenses.groupId, groupId)));
+      .where(
+        and(
+          eq(expenses.id, expenseId),
+          eq(expenses.groupId, groupId),
+          activeExpense(),
+        ),
+      );
   } catch (err) {
     if (uploadedPathname) {
       await deleteReceiptBlob(uploadedPathname).catch(() => {});
@@ -524,23 +549,41 @@ export async function attachReceiptAction(
   revalidatePath(`/g/${groupId}/expenses/${expenseId}`);
 }
 
-/** Delete an expense and revalidate; does not redirect (for in-list deletes). */
+function revalidateExpenseViews(groupId: string, expenseId: string) {
+  revalidatePath(`/g/${groupId}`);
+  revalidatePath(`/g/${groupId}/balances`);
+  revalidatePath(`/g/${groupId}/activity`);
+  revalidatePath("/activity");
+  revalidatePath(`/g/${groupId}/expenses/${expenseId}`);
+  revalidatePath("/");
+  revalidatePath("/friends", "layout");
+}
+
+/** Soft-delete an expense. The receipt blob stays so restore can show it. */
 export async function removeExpenseAction(groupId: string, expenseId: string) {
   const { member } = await requireMember(groupId);
 
-  const deletedPathname = await db.transaction(async (tx) => {
+  await db.transaction(async (tx) => {
     const [existing] = await tx
-      .select({
+      .update(expenses)
+      .set({
+        deletedAt: new Date(),
+        deletedByMemberId: member.id,
+      })
+      .where(
+        and(
+          eq(expenses.id, expenseId),
+          eq(expenses.groupId, groupId),
+          activeExpense(),
+        ),
+      )
+      .returning({
         id: expenses.id,
         description: expenses.description,
         amountCents: expenses.amountCents,
-        receiptBlobPathname: expenses.receiptBlobPathname,
-      })
-      .from(expenses)
-      .where(and(eq(expenses.id, expenseId), eq(expenses.groupId, groupId)))
-      .limit(1);
+      });
 
-    if (!existing) return null;
+    if (!existing) return;
 
     await logGroupActivity(tx, {
       groupId,
@@ -553,30 +596,50 @@ export async function removeExpenseAction(groupId: string, expenseId: string) {
         amountCents: existing.amountCents,
       },
     });
-
-    await tx
-      .delete(expenses)
-      .where(and(eq(expenses.id, expenseId), eq(expenses.groupId, groupId)));
-
-    return existing.receiptBlobPathname;
   });
 
-  if (deletedPathname) {
-    try {
-      await deleteReceiptBlob(deletedPathname);
-    } catch (err) {
-      console.error("Failed to delete receipt blob", deletedPathname, err);
-    }
-  }
-
-  revalidatePath(`/g/${groupId}`);
-  revalidatePath(`/g/${groupId}/balances`);
-  revalidatePath(`/g/${groupId}/activity`);
+  revalidateExpenseViews(groupId, expenseId);
   return { ok: true as const };
 }
 
-/** Detail-page delete: remove then redirect back to the group dashboard. */
-export async function deleteExpenseAction(groupId: string, expenseId: string) {
-  await removeExpenseAction(groupId, expenseId);
-  redirect(`/g/${groupId}`);
+/** Any group member can put a soft-deleted expense back. */
+export async function restoreExpenseAction(groupId: string, expenseId: string) {
+  const { member } = await requireMember(groupId);
+
+  await db.transaction(async (tx) => {
+    const [existing] = await tx
+      .update(expenses)
+      .set({
+        deletedAt: null,
+        deletedByMemberId: null,
+      })
+      .where(
+        and(
+          eq(expenses.id, expenseId),
+          eq(expenses.groupId, groupId),
+          isNotNull(expenses.deletedAt),
+        ),
+      )
+      .returning({
+        id: expenses.id,
+        description: expenses.description,
+        amountCents: expenses.amountCents,
+      });
+
+    if (!existing) return;
+
+    await logGroupActivity(tx, {
+      groupId,
+      type: "expense_restored",
+      actorMemberId: member.id,
+      expenseId: existing.id,
+      payload: {
+        actorName: member.displayName,
+        description: existing.description,
+        amountCents: existing.amountCents,
+      },
+    });
+  });
+
+  revalidateExpenseViews(groupId, expenseId);
 }

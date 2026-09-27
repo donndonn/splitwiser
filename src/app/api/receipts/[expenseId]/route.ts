@@ -1,9 +1,10 @@
 import { get } from "@vercel/blob";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/db";
 import { expenses } from "@/db/schema";
 import { getMembership, getOptionalUser } from "@/lib/auth-guards";
+import { activeExpense } from "@/lib/expenses";
 import { receiptImageHttpResult } from "@/lib/receipt-blob";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +40,7 @@ export async function GET(
       receiptContentType: expenses.receiptContentType,
     })
     .from(expenses)
-    .where(eq(expenses.id, expenseId))
+    .where(and(eq(expenses.id, expenseId), activeExpense()))
     .limit(1);
 
   if (!expense) {

@@ -1,13 +1,12 @@
 import { and, asc, eq } from "drizzle-orm";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { ExpenseComments } from "@/components/expense-comments";
+import { ExpenseDetailActions } from "@/components/expense-detail-actions";
 import { ExpenseForm } from "@/components/expense-form";
 import { ExpenseReadView } from "@/components/expense-read-view";
 import { ReceiptAttach } from "@/components/receipt-attach";
 import { ReceiptPhoto } from "@/components/receipt-photo";
-import { Button } from "@/components/ui/button";
 import { db } from "@/db";
 import {
   expenseComments,
@@ -26,12 +25,9 @@ import {
   buildSimpleReceiptBreakdown,
   type ExpenseReceiptBreakdown,
 } from "@/lib/expense-receipt-breakdown";
+import { activeExpense } from "@/lib/expenses";
 import { formatCents, formatMoney } from "@/lib/money";
-import {
-  attachReceiptAction,
-  deleteExpenseAction,
-  updateExpenseAction,
-} from "../actions";
+import { attachReceiptAction, updateExpenseAction } from "../actions";
 import {
   addExpenseCommentAction,
   deleteExpenseCommentAction,
@@ -62,7 +58,13 @@ export default async function ExpenseDetailPage({
     db
       .select()
       .from(expenses)
-      .where(and(eq(expenses.id, expenseId), eq(expenses.groupId, id)))
+      .where(
+        and(
+          eq(expenses.id, expenseId),
+          eq(expenses.groupId, id),
+          activeExpense(),
+        ),
+      )
       .limit(1),
   ]);
 
@@ -182,6 +184,7 @@ export default async function ExpenseDetailPage({
       defaultPaidById={expense.paidByMemberId}
       action={action}
       submitLabel="Save changes"
+      pinnedSubmit
       allowReceiptUpload={!hasReceipt}
       defaultValues={
         expense.entryMode === "itemized"
@@ -224,12 +227,14 @@ export default async function ExpenseDetailPage({
     <AppShell
       title="Expense"
       backHref={editing ? `/g/${id}/expenses/${expenseId}` : `/g/${id}`}
+      lockViewport={editing}
       actions={
-        editing ? null : (
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/g/${id}/expenses/${expenseId}?edit=1`}>Edit</Link>
-          </Button>
-        )
+        <ExpenseDetailActions
+          groupId={id}
+          expenseId={expenseId}
+          description={expense.description}
+          showEdit={!editing}
+        />
       }
     >
       {editing ? (
@@ -295,15 +300,6 @@ export default async function ExpenseDetailPage({
           deleteAction={deleteExpenseCommentAction.bind(null, id, expenseId)}
         />
       )}
-
-      <form
-        action={deleteExpenseAction.bind(null, id, expenseId)}
-        className="mt-6"
-      >
-        <Button type="submit" variant="destructive" className="w-full">
-          Delete expense
-        </Button>
-      </form>
     </AppShell>
   );
 }

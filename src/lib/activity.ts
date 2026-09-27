@@ -175,6 +175,16 @@ export function describeActivity(
         ],
         impact: amountImpact(),
       };
+    case "expense_restored":
+      return {
+        parts: [
+          actor,
+          { text: " restored " },
+          quoted(payload.description, "an expense"),
+          ...inGroup,
+        ],
+        impact: expenseImpact(),
+      };
     case "comment_added":
       return {
         parts: [
