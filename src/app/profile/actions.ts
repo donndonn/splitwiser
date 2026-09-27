@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { requireUser } from "@/lib/auth-guards";
+import { readAvatarImageFromFormData } from "@/lib/avatar";
+import { setAvatarWithoutUpload, uploadAvatar } from "@/lib/avatar-store";
 import { validateUsername } from "@/lib/friends";
 import { parseVenmoUsername } from "@/lib/venmo";
 
@@ -48,4 +50,28 @@ export async function updateProfileAction(formData: FormData) {
   revalidatePath("/profile");
   revalidatePath("/");
   revalidatePath("/friends");
+}
+
+function revalidateAvatar() {
+  // Avatars show on most pages.
+  revalidatePath("/", "layout");
+}
+
+export async function uploadAvatarAction(formData: FormData) {
+  const user = await requireUser("/profile");
+  const upload = readAvatarImageFromFormData(formData);
+  await uploadAvatar(db, user.id, upload);
+  revalidateAvatar();
+}
+
+export async function switchToAccountPhotoAction() {
+  const user = await requireUser("/profile");
+  await setAvatarWithoutUpload(db, user.id, "account");
+  revalidateAvatar();
+}
+
+export async function removeAvatarAction() {
+  const user = await requireUser("/profile");
+  await setAvatarWithoutUpload(db, user.id, "none");
+  revalidateAvatar();
 }
