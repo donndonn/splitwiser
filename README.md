@@ -82,9 +82,10 @@ npm run local:shot -- /g/local-group-trip/expenses/new \
 | `npm run local:db` | Start the local Docker Postgres, migrate, and seed |
 | `npm run local:dev` | Start Next.js against the local database with one-tap sign-in |
 | `npm run local:shot` | Screenshot a local page at phone size |
-| `npm run build` | Production build |
+| `npm run build` | Production build (does not migrate) |
+| `npm run vercel-build` | Vercel build: migrate on production, then `next build` |
 | `npm run db:generate` | Generate Drizzle migrations |
-| `npm run db:migrate` | Apply migrations |
+| `npm run db:migrate` | Apply migrations locally |
 | `npm run db:studio` | Open Drizzle Studio |
 | `npm test` | Run unit tests (database tests skip without `TEST_DATABASE_URL`) |
 
@@ -112,8 +113,21 @@ New accounts require a group invitation link, and total accounts are capped (500
    `https://<your-domain>/api/auth/callback/google`
 7. Publish the OAuth consent screen (email + profile only — no verification review needed).
 8. For preview deployments, set `AUTH_REDIRECT_PROXY_URL` to your production URL.
-9. Run migrations once against the Neon database (`npm run db:migrate` with production `DATABASE_URL_UNPOOLED`).
-10. Deploy.
+9. Deploy. Production deploys apply pending migrations before the new build goes live (below). Preview deploys do not.
+
+### Production migrations
+
+Vercel runs `vercel-build` instead of `build`. When `VERCEL_ENV` is `production`, that script applies pending Drizzle migrations with `DATABASE_URL_UNPOOLED`, then runs `next build`. If the migration fails, the build fails and Vercel keeps serving the previous deployment.
+
+Preview, development, and local `npm run build` never migrate. Preview deployments can point at the production database, so they must not change it.
+
+A migration that drops or rewrites data fails the production build unless that file contains:
+
+```sql
+-- allow-destructive: <reason>
+```
+
+The check looks for `DROP TABLE`, `DROP COLUMN`, `RENAME`, `ALTER COLUMN ... TYPE`, `TRUNCATE`, and `DELETE FROM` without a `WHERE`. See [DEPLOY.md](./DEPLOY.md#5-migrations).
 
 See [DEPLOY.md](./DEPLOY.md) for a more detailed checklist.
 

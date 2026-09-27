@@ -9,6 +9,7 @@
     "local:dev": "node scripts/local/dev.mjs",
     "local:shot": "node scripts/local/shot.mjs",
     "build": "next build",
+    "vercel-build": "node scripts/vercel-build.mjs",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
