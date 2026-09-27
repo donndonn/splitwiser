@@ -37,6 +37,7 @@ export function ExpenseDetailActions({
   description: string;
 }) {
   const router = useRouter();
+  const [menuOpen, setMenuOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
@@ -78,7 +79,7 @@ export function ExpenseDetailActions({
       <Button asChild variant="outline" size="sm">
         <Link href={`/g/${groupId}/expenses/${expenseId}?edit=1`}>Edit</Link>
       </Button>
-      <DropdownMenu>
+      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
         <DropdownMenuTrigger asChild>
           <Button
             type="button"
@@ -94,6 +95,7 @@ export function ExpenseDetailActions({
             variant="destructive"
             onSelect={(event) => {
               event.preventDefault();
+              setMenuOpen(false);
               setConfirmOpen(true);
             }}
           >
