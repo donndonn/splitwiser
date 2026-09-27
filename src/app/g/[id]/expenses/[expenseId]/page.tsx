@@ -184,6 +184,7 @@ export default async function ExpenseDetailPage({
       defaultPaidById={expense.paidByMemberId}
       action={action}
       submitLabel="Save changes"
+      pinnedSubmit
       allowReceiptUpload={!hasReceipt}
       defaultValues={
         expense.entryMode === "itemized"
@@ -226,14 +227,14 @@ export default async function ExpenseDetailPage({
     <AppShell
       title="Expense"
       backHref={editing ? `/g/${id}/expenses/${expenseId}` : `/g/${id}`}
+      lockViewport={editing}
       actions={
-        editing ? null : (
-          <ExpenseDetailActions
-            groupId={id}
-            expenseId={expenseId}
-            description={expense.description}
-          />
-        )
+        <ExpenseDetailActions
+          groupId={id}
+          expenseId={expenseId}
+          description={expense.description}
+          showEdit={!editing}
+        />
       }
     >
       {editing ? (

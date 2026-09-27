@@ -96,6 +96,8 @@ type Props = {
   defaultValues?: SimpleExpenseDefaults | ItemizedExpenseDefaults;
   action: (formData: FormData) => Promise<void>;
   submitLabel?: string;
+  /** Pin Save to the bottom of a viewport column. No tab-bar offset. */
+  pinnedSubmit?: boolean;
   allowReceiptUpload?: boolean;
   receiptFile?: File | null;
   children?: React.ReactNode;
@@ -174,6 +176,7 @@ export function ExpenseForm({
   defaultValues,
   action,
   submitLabel = "Save expense",
+  pinnedSubmit = false,
   allowReceiptUpload = false,
   receiptFile = null,
   children,
@@ -646,8 +649,18 @@ export function ExpenseForm({
           );
         }
       }}
-      className="min-w-0 space-y-5"
+      className={cn(
+        "min-w-0 space-y-5",
+        pinnedSubmit && "flex min-h-0 flex-1 flex-col space-y-0",
+      )}
     >
+      <div
+        className={cn(
+          "min-w-0 space-y-5",
+          pinnedSubmit &&
+            "min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-5 pb-6",
+        )}
+      >
       <section
         className={cn(
           groupedListClass,
@@ -1737,8 +1750,15 @@ export function ExpenseForm({
       </section>
 
       {children}
+      </div>
 
-      <div className="sticky bottom-0 z-10 -mx-4 space-y-3 bg-gradient-to-t from-background from-70% to-background/0 px-4 pt-6 pb-3">
+      <div
+        className={cn(
+          pinnedSubmit
+            ? "shrink-0 space-y-3 border-t border-border/60 bg-background px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]"
+            : "sticky bottom-0 z-10 -mx-4 space-y-3 bg-gradient-to-t from-background from-70% to-background/0 px-4 pt-6 pb-3",
+        )}
+      >
         {error && (
           <p className="rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive">
             {error}

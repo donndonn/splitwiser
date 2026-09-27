@@ -31,10 +31,12 @@ export function ExpenseDetailActions({
   groupId,
   expenseId,
   description,
+  showEdit = true,
 }: {
   groupId: string;
   expenseId: string;
   description: string;
+  showEdit?: boolean;
 }) {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -76,9 +78,11 @@ export function ExpenseDetailActions({
 
   return (
     <>
-      <Button asChild variant="outline" size="sm">
-        <Link href={`/g/${groupId}/expenses/${expenseId}?edit=1`}>Edit</Link>
-      </Button>
+      {showEdit ? (
+        <Button asChild variant="outline" size="sm">
+          <Link href={`/g/${groupId}/expenses/${expenseId}?edit=1`}>Edit</Link>
+        </Button>
+      ) : null}
       <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
         <DropdownMenuTrigger asChild>
           <Button
