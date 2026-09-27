@@ -10,6 +10,7 @@ import {
   type GroupSettleMarker,
 } from "@/db/schema";
 import { getGroupBalances } from "@/lib/balances";
+import { activeExpense } from "@/lib/expenses";
 import {
   areAllBalancesZero,
   isDismissalActive,
@@ -74,7 +75,7 @@ export async function getGroupActivityWatermark(
 ): Promise<Date | null> {
   const rows = await db.execute<{ value: Date | string | null }>(sql`
     select greatest(
-      (select max(${expenses.createdAt}) from ${expenses} where ${eq(expenses.groupId, groupId)}),
+      (select max(${expenses.createdAt}) from ${expenses} where ${and(eq(expenses.groupId, groupId), activeExpense())}),
       (select max(${settlements.createdAt}) from ${settlements} where ${eq(settlements.groupId, groupId)})
     ) as value
   `);
@@ -85,9 +86,11 @@ async function countOpenPeriodExpenses(
   groupId: string,
   settledAt: Date | null,
 ): Promise<number> {
-  const where = settledAt
-    ? and(eq(expenses.groupId, groupId), gt(expenses.createdAt, settledAt))
-    : eq(expenses.groupId, groupId);
+  const where = and(
+    eq(expenses.groupId, groupId),
+    activeExpense(),
+    settledAt ? gt(expenses.createdAt, settledAt) : undefined,
+  );
 
   const [row] = await db
     .select({
@@ -116,10 +119,7 @@ async function listExpenses(input: {
         ? gt(expenses.createdAt, settledAt)
         : lte(expenses.createdAt, settledAt);
 
-  const where =
-    cutoffClause == null
-      ? eq(expenses.groupId, groupId)
-      : and(eq(expenses.groupId, groupId), cutoffClause);
+  const where = and(eq(expenses.groupId, groupId), activeExpense(), cutoffClause);
 
   const rows = await db
     .select({

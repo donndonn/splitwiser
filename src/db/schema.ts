@@ -32,6 +32,7 @@ export const groupActivityTypeEnum = pgEnum("group_activity_type", [
   "expense_created",
   "expense_updated",
   "expense_deleted",
+  "expense_restored",
   "group_renamed",
   "settlement_recorded",
   "settlement_deleted",
@@ -231,6 +232,11 @@ export const expenses = pgTable(
       .notNull()
       .references(() => members.id, { onDelete: "restrict" }),
     createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    /** Set when a member deletes the expense. The row, splits, and receipt stay. */
+    deletedAt: timestamp("deleted_at", { withTimezone: true, mode: "date" }),
+    deletedByMemberId: text("deleted_by_member_id").references(() => members.id, {
+      onDelete: "set null",
+    }),
   },
   (table) => [
     index("expenses_group_id_idx").on(table.groupId),
@@ -410,7 +416,7 @@ export const groupActivities = pgTable(
   ],
 );
 
-/** Discussion on an expense. Removed with the expense. */
+/** Discussion on an expense. Kept across soft-delete so restore brings it back. */
 export const expenseComments = pgTable(
   "expense_comments",
   {

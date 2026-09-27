@@ -38,8 +38,20 @@ describe.skipIf(!hasTestDatabase)("loadActivityFeed", () => {
         ('a5', 'g3', 'group_renamed', 'm4', null, ${JSON.stringify({ actorName: "Alex", oldName: "X", newName: "Not mine" })}::jsonb, now() - interval '1 hour')
     `;
     await t.sql`
+      insert into expenses (
+        id, group_id, description, amount_cents, paid_by_member_id, created_by_member_id, deleted_at
+      ) values ('e-del', 'g1', 'Cab', 400, 'm2', 'm2', now())
+    `;
+    await t.sql`
       insert into expense_comments (id, expense_id, author_member_id, body, created_at)
-      values ('c1', 'e1', 'm2', 'Nice spot', now() - interval '30 minutes')
+      values
+        ('c1', 'e1', 'm2', 'Nice spot', now() - interval '30 minutes'),
+        ('c-del', 'e-del', 'm2', 'gone', now() - interval '10 minutes')
+    `;
+    await t.sql`
+      insert into group_activities (id, group_id, type, actor_member_id, expense_id, payload, created_at) values
+        ('a-del', 'g1', 'expense_deleted', 'm2', 'e-del', ${JSON.stringify({ actorName: "Alex", description: "Cab", amountCents: 400 })}::jsonb, now() - interval '20 minutes'),
+        ('a-old', 'g1', 'expense_deleted', 'm2', 'e1', ${JSON.stringify({ actorName: "Alex", description: "Dinner", amountCents: 1000 })}::jsonb, now() - interval '6 hours')
     `;
   });
 
@@ -50,17 +62,35 @@ describe.skipIf(!hasTestDatabase)("loadActivityFeed", () => {
   it("merges every group the viewer is in, newest first, from their side", async () => {
     const items = await loadActivityFeed({ viewerUserId: "u1", client: t.db });
     expect(items.map((i) => activityText(i.parts))).toEqual([
+      "Alex deleted “Cab” in “Trip”",
       "Alex commented on “Dinner” in “Trip”",
       "You renamed “Home” to “Flat”",
       "Alex updated “Dinner” 2 times in “Trip”",
       "Alex added “Dinner” in “Trip”",
+      "Alex deleted “Dinner” in “Trip”",
     ]);
-    expect(items[0].quote).toBe("Nice spot");
-    expect(items[0].href).toBe("/g/g1/expenses/e1");
-    expect(items[3].impact).toEqual({
+    expect(items.map((i) => i.quote)).not.toContain("gone");
+    expect(items[0].restoreExpenseId).toBe("e-del");
+    expect(items[0].href).toBe("/g/g1");
+    expect(items[1].quote).toBe("Nice spot");
+    expect(items[1].href).toBe("/g/g1/expenses/e1");
+    expect(items[4].impact).toEqual({
       text: "You owe $5.00",
       tone: "negative",
     });
+    expect(items[5].restoreExpenseId).toBeNull();
+  });
+
+  it("hides comments on a deleted expense and offers restore in that group", async () => {
+    const items = await loadActivityFeed({
+      viewerUserId: "u1",
+      groupId: "g1",
+      client: t.db,
+    });
+    const deleted = items.find((item) => item.id === "a-del");
+    expect(deleted?.restoreExpenseId).toBe("e-del");
+    expect(deleted?.href).toBeNull();
+    expect(items.some((item) => item.quote === "gone")).toBe(false);
   });
 
   it("limits to one group when asked", async () => {

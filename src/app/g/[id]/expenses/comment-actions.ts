@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { expenseComments, expenses } from "@/db/schema";
 import { requireMember } from "@/lib/auth-guards";
 import { canDeleteComment, parseCommentBody } from "@/lib/expense-comments";
+import { activeExpense } from "@/lib/expenses";
 
 export type CommentFormState = { error: string | null; postedAt?: number };
 
@@ -22,7 +23,13 @@ export async function addExpenseCommentAction(
   const [expense] = await db
     .select({ id: expenses.id })
     .from(expenses)
-    .where(and(eq(expenses.id, expenseId), eq(expenses.groupId, groupId)))
+    .where(
+      and(
+        eq(expenses.id, expenseId),
+        eq(expenses.groupId, groupId),
+        activeExpense(),
+      ),
+    )
     .limit(1);
   if (!expense) return { error: "This expense no longer exists." };
 
@@ -52,6 +59,7 @@ export async function deleteExpenseCommentAction(
         eq(expenseComments.id, commentId),
         eq(expenseComments.expenseId, expenseId),
         eq(expenses.groupId, groupId),
+        activeExpense(),
       ),
     )
     .limit(1);

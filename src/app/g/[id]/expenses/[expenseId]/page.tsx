@@ -2,6 +2,7 @@ import { and, asc, eq } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { DeleteExpenseButton } from "@/components/delete-expense-button";
 import { ExpenseComments } from "@/components/expense-comments";
 import { ExpenseForm } from "@/components/expense-form";
 import { ExpenseReadView } from "@/components/expense-read-view";
@@ -26,12 +27,9 @@ import {
   buildSimpleReceiptBreakdown,
   type ExpenseReceiptBreakdown,
 } from "@/lib/expense-receipt-breakdown";
+import { activeExpense } from "@/lib/expenses";
 import { formatCents, formatMoney } from "@/lib/money";
-import {
-  attachReceiptAction,
-  deleteExpenseAction,
-  updateExpenseAction,
-} from "../actions";
+import { attachReceiptAction, updateExpenseAction } from "../actions";
 import {
   addExpenseCommentAction,
   deleteExpenseCommentAction,
@@ -62,7 +60,13 @@ export default async function ExpenseDetailPage({
     db
       .select()
       .from(expenses)
-      .where(and(eq(expenses.id, expenseId), eq(expenses.groupId, id)))
+      .where(
+        and(
+          eq(expenses.id, expenseId),
+          eq(expenses.groupId, id),
+          activeExpense(),
+        ),
+      )
       .limit(1),
   ]);
 
@@ -296,14 +300,7 @@ export default async function ExpenseDetailPage({
         />
       )}
 
-      <form
-        action={deleteExpenseAction.bind(null, id, expenseId)}
-        className="mt-6"
-      >
-        <Button type="submit" variant="destructive" className="w-full">
-          Delete expense
-        </Button>
-      </form>
+      <DeleteExpenseButton groupId={id} expenseId={expenseId} />
     </AppShell>
   );
 }

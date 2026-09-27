@@ -11,6 +11,7 @@ import {
   type GroupActivityPayload,
 } from "@/db/schema";
 import type { Db } from "@/db/types";
+import { activeExpense } from "@/lib/expenses";
 import {
   describeActivity,
   type ActivityImpact,
@@ -30,6 +31,8 @@ export type ActivityFeedItem = {
   /** Comment text, for comment rows. */
   quote: string | null;
   href: string | null;
+  /** Set when this deleted-expense row can still be restored. */
+  restoreExpenseId: string | null;
 };
 
 type RawRow = {
@@ -49,6 +52,7 @@ type RawRow = {
 const EXPENSE_KINDS = new Set<ActivityKind>([
   "expense_created",
   "expense_updated",
+  "expense_restored",
   "comment_added",
 ]);
 
@@ -160,7 +164,7 @@ export async function loadActivityFeed(options: {
       .innerJoin(expenses, eq(expenseComments.expenseId, expenses.id))
       .leftJoin(members, eq(expenseComments.authorMemberId, members.id))
       .leftJoin(users, eq(members.userId, users.id))
-      .where(inArray(expenses.groupId, groupIds))
+      .where(and(inArray(expenses.groupId, groupIds), activeExpense()))
       .orderBy(desc(expenseComments.createdAt))
       .limit(limit),
   ]);
@@ -202,7 +206,11 @@ export async function loadActivityFeed(options: {
   const expenseIds = [
     ...new Set(
       rows
-        .filter((r) => EXPENSE_KINDS.has(r.kind) && r.expenseId)
+        .filter(
+          (r) =>
+            r.expenseId &&
+            (EXPENSE_KINDS.has(r.kind) || r.kind === "expense_deleted"),
+        )
         .map((r) => r.expenseId as string),
     ),
   ];
@@ -215,6 +223,7 @@ export async function loadActivityFeed(options: {
               id: expenses.id,
               amountCents: expenses.amountCents,
               paidByMemberId: expenses.paidByMemberId,
+              deletedAt: expenses.deletedAt,
             })
             .from(expenses)
             .where(inArray(expenses.id, expenseIds)),
@@ -238,7 +247,8 @@ export async function loadActivityFeed(options: {
 
   return rows.map((row) => {
     const group = groupById.get(row.groupId)!;
-    const expense = row.expenseId ? expenseById.get(row.expenseId) : undefined;
+    const stored = row.expenseId ? expenseById.get(row.expenseId) : undefined;
+    const expense = stored?.deletedAt ? undefined : stored;
     const payload: GroupActivityPayload = {
       ...row.payload,
       actorName: row.actorName ?? row.payload.actorName,
@@ -275,6 +285,10 @@ export async function loadActivityFeed(options: {
       impact,
       quote: row.quote,
       href: activityHref(row, Boolean(expense), !options.groupId),
+      restoreExpenseId:
+        row.kind === "expense_deleted" && stored?.deletedAt
+          ? row.expenseId
+          : null,
     };
   });
 }

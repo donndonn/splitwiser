@@ -63,6 +63,12 @@ describe("describeActivity", () => {
     });
   });
 
+  it("says the viewer restored an expense", () => {
+    expect(
+      describe_({ kind: "expense_restored", actorIsViewer: true }).text,
+    ).toBe("You restored “Wine”");
+  });
+
   it("folds repeated edits into a count", () => {
     expect(describe_({ kind: "expense_updated", count: 3 }).text).toBe(
       "Allison updated “Wine” 3 times",
