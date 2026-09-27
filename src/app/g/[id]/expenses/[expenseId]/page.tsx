@@ -1,7 +1,8 @@
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { ExpenseComments } from "@/components/expense-comments";
 import { ExpenseForm } from "@/components/expense-form";
 import { ExpenseReadView } from "@/components/expense-read-view";
 import { ReceiptAttach } from "@/components/receipt-attach";
@@ -9,6 +10,7 @@ import { ReceiptPhoto } from "@/components/receipt-photo";
 import { Button } from "@/components/ui/button";
 import { db } from "@/db";
 import {
+  expenseComments,
   expenseItemAssignments,
   expenseItems,
   expenseSplits,
@@ -18,6 +20,7 @@ import {
   users,
 } from "@/db/schema";
 import { requireMember } from "@/lib/auth-guards";
+import { canDeleteComment } from "@/lib/expense-comments";
 import {
   buildItemizedReceiptBreakdown,
   buildSimpleReceiptBreakdown,
@@ -29,6 +32,10 @@ import {
   deleteExpenseAction,
   updateExpenseAction,
 } from "../actions";
+import {
+  addExpenseCommentAction,
+  deleteExpenseCommentAction,
+} from "../comment-actions";
 
 function formatAddedOn(date: Date) {
   return date.toLocaleDateString("en-US", {
@@ -48,7 +55,7 @@ export default async function ExpenseDetailPage({
   const { id, expenseId } = await params;
   const { edit } = await searchParams;
   const editing = edit === "1";
-  await requireMember(id);
+  const { member: viewer } = await requireMember(id);
 
   const [[group], [expense]] = await Promise.all([
     db.select().from(groups).where(eq(groups.id, id)).limit(1),
@@ -61,38 +68,44 @@ export default async function ExpenseDetailPage({
 
   if (!group || !expense) notFound();
 
-  const [roster, splits, itemRows, assignmentRows] = await Promise.all([
-    db
-      .select({
-        id: members.id,
-        displayName: members.displayName,
-        image: users.image,
-      })
-      .from(members)
-      .leftJoin(users, eq(members.userId, users.id))
-      .where(eq(members.groupId, id))
-      .orderBy(members.createdAt),
-    db
-      .select()
-      .from(expenseSplits)
-      .where(eq(expenseSplits.expenseId, expenseId)),
-    db
-      .select()
-      .from(expenseItems)
-      .where(eq(expenseItems.expenseId, expenseId))
-      .orderBy(expenseItems.sortOrder),
-    db
-      .select({
-        expenseItemId: expenseItemAssignments.expenseItemId,
-        memberId: expenseItemAssignments.memberId,
-      })
-      .from(expenseItemAssignments)
-      .innerJoin(
-        expenseItems,
-        eq(expenseItemAssignments.expenseItemId, expenseItems.id),
-      )
-      .where(eq(expenseItems.expenseId, expenseId)),
-  ]);
+  const [roster, splits, itemRows, assignmentRows, commentRows] =
+    await Promise.all([
+      db
+        .select({
+          id: members.id,
+          displayName: members.displayName,
+          image: users.image,
+        })
+        .from(members)
+        .leftJoin(users, eq(members.userId, users.id))
+        .where(eq(members.groupId, id))
+        .orderBy(members.createdAt),
+      db
+        .select()
+        .from(expenseSplits)
+        .where(eq(expenseSplits.expenseId, expenseId)),
+      db
+        .select()
+        .from(expenseItems)
+        .where(eq(expenseItems.expenseId, expenseId))
+        .orderBy(expenseItems.sortOrder),
+      db
+        .select({
+          expenseItemId: expenseItemAssignments.expenseItemId,
+          memberId: expenseItemAssignments.memberId,
+        })
+        .from(expenseItemAssignments)
+        .innerJoin(
+          expenseItems,
+          eq(expenseItemAssignments.expenseItemId, expenseItems.id),
+        )
+        .where(eq(expenseItems.expenseId, expenseId)),
+      db
+        .select()
+        .from(expenseComments)
+        .where(eq(expenseComments.expenseId, expenseId))
+        .orderBy(asc(expenseComments.createdAt), asc(expenseComments.id)),
+    ]);
 
   const assignedMembers = new Map<string, string[]>();
   for (const assignment of assignmentRows) {
@@ -260,6 +273,26 @@ export default async function ExpenseDetailPage({
               </div>
             )
           }
+        />
+      )}
+
+      {editing ? null : (
+        <ExpenseComments
+          comments={commentRows.map((comment) => {
+            const author = comment.authorMemberId
+              ? personById.get(comment.authorMemberId)
+              : undefined;
+            return {
+              id: comment.id,
+              body: comment.body,
+              createdAt: comment.createdAt,
+              authorName: author?.displayName ?? "Former member",
+              authorImage: author?.image ?? null,
+              canDelete: canDeleteComment(comment, viewer),
+            };
+          })}
+          addAction={addExpenseCommentAction.bind(null, id, expenseId)}
+          deleteAction={deleteExpenseCommentAction.bind(null, id, expenseId)}
         />
       )}
 

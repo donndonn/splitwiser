@@ -400,6 +400,35 @@ export const groupActivities = pgTable(
   ],
 );
 
+/** Discussion on an expense. Removed with the expense. */
+export const expenseComments = pgTable(
+  "expense_comments",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    expenseId: text("expense_id")
+      .notNull()
+      .references(() => expenses.id, { onDelete: "cascade" }),
+    /** Null once the author leaves the group; the comment stays. */
+    authorMemberId: text("author_member_id").references(() => members.id, {
+      onDelete: "set null",
+    }),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("expense_comments_expense_created_idx").on(
+      table.expenseId,
+      table.createdAt,
+    ),
+    check(
+      "expense_comments_body_length",
+      sql`char_length(${table.body}) between 1 and 1000`,
+    ),
+  ],
+);
+
 export type AdminActionType =
   | "set_max_users"
   | "delete_stale_pending_users"
@@ -574,6 +603,7 @@ export const expensesRelations = relations(expenses, ({ one, many }) => ({
   }),
   splits: many(expenseSplits),
   items: many(expenseItems),
+  comments: many(expenseComments),
 }));
 
 export const expenseItemsRelations = relations(expenseItems, ({ one, many }) => ({
@@ -668,6 +698,20 @@ export const groupActivitiesRelations = relations(
   }),
 );
 
+export const expenseCommentsRelations = relations(
+  expenseComments,
+  ({ one }) => ({
+    expense: one(expenses, {
+      fields: [expenseComments.expenseId],
+      references: [expenses.id],
+    }),
+    author: one(members, {
+      fields: [expenseComments.authorMemberId],
+      references: [members.id],
+    }),
+  }),
+);
+
 export const aiParseRequestsRelations = relations(
   aiParseRequests,
   ({ one }) => ({
@@ -712,6 +756,7 @@ export type AppSettings = typeof appSettings.$inferSelect;
 export type Friendship = typeof friendships.$inferSelect;
 export type FriendRequest = typeof friendRequests.$inferSelect;
 export type Expense = typeof expenses.$inferSelect;
+export type ExpenseComment = typeof expenseComments.$inferSelect;
 export type ExpenseItem = typeof expenseItems.$inferSelect;
 export type ExpenseItemAssignment = typeof expenseItemAssignments.$inferSelect;
 export type ExpenseSplit = typeof expenseSplits.$inferSelect;
