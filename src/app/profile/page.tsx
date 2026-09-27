@@ -4,14 +4,15 @@ import { AppBottomNav } from "@/components/app-bottom-nav";
 import { AppShell } from "@/components/app-shell";
 import { InstallCoach } from "@/components/install-coach";
 import { SettingsSection } from "@/components/settings-list";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ThemeSelector } from "@/components/theme-selector";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { requireUser } from "@/lib/auth-guards";
+import { getAccountPhoto } from "@/lib/avatar-store";
 import { displayNameForUser } from "@/lib/friends";
 import { isTwilioVerifyConfigured } from "@/lib/twilio-verify";
+import { AvatarEditor } from "./avatar-editor";
 import { ProfileForm } from "./profile-form";
 
 export default async function ProfilePage() {
@@ -30,6 +31,7 @@ export default async function ProfilePage() {
   const username = dbUser?.username ?? null;
   const phone = dbUser?.phone ?? null;
   const smsEnabled = isTwilioVerifyConfigured();
+  const accountPhoto = await getAccountPhoto(db, sessionUser.id);
 
   return (
     <>
@@ -50,10 +52,11 @@ export default async function ProfilePage() {
         }
       >
         <div className="mb-6 flex items-center gap-3">
-          <Avatar className="size-14">
-            <AvatarImage src={image ?? undefined} alt="" />
-            <AvatarFallback>{name.slice(0, 1).toUpperCase()}</AvatarFallback>
-          </Avatar>
+          <AvatarEditor
+            name={name}
+            image={image}
+            accountPhoto={accountPhoto}
+          />
           <p className="min-w-0 truncate text-lg font-semibold">{name}</p>
         </div>
 
