@@ -1,6 +1,6 @@
 {
-  "id": "ca068c75-452c-4358-9eec-73b5a3c29ad4",
-  "prevId": "8cc51c0a-8b52-4bb4-a412-db1ed163e30a",
+  "id": "edae633f-ee29-4f94-806c-6295ef7d11d3",
+  "prevId": "ca068c75-452c-4358-9eec-73b5a3c29ad4",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1757,6 +1757,160 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.recurring_expenses": {
+      "name": "recurring_expenses",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "group_id": {
+          "name": "group_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_expense_id": {
+          "name": "source_expense_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "frequency": {
+          "name": "frequency",
+          "type": "recurrence_frequency",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "starts_at": {
+          "name": "starts_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "occurrence_count": {
+          "name": "occurrence_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "next_occurrence_at": {
+          "name": "next_occurrence_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by_member_id": {
+          "name": "created_by_member_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "recurring_expenses_group_id_idx": {
+          "name": "recurring_expenses_group_id_idx",
+          "columns": [
+            {
+              "expression": "group_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "recurring_expenses_next_occurrence_idx": {
+          "name": "recurring_expenses_next_occurrence_idx",
+          "columns": [
+            {
+              "expression": "next_occurrence_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "recurring_expenses_group_id_groups_id_fk": {
+          "name": "recurring_expenses_group_id_groups_id_fk",
+          "tableFrom": "recurring_expenses",
+          "tableTo": "groups",
+          "columnsFrom": [
+            "group_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "recurring_expenses_source_expense_id_expenses_id_fk": {
+          "name": "recurring_expenses_source_expense_id_expenses_id_fk",
+          "tableFrom": "recurring_expenses",
+          "tableTo": "expenses",
+          "columnsFrom": [
+            "source_expense_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "recurring_expenses_created_by_member_id_members_id_fk": {
+          "name": "recurring_expenses_created_by_member_id_members_id_fk",
+          "tableFrom": "recurring_expenses",
+          "tableTo": "members",
+          "columnsFrom": [
+            "created_by_member_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "recurring_expenses_source_expense_id_unique": {
+          "name": "recurring_expenses_source_expense_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "source_expense_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "recurring_expenses_occurrence_count_positive": {
+          "name": "recurring_expenses_occurrence_count_positive",
+          "value": "\"recurring_expenses\".\"occurrence_count\" >= 1"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.settlements": {
       "name": "settlements",
       "schema": "",
@@ -2083,7 +2237,18 @@
         "settlement_recorded",
         "settlement_deleted",
         "member_joined",
-        "member_left"
+        "member_left",
+        "recurring_expense_created"
+      ]
+    },
+    "public.recurrence_frequency": {
+      "name": "recurrence_frequency",
+      "schema": "public",
+      "values": [
+        "weekly",
+        "biweekly",
+        "monthly",
+        "yearly"
       ]
     },
     "public.split_mode": {

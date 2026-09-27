@@ -103,8 +103,15 @@
     {
       "idx": 14,
       "version": "7",
-      "when": 1790478997427,
-      "tag": "0014_recurring_expenses",
+      "when": 1790478950574,
+      "tag": "0014_expense_comments",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1790479945524,
+      "tag": "0015_recurring_expenses",
       "breakpoints": true
     }
   ]
