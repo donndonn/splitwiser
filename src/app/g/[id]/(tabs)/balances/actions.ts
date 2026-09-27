@@ -4,10 +4,11 @@ import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { members, settlements } from "@/db/schema";
-import { formatActivityMessage, logGroupActivity } from "@/lib/activity";
+import { logGroupActivity } from "@/lib/activity";
 import { requireMember } from "@/lib/auth-guards";
 import { getGroupBalances } from "@/lib/balances";
 import { parseAmountToCents, suggestSettlements } from "@/lib/money";
+import { activityPushBody } from "@/lib/push";
 import { notifyGroupMembers } from "@/lib/push-send";
 
 function revalidateSettlementPaths(groupId: string) {
@@ -229,10 +230,10 @@ function notifySettlement(
     memberIds: [payment.fromMemberId, payment.toMemberId],
     actorMemberId,
     body: (group) =>
-      formatActivityMessage(
-        "settlement_recorded",
+      activityPushBody(
+        actorName,
         {
-          actorName,
+          kind: "settlement_recorded",
           fromName: payment.fromName,
           toName: payment.toName,
           amountCents: payment.amountCents,

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  activityPushBody,
   commentPushBody,
   isAllowedPushEndpoint,
   isExpiredSubscriptionStatus,
@@ -84,13 +85,43 @@ describe("isExpiredSubscriptionStatus", () => {
 describe("commentPushBody", () => {
   it("quotes a one-line snippet", () => {
     expect(commentPushBody("Ana", "Dinner", "Was  this\nthe tip?")).toBe(
-      "Ana commented on Dinner: Was this the tip?",
+      "Ana commented on “Dinner”: Was this the tip?",
     );
   });
 
   it("shortens long comments", () => {
     const body = commentPushBody("Ana", "Dinner", "x".repeat(200));
     expect(body.endsWith("…")).toBe(true);
-    expect(body.length).toBe("Ana commented on Dinner: ".length + 80);
+    expect(body.length).toBe("Ana commented on “Dinner”: ".length + 80);
+  });
+});
+
+describe("activityPushBody", () => {
+  it("describes each notified change", () => {
+    expect(
+      activityPushBody(
+        "Ana",
+        { kind: "expense_created", description: "Pizza", amountCents: 3000 },
+        "USD",
+      ),
+    ).toBe("Ana added “Pizza” · $30.00");
+    expect(
+      activityPushBody("Ana", { kind: "expense_deleted", description: "Pizza" }, "USD"),
+    ).toBe("Ana deleted “Pizza”");
+    expect(
+      activityPushBody(
+        "Ana",
+        {
+          kind: "settlement_recorded",
+          fromName: "Bob",
+          toName: "Ana",
+          amountCents: 1250,
+        },
+        "USD",
+      ),
+    ).toBe("Bob paid Ana $12.50");
+    expect(
+      activityPushBody("Cy", { kind: "member_joined", memberName: "Cy" }, "USD"),
+    ).toBe("Cy joined the group");
   });
 });

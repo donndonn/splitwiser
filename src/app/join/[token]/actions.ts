@@ -5,13 +5,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { members } from "@/db/schema";
-import { formatActivityMessage } from "@/lib/activity";
 import { requireSignedIn } from "@/lib/auth-guards";
 import {
   InviteUnavailableError,
   joinGroupWithInvite,
   type JoinChoice,
 } from "@/lib/invites";
+import { activityPushBody } from "@/lib/push";
 import { notifyGroupMembers } from "@/lib/push-send";
 
 async function join(token: string, choice: JoinChoice) {
@@ -45,9 +45,9 @@ async function join(token: string, choice: JoinChoice) {
         memberIds: "everyone",
         actorMemberId: member.id,
         body: (group) =>
-          formatActivityMessage(
-            "member_joined",
-            { actorName: member.displayName, memberName: member.displayName },
+          activityPushBody(
+            member.displayName,
+            { kind: "member_joined", memberName: member.displayName },
             group.currency,
           ),
         url: `/g/${groupId}/members`,

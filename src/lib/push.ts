@@ -1,3 +1,5 @@
+import { formatMoney } from "@/lib/money";
+
 /** Payload the service worker turns into a notification (see public/sw.js). */
 export type PushMessage = {
   title: string;
@@ -86,5 +88,37 @@ export function commentPushBody(
 ): string {
   const oneLine = comment.replace(/\s+/g, " ").trim();
   const snippet = oneLine.length > 80 ? `${oneLine.slice(0, 79)}…` : oneLine;
-  return `${authorName} commented on ${expenseDescription}: ${snippet}`;
+  return `${authorName} commented on “${expenseDescription}”: ${snippet}`;
+}
+
+export type PushActivity =
+  | { kind: "expense_created"; description: string; amountCents: number }
+  | { kind: "expense_updated"; description: string }
+  | { kind: "expense_deleted"; description: string }
+  | {
+      kind: "settlement_recorded";
+      fromName: string;
+      toName: string;
+      amountCents: number;
+    }
+  | { kind: "member_joined"; memberName: string };
+
+/** One-line notification text for a group change. */
+export function activityPushBody(
+  actorName: string,
+  activity: PushActivity,
+  currency: string,
+): string {
+  switch (activity.kind) {
+    case "expense_created":
+      return `${actorName} added “${activity.description}” · ${formatMoney(activity.amountCents, currency)}`;
+    case "expense_updated":
+      return `${actorName} updated “${activity.description}”`;
+    case "expense_deleted":
+      return `${actorName} deleted “${activity.description}”`;
+    case "settlement_recorded":
+      return `${activity.fromName} paid ${activity.toName} ${formatMoney(activity.amountCents, currency)}`;
+    case "member_joined":
+      return `${activity.memberName} joined the group`;
+  }
 }

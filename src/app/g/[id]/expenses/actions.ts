@@ -13,7 +13,7 @@ import {
   type ExpenseEntryMode,
   type SplitMode,
 } from "@/db/schema";
-import { formatActivityMessage, logGroupActivity } from "@/lib/activity";
+import { logGroupActivity } from "@/lib/activity";
 import { requireMember } from "@/lib/auth-guards";
 import {
   assertAllowedMemberIds,
@@ -21,6 +21,7 @@ import {
   type ItemizedExpenseItemInput,
 } from "@/lib/itemized-expense";
 import { allocateSplits, parseAmountToCents } from "@/lib/money";
+import { activityPushBody } from "@/lib/push";
 import { notifyGroupMembers } from "@/lib/push-send";
 import { readReceiptImageFromFormData } from "@/lib/receipt-blob";
 import {
@@ -322,10 +323,10 @@ export async function createExpenseAction(groupId: string, formData: FormData) {
     ],
     actorMemberId: member.id,
     body: (group) =>
-      formatActivityMessage(
-        "expense_created",
+      activityPushBody(
+        member.displayName,
         {
-          actorName: member.displayName,
+          kind: "expense_created",
           description: common.description,
           amountCents: details.amountCents,
         },
@@ -496,13 +497,9 @@ export async function updateExpenseAction(
     ],
     actorMemberId: member.id,
     body: (group) =>
-      formatActivityMessage(
-        "expense_updated",
-        {
-          actorName: member.displayName,
-          description: common.description,
-          amountCents: details.amountCents,
-        },
+      activityPushBody(
+        member.displayName,
+        { kind: "expense_updated", description: common.description },
         group.currency,
       ),
     url: `/g/${groupId}/expenses/${expenseId}`,
@@ -634,13 +631,9 @@ export async function removeExpenseAction(groupId: string, expenseId: string) {
       memberIds: [deleted.paidByMemberId, ...deleted.memberIds],
       actorMemberId: member.id,
       body: (group) =>
-        formatActivityMessage(
-          "expense_deleted",
-          {
-            actorName: member.displayName,
-            description: deleted.description,
-            amountCents: deleted.amountCents,
-          },
+        activityPushBody(
+          member.displayName,
+          { kind: "expense_deleted", description: deleted.description },
           group.currency,
         ),
       url: `/g/${groupId}`,
