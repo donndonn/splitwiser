@@ -1,67 +1,43 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowLeftRight, History, Home, Users } from "lucide-react";
-import { cn } from "@/lib/utils";
-
-const tabs = [
-  { href: "", label: "Home", icon: Home, match: "exact" as const },
-  {
-    href: "/balances",
-    label: "Balances",
-    icon: ArrowLeftRight,
-    match: "prefix" as const,
-  },
-  {
-    href: "/activity",
-    label: "Activity",
-    icon: History,
-    match: "prefix" as const,
-  },
-  {
-    href: "/members",
-    label: "Members",
-    icon: Users,
-    match: "prefix" as const,
-  },
-];
+import { BottomTabBar } from "@/components/bottom-tab-bar";
 
 export function GroupBottomNav({ groupId }: { groupId: string }) {
   const pathname = usePathname();
   const base = `/g/${groupId}`;
 
   return (
-    <nav className="shrink-0 border-t border-border/60 bg-card pb-[env(safe-area-inset-bottom)]">
-      <ul className="mx-auto flex max-w-lg items-stretch justify-between gap-0.5 px-1">
-        {tabs.map((tab) => {
-          const href = `${base}${tab.href}`;
-          const active =
-            tab.match === "exact"
-              ? pathname === base || pathname === `${base}/`
-              : pathname.startsWith(href);
-          const Icon = tab.icon;
-          return (
-            <li key={tab.href} className="min-w-0 flex-1">
-              <Link
-                href={href}
-                className={cn(
-                  "relative flex min-h-[var(--tab-bar-height)] flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 py-2 text-[10px] font-medium transition-colors",
-                  active
-                    ? "text-primary"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {active && (
-                  <span className="absolute top-1 h-1 w-5 rounded-full bg-primary" />
-                )}
-                <Icon className="size-5 shrink-0" strokeWidth={active ? 2.4 : 1.8} />
-                <span className="max-w-full truncate">{tab.label}</span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
+    <BottomTabBar
+      label="Group navigation"
+      className="shrink-0"
+      tabs={[
+        {
+          href: base,
+          label: "Home",
+          icon: Home,
+          active: pathname === base || pathname === `${base}/`,
+        },
+        {
+          href: `${base}/balances`,
+          label: "Balances",
+          icon: ArrowLeftRight,
+          active: pathname.startsWith(`${base}/balances`),
+        },
+        {
+          href: `${base}/activity`,
+          label: "Activity",
+          icon: History,
+          active: pathname.startsWith(`${base}/activity`),
+        },
+        {
+          href: `${base}/members`,
+          label: "Members",
+          icon: Users,
+          active: pathname.startsWith(`${base}/members`),
+        },
+      ]}
+    />
   );
 }
