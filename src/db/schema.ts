@@ -371,6 +371,9 @@ export type GroupActivityPayload = {
   newName?: string;
   fromName?: string;
   toName?: string;
+  /** Settlement parties, recorded since the all-groups Activity tab. */
+  fromMemberId?: string;
+  toMemberId?: string;
   memberName?: string;
 };
 

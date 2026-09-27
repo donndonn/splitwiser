@@ -73,6 +73,8 @@ export async function recordSettlementAction(
         actorName: member.displayName,
         fromName: nameById.get(fromMemberId) ?? "Someone",
         toName: nameById.get(toMemberId) ?? "someone",
+        fromMemberId,
+        toMemberId,
         amountCents,
       },
     });
@@ -136,6 +138,8 @@ export async function settleGroupAction(groupId: string) {
           actorName: member.displayName,
           fromName: nameById.get(suggestion.fromMemberId) ?? "Someone",
           toName: nameById.get(suggestion.toMemberId) ?? "someone",
+          fromMemberId: suggestion.fromMemberId,
+          toMemberId: suggestion.toMemberId,
           amountCents: suggestion.amountCents,
         },
       });
@@ -190,6 +194,8 @@ export async function reverseSettlementAction(
         actorName: member.displayName,
         fromName: nameById.get(existing.fromMemberId) ?? "someone",
         toName: nameById.get(existing.toMemberId) ?? "someone",
+        fromMemberId: existing.fromMemberId,
+        toMemberId: existing.toMemberId,
         amountCents: existing.amountCents,
       },
     });
