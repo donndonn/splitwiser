@@ -69,6 +69,17 @@ npx vercel env add TWILIO_VERIFY_SERVICE_SID   # Verify → Services, starts wit
 
 Without all three, the profile page hides the phone field. In the Twilio console, limit Verify **Geo Permissions** to the United States and Taiwan (the app's `SMS_COUNTRIES`) and turn on **Fraud Guard**. The app also caps codes at 5/hour and 10/day per user and 200/day site-wide.
 
+Optional — push notifications (Web Push, no third-party service):
+
+```bash
+npx web-push generate-vapid-keys   # once; keep the pair
+npx vercel env add VAPID_PUBLIC_KEY
+npx vercel env add VAPID_PRIVATE_KEY
+npx vercel env add VAPID_SUBJECT     # mailto:you@example.com
+```
+
+Without all three, the profile page hides the Notifications row. Don't rotate the keys casually: every existing subscription stops working and people have to turn notifications on again.
+
 Optional for preview deployments:
 
 ```bash
@@ -96,6 +107,8 @@ npm run db:migrate
 
 - **iOS Safari**: Share → Add to Home Screen
 - **Android Chrome**: menu → Install app / Add to Home screen
+
+Notifications: Profile → Notifications → **Turn on**. iPhone and iPad (iOS 16.4+) only offer this inside the app added to the Home Screen, not in a Safari tab.
 
 ## 7. Invitations and the account cap
 

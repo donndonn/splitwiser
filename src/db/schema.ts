@@ -439,6 +439,25 @@ export const expenseComments = pgTable(
   ],
 );
 
+/** One Web Push subscription per browser/device a user opted in on. */
+export const pushSubscriptions = pgTable(
+  "push_subscriptions",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Push service URL; unique per browser subscription. */
+    endpoint: text("endpoint").notNull().unique(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [index("push_subscriptions_user_id_idx").on(table.userId)],
+);
+
 export type AdminActionType =
   | "set_max_users"
   | "delete_stale_pending_users"
@@ -777,6 +796,7 @@ export type GroupSettlePromptDismissal =
 export type GroupActivity = typeof groupActivities.$inferSelect;
 export type AiParseRequest = typeof aiParseRequests.$inferSelect;
 export type AdminAction = typeof adminActions.$inferSelect;
+export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 export type SplitMode = (typeof splitModeEnum.enumValues)[number];
 export type ExpenseEntryMode = (typeof expenseEntryModeEnum.enumValues)[number];
 export type GroupActivityType =

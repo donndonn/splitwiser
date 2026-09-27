@@ -1,11 +1,13 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
-import { expenseComments, expenses } from "@/db/schema";
+import { expenseComments, expenseSplits, expenses } from "@/db/schema";
 import { requireMember } from "@/lib/auth-guards";
 import { canDeleteComment, parseCommentBody } from "@/lib/expense-comments";
+import { commentPushBody } from "@/lib/push";
+import { notifyGroupMembers } from "@/lib/push-send";
 
 export type CommentFormState = { error: string | null; postedAt?: number };
 
@@ -20,7 +22,11 @@ export async function addExpenseCommentAction(
   if (!parsed.ok) return { error: parsed.error };
 
   const [expense] = await db
-    .select({ id: expenses.id })
+    .select({
+      id: expenses.id,
+      description: expenses.description,
+      paidByMemberId: expenses.paidByMemberId,
+    })
     .from(expenses)
     .where(and(eq(expenses.id, expenseId), eq(expenses.groupId, groupId)))
     .limit(1);
@@ -30,6 +36,35 @@ export async function addExpenseCommentAction(
     expenseId,
     authorMemberId: member.id,
     body: parsed.body,
+  });
+
+  // Everyone on the expense, plus anyone already in the conversation.
+  const [splitRows, commenterRows] = await Promise.all([
+    db
+      .select({ memberId: expenseSplits.memberId })
+      .from(expenseSplits)
+      .where(eq(expenseSplits.expenseId, expenseId)),
+    db
+      .selectDistinct({ memberId: expenseComments.authorMemberId })
+      .from(expenseComments)
+      .where(
+        and(
+          eq(expenseComments.expenseId, expenseId),
+          isNotNull(expenseComments.authorMemberId),
+        ),
+      ),
+  ]);
+  notifyGroupMembers({
+    groupId,
+    memberIds: [
+      expense.paidByMemberId,
+      ...splitRows.map((row) => row.memberId),
+      ...commenterRows.map((row) => row.memberId),
+    ],
+    actorMemberId: member.id,
+    body: () =>
+      commentPushBody(member.displayName, expense.description, parsed.body),
+    url: `/g/${groupId}/expenses/${expenseId}`,
   });
 
   revalidatePath(`/g/${groupId}/expenses/${expenseId}`);
