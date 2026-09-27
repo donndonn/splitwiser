@@ -53,7 +53,9 @@ export default async function ActivityPage({
       activities
         .filter(
           (a) =>
-            (a.type === "expense_created" || a.type === "expense_updated") &&
+            (a.type === "expense_created" ||
+              a.type === "expense_updated" ||
+              a.type === "recurring_expense_created") &&
             a.expenseId,
         )
         .map((a) => a.expenseId as string),
@@ -99,7 +101,8 @@ export default async function ActivityPage({
               const href =
                 activity.expenseId &&
                 (activity.type === "expense_created" ||
-                  activity.type === "expense_updated") &&
+                  activity.type === "expense_updated" ||
+                  activity.type === "recurring_expense_created") &&
                 linkableExpenseIds.has(activity.expenseId)
                   ? `/g/${id}/expenses/${activity.expenseId}`
                   : null;

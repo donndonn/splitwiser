@@ -22,6 +22,8 @@ import {
 } from "@/lib/itemized-expense";
 import { allocateSplits, parseAmountToCents } from "@/lib/money";
 import { readReceiptImageFromFormData } from "@/lib/receipt-blob";
+import { parseRepeatChoice } from "@/lib/recurrence";
+import { setExpenseRecurrence } from "@/lib/recurring-expenses";
 import {
   deleteReceiptBlob,
   putReceiptBlob,
@@ -151,6 +153,7 @@ function parseCommonFields(formData: FormData) {
     spentAt: spentAtRaw ? new Date(`${spentAtRaw}T12:00:00`) : new Date(),
     notes,
     entryMode: entryModeValue as ExpenseEntryMode,
+    repeat: parseRepeatChoice(formData.get("repeat")),
   };
 }
 
@@ -294,6 +297,14 @@ export async function createExpenseAction(groupId: string, formData: FormData) {
         );
       }
 
+      await setExpenseRecurrence(tx, {
+        groupId,
+        expenseId: expense.id,
+        spentAt: common.spentAt,
+        repeat: common.repeat,
+        actorMemberId: member.id,
+      });
+
       await logGroupActivity(tx, {
         groupId,
         type: "expense_created",
@@ -429,6 +440,14 @@ export async function updateExpenseAction(
       );
     }
 
+    await setExpenseRecurrence(tx, {
+      groupId,
+      expenseId,
+      spentAt: common.spentAt,
+      repeat: common.repeat,
+      actorMemberId: member.id,
+    });
+
     await logGroupActivity(tx, {
       groupId,
       type: "expense_updated",
@@ -521,6 +540,26 @@ export async function attachReceiptAction(
     throw new Error("Could not store the receipt photo. Try again.");
   }
 
+  revalidatePath(`/g/${groupId}/expenses/${expenseId}`);
+}
+
+/** Stop the schedule that uses this expense as its template. */
+export async function stopRecurrenceAction(groupId: string, expenseId: string) {
+  const { member } = await requireMember(groupId);
+  const [expense] = await db
+    .select({ id: expenses.id, spentAt: expenses.spentAt })
+    .from(expenses)
+    .where(and(eq(expenses.id, expenseId), eq(expenses.groupId, groupId)))
+    .limit(1);
+  if (!expense) throw new Error("Expense not found");
+
+  await setExpenseRecurrence(db, {
+    groupId,
+    expenseId,
+    spentAt: expense.spentAt,
+    repeat: "never",
+    actorMemberId: member.id,
+  });
   revalidatePath(`/g/${groupId}/expenses/${expenseId}`);
 }
 

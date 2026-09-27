@@ -74,6 +74,13 @@ export function formatActivityMessage(
           : "";
       return `${actor} undid a${amount} payment from ${payload.fromName ?? "someone"} to ${payload.toName ?? "someone"}`;
     }
+    case "recurring_expense_created": {
+      const amount =
+        payload.amountCents != null
+          ? ` · ${formatMoney(payload.amountCents, currency)}`
+          : "";
+      return `Repeating expense added: ${payload.description ?? "an expense"}${amount}`;
+    }
     case "member_joined":
       return `${payload.memberName ?? actor} joined the group`;
     case "member_left":
