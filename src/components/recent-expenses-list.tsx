@@ -234,7 +234,11 @@ export function RecentExpensesList({
       >
         <AlertDialogContent size="sm">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete expense?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {pendingDelete
+                ? `Delete “${pendingDelete.description}”?`
+                : "Delete expense?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {pendingDelete
                 ? `“${pendingDelete.description}” will be deleted.`

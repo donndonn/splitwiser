@@ -1,14 +1,12 @@
 import { and, asc, eq } from "drizzle-orm";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
-import { DeleteExpenseButton } from "@/components/delete-expense-button";
 import { ExpenseComments } from "@/components/expense-comments";
+import { ExpenseDetailActions } from "@/components/expense-detail-actions";
 import { ExpenseForm } from "@/components/expense-form";
 import { ExpenseReadView } from "@/components/expense-read-view";
 import { ReceiptAttach } from "@/components/receipt-attach";
 import { ReceiptPhoto } from "@/components/receipt-photo";
-import { Button } from "@/components/ui/button";
 import { db } from "@/db";
 import {
   expenseComments,
@@ -230,9 +228,11 @@ export default async function ExpenseDetailPage({
       backHref={editing ? `/g/${id}/expenses/${expenseId}` : `/g/${id}`}
       actions={
         editing ? null : (
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/g/${id}/expenses/${expenseId}?edit=1`}>Edit</Link>
-          </Button>
+          <ExpenseDetailActions
+            groupId={id}
+            expenseId={expenseId}
+            description={expense.description}
+          />
         )
       }
     >
@@ -299,8 +299,6 @@ export default async function ExpenseDetailPage({
           deleteAction={deleteExpenseCommentAction.bind(null, id, expenseId)}
         />
       )}
-
-      <DeleteExpenseButton groupId={id} expenseId={expenseId} />
     </AppShell>
   );
 }
