@@ -3,6 +3,7 @@ import { signOut } from "@/auth";
 import { AppBottomNav } from "@/components/app-bottom-nav";
 import { AppShell } from "@/components/app-shell";
 import { InstallCoach } from "@/components/install-coach";
+import { PushToggle } from "@/components/push-toggle";
 import { SettingsSection } from "@/components/settings-list";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { requireUser } from "@/lib/auth-guards";
 import { displayNameForUser } from "@/lib/friends";
+import { getVapidPublicKey } from "@/lib/push-send";
 import { isTwilioVerifyConfigured } from "@/lib/twilio-verify";
 import { ProfileForm } from "./profile-form";
 
@@ -30,6 +32,7 @@ export default async function ProfilePage() {
   const username = dbUser?.username ?? null;
   const phone = dbUser?.phone ?? null;
   const smsEnabled = isTwilioVerifyConfigured();
+  const vapidPublicKey = getVapidPublicKey();
 
   return (
     <>
@@ -68,6 +71,7 @@ export default async function ProfilePage() {
 
         <SettingsSection id="preferences-heading" title="Preferences">
           <ThemeSelector />
+          {vapidPublicKey ? <PushToggle vapidPublicKey={vapidPublicKey} /> : null}
           <InstallCoach venue="profile" />
         </SettingsSection>
       </AppShell>

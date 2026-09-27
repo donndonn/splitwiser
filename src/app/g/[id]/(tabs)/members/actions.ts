@@ -8,6 +8,7 @@ import { logGroupActivity } from "@/lib/activity";
 import { requireAdmin, requireMember } from "@/lib/auth-guards";
 import { areFriends, displayNameForUser } from "@/lib/friends";
 import { changeGroupInviteLink, type InviteLinkChange } from "@/lib/invites";
+import { notifyGroupMembers } from "@/lib/push-send";
 
 /**
  * Create (or reuse), reset, or disable the group's single invitation link.
@@ -166,6 +167,14 @@ export async function addFriendAsMemberAction(
     });
 
     return row;
+  });
+
+  notifyGroupMembers({
+    groupId,
+    memberIds: [added.id],
+    actorMemberId: actor.id,
+    body: (group) => `${actor.displayName} added you to ${group.name}`,
+    url: `/g/${groupId}`,
   });
 
   revalidateMemberPaths(groupId);
