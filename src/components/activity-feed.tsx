@@ -72,17 +72,17 @@ function ActivityRow({ item }: { item: ActivityFeedItem }) {
         >
           <Icon className="size-5" />
         </div>
-        <Avatar
-          size="sm"
-          className="absolute -right-1.5 -bottom-1.5 ring-2 ring-card"
-        >
-          {item.actorImage ? (
+        {item.actorImage ? (
+          <Avatar
+            size="sm"
+            className="absolute -right-1.5 -bottom-1.5 ring-2 ring-card"
+          >
             <AvatarImage src={item.actorImage} alt="" />
-          ) : null}
-          <AvatarFallback className="text-[9px]">
-            {initials(item.actorName)}
-          </AvatarFallback>
-        </Avatar>
+            <AvatarFallback className="text-[9px]">
+              {initials(item.actorName)}
+            </AvatarFallback>
+          </Avatar>
+        ) : null}
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-sm leading-snug text-foreground/90">
