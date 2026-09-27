@@ -5,6 +5,7 @@ const ALLOWED_PATHS = [
   /^\/g\/[^/]+(\/.*)?$/,
   /^\/join\/[^/]+$/,
   /^\/friends(\/[^/]+)?$/,
+  /^\/activity$/,
   /^\/profile$/,
   /^\/new$/,
   /^\/onboarding$/,

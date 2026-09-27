@@ -12,6 +12,7 @@ describe("safeCallbackPath", () => {
     expect(safeCallbackPath(`${origin}/friends?x=1`, origin)).toBe(
       "/friends?x=1",
     );
+    expect(safeCallbackPath("/activity", origin)).toBe("/activity");
   });
 
   it("falls back to / for other origins and unknown routes", () => {
