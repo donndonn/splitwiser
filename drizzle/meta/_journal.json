@@ -110,8 +110,15 @@
     {
       "idx": 15,
       "version": "7",
-      "when": 1790484481326,
-      "tag": "0015_web_push_subscriptions",
+      "when": 1790485156777,
+      "tag": "0015_avatar_photo",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1790487079337,
+      "tag": "0016_web_push_subscriptions",
       "breakpoints": true
     }
   ]

@@ -87,6 +87,7 @@ export async function admitNewUser(
         name: input.profile.name ?? null,
         email: input.profile.email ?? null,
         image: input.profile.image ?? null,
+        accountImage: input.profile.image ?? null,
         emailVerified: input.profile.emailVerified ?? null,
         onboardingCompletedAt: null,
         signupInviteId: invite.id,

@@ -53,7 +53,14 @@ export const users = pgTable(
      * Used for exact-match friend search; never shown to other users. */
     phone: text("phone").unique(),
     emailVerified: timestamp("emailVerified", { mode: "date" }),
+    /** The avatar shown everywhere: the sign-in provider's photo, an
+     * uploaded photo (served from /api/avatars), or null for initials. */
     image: text("image"),
+    /** Photo the sign-in provider gave at signup, kept so the account can
+     * switch back to it after uploading or removing a photo. */
+    accountImage: text("account_image"),
+    /** Private Blob pathname of the uploaded avatar, if any. */
+    avatarBlobPathname: text("avatar_blob_pathname"),
     /** Null until the account joins its first group. Pending accounts only
      * reach invitation and onboarding pages. */
     onboardingCompletedAt: timestamp("onboarding_completed_at", {
