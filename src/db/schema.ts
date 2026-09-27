@@ -37,6 +37,14 @@ export const groupActivityTypeEnum = pgEnum("group_activity_type", [
   "settlement_deleted",
   "member_joined",
   "member_left",
+  "recurring_expense_created",
+]);
+
+export const recurrenceFrequencyEnum = pgEnum("recurrence_frequency", [
+  "weekly",
+  "biweekly",
+  "monthly",
+  "yearly",
 ]);
 export const users = pgTable(
   "users",
@@ -228,6 +236,49 @@ export const expenses = pgTable(
   (table) => [
     index("expenses_group_id_idx").on(table.groupId),
     index("expenses_spent_at_idx").on(table.spentAt),
+  ],
+);
+
+/**
+ * A repeating expense. The latest occurrence is the template: each run copies
+ * it (splits and items, not the receipt) and moves sourceExpenseId to the
+ * copy, so edits to the newest occurrence carry forward. Deleting the source
+ * expense ends the schedule.
+ */
+export const recurringExpenses = pgTable(
+  "recurring_expenses",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    groupId: text("group_id")
+      .notNull()
+      .references(() => groups.id, { onDelete: "cascade" }),
+    sourceExpenseId: text("source_expense_id")
+      .notNull()
+      .unique()
+      .references(() => expenses.id, { onDelete: "cascade" }),
+    frequency: recurrenceFrequencyEnum("frequency").notNull(),
+    /** Date of the first occurrence; later dates are computed from it so
+     * month-end anchors (Jan 31 → Feb 28 → Mar 31) do not drift. */
+    startsAt: timestamp("starts_at", { mode: "date" }).notNull(),
+    /** Occurrences created so far, including the first. */
+    occurrenceCount: integer("occurrence_count").notNull().default(1),
+    nextOccurrenceAt: timestamp("next_occurrence_at", {
+      mode: "date",
+    }).notNull(),
+    createdByMemberId: text("created_by_member_id")
+      .notNull()
+      .references(() => members.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("recurring_expenses_group_id_idx").on(table.groupId),
+    index("recurring_expenses_next_occurrence_idx").on(table.nextOccurrenceAt),
+    check(
+      "recurring_expenses_occurrence_count_positive",
+      sql`${table.occurrenceCount} >= 1`,
+    ),
   ],
 );
 
@@ -756,6 +807,9 @@ export type AppSettings = typeof appSettings.$inferSelect;
 export type Friendship = typeof friendships.$inferSelect;
 export type FriendRequest = typeof friendRequests.$inferSelect;
 export type Expense = typeof expenses.$inferSelect;
+export type RecurringExpense = typeof recurringExpenses.$inferSelect;
+export type RecurrenceFrequency =
+  (typeof recurrenceFrequencyEnum.enumValues)[number];
 export type ExpenseComment = typeof expenseComments.$inferSelect;
 export type ExpenseItem = typeof expenseItems.$inferSelect;
 export type ExpenseItemAssignment = typeof expenseItemAssignments.$inferSelect;

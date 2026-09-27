@@ -14,6 +14,7 @@ import {
   NotebookPen,
   Plus,
   ReceiptText,
+  Repeat,
   Scale,
   Trash2,
   Users,
@@ -27,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Label } from "@/components/ui/label";
 import {
   Sheet,
@@ -55,6 +57,7 @@ import {
   parseAmountToCents,
   type SplitMode,
 } from "@/lib/money";
+import { REPEAT_OPTIONS, type RepeatChoice } from "@/lib/recurrence";
 import { cn, groupedListClass } from "@/lib/utils";
 
 export type MemberOption = {
@@ -68,6 +71,7 @@ type CommonDefaults = {
   paidByMemberId?: string;
   spentAt?: string;
   notes?: string;
+  repeat?: RepeatChoice;
 };
 
 export type SimpleExpenseDefaults = CommonDefaults & {
@@ -1646,6 +1650,27 @@ export function ExpenseForm({
             placeholder="Add a note (optional)"
             className="min-h-9 flex-1 resize-none border-0 bg-transparent px-0 py-1.5 shadow-none focus-visible:ring-0 dark:bg-transparent"
           />
+        </div>
+
+        <div className="flex items-center gap-3 border-t border-border/65 px-4 py-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground">
+            <Repeat className="size-4" />
+          </span>
+          <Label htmlFor="repeat" className="sr-only">
+            Repeat
+          </Label>
+          <NativeSelect
+            id="repeat"
+            name="repeat"
+            defaultValue={defaultValues?.repeat ?? "never"}
+            className="h-9 flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+          >
+            {REPEAT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </NativeSelect>
         </div>
 
         {allowReceiptUpload && (

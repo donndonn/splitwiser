@@ -3,3 +3,6 @@ import type * as schema from "./schema";
 
 /** The app database, or an isolated test database with the same schema. */
 export type Db = PostgresJsDatabase<typeof schema>;
+
+/** The database or an open transaction on it. */
+export type DbOrTx = Db | Parameters<Parameters<Db["transaction"]>[0]>[0];

@@ -69,6 +69,14 @@ npx vercel env add TWILIO_VERIFY_SERVICE_SID   # Verify → Services, starts wit
 
 Without all three, the profile page hides the phone field. In the Twilio console, limit Verify **Geo Permissions** to the United States and Taiwan (the app's `SMS_COUNTRIES`) and turn on **Fraud Guard**. The app also caps codes at 5/hour and 10/day per user and 200/day site-wide.
 
+Recurring expenses — a daily [Vercel Cron](https://vercel.com/docs/cron-jobs) job (`vercel.json`) calls `/api/cron/recurring-expenses` at 13:00 UTC to add every occurrence that is due. Set a random secret; Vercel sends it as `Authorization: Bearer …` and the route rejects anything else:
+
+```bash
+npx vercel env add CRON_SECRET production   # openssl rand -base64 32
+```
+
+To run it by hand: `curl -H "Authorization: Bearer $CRON_SECRET" https://your-domain/api/cron/recurring-expenses`.
+
 Optional for preview deployments:
 
 ```bash

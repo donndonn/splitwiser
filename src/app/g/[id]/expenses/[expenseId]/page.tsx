@@ -1,4 +1,5 @@
 import { and, asc, eq } from "drizzle-orm";
+import { Repeat } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
@@ -27,9 +28,12 @@ import {
   type ExpenseReceiptBreakdown,
 } from "@/lib/expense-receipt-breakdown";
 import { formatCents, formatMoney } from "@/lib/money";
+import { frequencyLabel } from "@/lib/recurrence";
+import { getExpenseRecurrence } from "@/lib/recurring-expenses";
 import {
   attachReceiptAction,
   deleteExpenseAction,
+  stopRecurrenceAction,
   updateExpenseAction,
 } from "../actions";
 import {
@@ -68,7 +72,7 @@ export default async function ExpenseDetailPage({
 
   if (!group || !expense) notFound();
 
-  const [roster, splits, itemRows, assignmentRows, commentRows] =
+  const [roster, splits, itemRows, assignmentRows, commentRows, recurrence] =
     await Promise.all([
       db
         .select({
@@ -105,6 +109,7 @@ export default async function ExpenseDetailPage({
         .from(expenseComments)
         .where(eq(expenseComments.expenseId, expenseId))
         .orderBy(asc(expenseComments.createdAt), asc(expenseComments.id)),
+      getExpenseRecurrence(db, expenseId),
     ]);
 
   const assignedMembers = new Map<string, string[]>();
@@ -192,6 +197,7 @@ export default async function ExpenseDetailPage({
               paidByMemberId: expense.paidByMemberId,
               spentAt: expense.spentAt.toISOString().slice(0, 10),
               notes: expense.notes ?? undefined,
+              repeat: recurrence?.frequency ?? "never",
               tax: formatCents(expense.taxCents),
               tip: formatCents(expense.tipCents),
               items: itemRows.map((item) => ({
@@ -209,6 +215,7 @@ export default async function ExpenseDetailPage({
               spentAt: expense.spentAt.toISOString().slice(0, 10),
               splitMode: expense.splitMode,
               notes: expense.notes ?? undefined,
+              repeat: recurrence?.frequency ?? "never",
               weights,
               included: splits.map((split) => split.memberId),
             }
@@ -232,6 +239,21 @@ export default async function ExpenseDetailPage({
         )
       }
     >
+      {recurrence && !editing ? (
+        <div className="mb-4 flex items-center gap-3 rounded-2xl bg-secondary px-4 py-3 text-sm">
+          <Repeat className="size-4 shrink-0 text-muted-foreground" />
+          <p className="min-w-0 flex-1">
+            Repeats {frequencyLabel(recurrence.frequency)}. Next on{" "}
+            {formatAddedOn(recurrence.nextOccurrenceAt)}.
+          </p>
+          <form action={stopRecurrenceAction.bind(null, id, expenseId)}>
+            <Button type="submit" variant="ghost" size="sm">
+              Stop
+            </Button>
+          </form>
+        </div>
+      ) : null}
+
       {editing ? (
         form
       ) : (
