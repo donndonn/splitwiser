@@ -85,10 +85,26 @@ npx vercel env add AUTH_REDIRECT_PROXY_URL
 
 Receipt images are never served from public Blob URLs. Group members view them through `/api/receipts/[expenseId]`.
 
-## 5. Run migrations
+## 5. Migrations
+
+Production deploys apply pending migrations before the new code goes live. `vercel-build` runs when `VERCEL_ENV` is `production`: it migrates with `DATABASE_URL_UNPOOLED`, then runs `next build`. A failed migration fails the build, and Vercel keeps the previous deployment.
+
+Preview and development builds never migrate, even if they have `DATABASE_URL_UNPOOLED` (a preview can point at the production database). Local `npm run build` does not run this script.
+
+`DATABASE_URL_UNPOOLED` has to be present at **build** time for the Production environment. The Neon integration usually injects it; confirm the variable is not limited to runtime. The pooled `DATABASE_URL` is not used for migrations.
+
+Destructive SQL fails the build unless that migration file opts in:
+
+```sql
+-- allow-destructive: <reason>
+```
+
+That covers `DROP TABLE`, `DROP COLUMN`, `RENAME`, `ALTER COLUMN ... TYPE`, `TRUNCATE`, and `DELETE FROM` without a `WHERE`.
+
+Apply migrations by hand for local development:
 
 ```bash
-# with production unpooled URL in .env.local or exported:
+# with the unpooled URL in .env.local or exported:
 npm run db:migrate
 ```
 
@@ -149,5 +165,5 @@ Then sign in with Google using that email. Auth.js links the Google identity to 
 
 ### Rollout of invitation-only signup (migration `0011`)
 
-`npm run db:migrate` creates `app_settings` with a 500-account cap, marks every existing account as onboarded, and revokes all existing invitation links (admins create new ones from Members). Memberships are unchanged. Run the migration, then deploy.
+`npm run db:migrate` creates `app_settings` with a 500-account cap, marks every existing account as onboarded, and revokes all existing invitation links (admins create new ones from Members). Memberships are unchanged. Production deploys apply pending migrations before the new build (see section 5).
 
