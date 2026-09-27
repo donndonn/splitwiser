@@ -3,6 +3,7 @@ import { signOut } from "@/auth";
 import { AppBottomNav } from "@/components/app-bottom-nav";
 import { AppShell } from "@/components/app-shell";
 import { InstallCoach } from "@/components/install-coach";
+import { SettingsSection } from "@/components/settings-list";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ThemeSelector } from "@/components/theme-selector";
@@ -53,16 +54,7 @@ export default async function ProfilePage() {
             <AvatarImage src={image ?? undefined} alt="" />
             <AvatarFallback>{name.slice(0, 1).toUpperCase()}</AvatarFallback>
           </Avatar>
-          <div className="min-w-0">
-            <p className="truncate font-medium">{name}</p>
-            {username ? (
-              <p className="truncate text-sm text-muted-foreground">
-                <span className="text-muted-foreground/80">@</span>
-                {username}
-              </p>
-            ) : null}
-            <p className="truncate text-sm text-muted-foreground">{email}</p>
-          </div>
+          <p className="min-w-0 truncate text-lg font-semibold">{name}</p>
         </div>
 
         <ProfileForm
@@ -74,9 +66,10 @@ export default async function ProfilePage() {
           smsEnabled={smsEnabled}
         />
 
-        <InstallCoach venue="profile" />
-
-        <ThemeSelector />
+        <SettingsSection id="preferences-heading" title="Preferences">
+          <ThemeSelector />
+          <InstallCoach venue="profile" />
+        </SettingsSection>
       </AppShell>
       <AppBottomNav />
     </>

@@ -2,9 +2,15 @@
 
 import { useState, useTransition, type KeyboardEvent } from "react";
 import { toast } from "sonner";
+import {
+  settingsInputClass,
+  settingsLabelClass,
+  settingsRowClass,
+  settingsValueClass,
+} from "@/components/settings-list";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { formatPhone } from "@/lib/phone";
+import { cn } from "@/lib/utils";
 import {
   confirmPhoneCodeAction,
   removePhoneAction,
@@ -13,9 +19,6 @@ import {
 
 type Step =
   { kind: "view" } | { kind: "number" } | { kind: "code"; phone: string };
-
-const inputClass =
-  "flex h-11 w-full rounded-xl border border-input bg-card px-3.5 text-base shadow-xs outline-none placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 md:text-sm";
 
 /** Enter inside the profile form would submit it; run the phone step instead. */
 function onEnter(action: () => void) {
@@ -80,57 +83,63 @@ export function PhoneSection({
     });
   }
 
-  return (
-    <div className="space-y-2">
-      <Label htmlFor={step.kind === "view" ? undefined : "phone"}>Phone</Label>
+  if (step.kind === "view") {
+    return (
+      <div className={cn(settingsRowClass, editing && "pr-2")}>
+        <span className={settingsLabelClass}>Phone</span>
+        <span className={settingsValueClass}>
+          {saved ? (
+            formatPhone(saved)
+          ) : (
+            <span className="font-normal text-muted-foreground">Not set</span>
+          )}
+        </span>
+        {editing && enabled ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={pending}
+            onClick={() => {
+              setNumberValue("");
+              setStep({ kind: "number" });
+            }}
+          >
+            {saved ? "Change" : "Add"}
+          </Button>
+        ) : null}
+        {editing && saved ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={pending}
+            onClick={() => {
+              startTransition(async () => {
+                try {
+                  await removePhoneAction();
+                  setSaved(null);
+                  toast.success("Phone number removed");
+                } catch {
+                  toast.error("Could not remove phone number");
+                }
+              });
+            }}
+          >
+            Remove
+          </Button>
+        ) : null}
+      </div>
+    );
+  }
 
-      {step.kind === "view" ? (
-        <div className="flex h-11 items-center gap-2 rounded-xl border bg-muted/40 pl-3.5 pr-1.5 text-sm font-medium tracking-tight">
-          <span className="min-w-0 flex-1 truncate">
-            {saved ? (
-              formatPhone(saved)
-            ) : (
-              <span className="font-normal text-muted-foreground">Not set</span>
-            )}
-          </span>
-          {editing && enabled ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={pending}
-              onClick={() => {
-                setNumberValue("");
-                setStep({ kind: "number" });
-              }}
-            >
-              {saved ? "Change" : "Add"}
-            </Button>
-          ) : null}
-          {editing && saved ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={pending}
-              onClick={() => {
-                startTransition(async () => {
-                  try {
-                    await removePhoneAction();
-                    setSaved(null);
-                    toast.success("Phone number removed");
-                  } catch {
-                    toast.error("Could not remove phone number");
-                  }
-                });
-              }}
-            >
-              Remove
-            </Button>
-          ) : null}
-        </div>
-      ) : step.kind === "number" ? (
-        <div className="space-y-2">
+  return (
+    <div className="bg-muted/30 pb-3">
+      <div className={settingsRowClass}>
+        <label htmlFor="phone" className={settingsLabelClass}>
+          Phone
+        </label>
+        {step.kind === "number" ? (
           <input
             id="phone"
             type="tel"
@@ -143,29 +152,9 @@ export function PhoneSection({
             onKeyDown={onEnter(sendNumber)}
             placeholder="+1 415 555 0123"
             maxLength={32}
-            className={inputClass}
+            className={cn(settingsInputClass, "flex-1")}
           />
-          <p className="text-xs text-muted-foreground">
-            We&apos;ll text you a code. US and Taiwan numbers only. Friends can
-            find you by this number; it&apos;s never shown to others. Saved as
-            soon as it&apos;s verified.
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            <Button type="button" disabled={pending} onClick={sendNumber}>
-              {pending ? "Sending…" : "Send code"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={pending}
-              onClick={() => setStep({ kind: "view" })}
-            >
-              Cancel
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-2">
+        ) : (
           <input
             id="phone"
             inputMode="numeric"
@@ -177,8 +166,18 @@ export function PhoneSection({
             onKeyDown={onEnter(confirmCode)}
             placeholder="6-digit code"
             maxLength={10}
-            className={`${inputClass} tracking-widest`}
+            className={cn(settingsInputClass, "flex-1 tracking-widest")}
           />
+        )}
+      </div>
+      <div className="space-y-2 px-4">
+        {step.kind === "number" ? (
+          <p className="text-xs text-muted-foreground">
+            We&apos;ll text you a code. US and Taiwan numbers only. Friends can
+            find you by this number; it&apos;s never shown to others. Saved as
+            soon as it&apos;s verified.
+          </p>
+        ) : (
           <p className="text-xs text-muted-foreground">
             Sent to {formatPhone(step.phone)}.{" "}
             <button
@@ -190,21 +189,27 @@ export function PhoneSection({
               Resend
             </button>
           </p>
-          <div className="grid grid-cols-2 gap-2">
+        )}
+        <div className="grid grid-cols-2 gap-2">
+          {step.kind === "number" ? (
+            <Button type="button" disabled={pending} onClick={sendNumber}>
+              {pending ? "Sending…" : "Send code"}
+            </Button>
+          ) : (
             <Button type="button" disabled={pending} onClick={confirmCode}>
               {pending ? "Checking…" : "Verify"}
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={pending}
-              onClick={() => setStep({ kind: "view" })}
-            >
-              Cancel
-            </Button>
-          </div>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            disabled={pending}
+            onClick={() => setStep({ kind: "view" })}
+          >
+            Cancel
+          </Button>
         </div>
-      )}
+      </div>
     </div>
   );
 }

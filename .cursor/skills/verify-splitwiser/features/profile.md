@@ -35,5 +35,6 @@ Preconditions:
 - The visible name is `Pay {display name} {amount}` plus the word `Venmo`. It is not the phrase `Pay on Venmo`.
 - Opening the link leaves Splitwiser for Venmo. Abort that page; do not log into Venmo. Reading `href` is enough.
 - `Edit profile` is a small pencil `Edit` button beside the `Account` heading (its accessible name is still `Edit profile`). Phone `Change`/`Remove` only appear after choosing it; a verified phone saves on its own, not with `Save`.
+- Account fields are one-line rows in a card: label on the left, value on the right. In edit mode the value itself becomes the textbox, still named by its label.
 - Clearing Venmo back to empty shows `Not set`. This recipe leaves `swvbobpay` in place. Cleanup deletes the verify user.
 - `Sign out` on this screen is the sign-in feature. Do not treat theme changes as part of this proof.
