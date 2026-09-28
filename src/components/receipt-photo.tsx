@@ -2,40 +2,45 @@ import { ReceiptPhotoDisclosure } from "@/components/receipt-photo-disclosure";
 import { receiptImageApiPath } from "@/lib/receipt-blob";
 import { cn, groupedListClass } from "@/lib/utils";
 
+type ReceiptSource = {
+  expenseId: string;
+  /** Image URL. Defaults to the member-only receipt route. */
+  src?: string;
+  caption?: string;
+};
+
 function ReceiptFigure({
   expenseId,
+  src,
+  caption = "Receipt photo · visible to group members only",
   className,
-}: {
-  expenseId: string;
-  className?: string;
-}) {
+}: ReceiptSource & { className?: string }) {
   return (
     <figure className={className}>
       {/* Auth'd same-origin route — next/image remote config is not needed. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={receiptImageApiPath(expenseId)}
+        src={src ?? receiptImageApiPath(expenseId)}
         alt="Receipt"
         className="mx-auto max-h-80 w-full rounded-xl bg-muted object-contain"
       />
       <figcaption className="mt-2 text-xs text-muted-foreground">
-        Receipt photo · visible to group members only
+        {caption}
       </figcaption>
     </figure>
   );
 }
 
 export function ReceiptPhoto({
-  expenseId,
   collapsible = true,
-}: {
-  expenseId: string;
+  ...source
+}: ReceiptSource & {
   collapsible?: boolean;
 }) {
   if (!collapsible) {
     return (
       <ReceiptFigure
-        expenseId={expenseId}
+        {...source}
         className={cn(groupedListClass, "min-w-0 p-4")}
       />
     );
@@ -43,7 +48,7 @@ export function ReceiptPhoto({
 
   return (
     <ReceiptPhotoDisclosure>
-      <ReceiptFigure expenseId={expenseId} />
+      <ReceiptFigure {...source} />
     </ReceiptPhotoDisclosure>
   );
 }

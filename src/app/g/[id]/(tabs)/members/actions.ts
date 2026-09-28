@@ -8,6 +8,7 @@ import { logGroupActivity } from "@/lib/activity";
 import { requireAdmin, requireMember } from "@/lib/auth-guards";
 import { areFriends, displayNameForUser } from "@/lib/friends";
 import { changeGroupInviteLink, type InviteLinkChange } from "@/lib/invites";
+import { changeGroupShareLink, type ShareLinkChange } from "@/lib/share-link";
 
 /**
  * Create (or reuse), reset, or disable the group's single invitation link.
@@ -29,6 +30,23 @@ export async function changeInviteLinkAction(
   if (replaced) {
     console.info("[invites] invitation replaced", { groupId, change });
   }
+  revalidatePath(`/g/${groupId}/members`);
+  return token;
+}
+
+/**
+ * Turn on (or reuse), reset, or turn off the group's read-only share link.
+ * Returns the current token, or null once sharing is off.
+ */
+export async function changeShareLinkAction(
+  groupId: string,
+  change: ShareLinkChange,
+): Promise<string | null> {
+  if (change !== "create" && change !== "reset" && change !== "disable") {
+    throw new Error("Unknown share link change");
+  }
+  await requireAdmin(groupId);
+  const token = await changeGroupShareLink(db, { groupId, change });
   revalidatePath(`/g/${groupId}/members`);
   return token;
 }

@@ -118,14 +118,21 @@ export const verificationTokens = pgTable(
   (vt) => [primaryKey({ columns: [vt.identifier, vt.token] })],
 );
 
-export const groups = pgTable("groups", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  name: text("name").notNull(),
-  currency: text("currency").notNull().default("USD"),
-  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
-});
+export const groups = pgTable(
+  "groups",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    name: text("name").notNull(),
+    currency: text("currency").notNull().default("USD"),
+    /** Read-only share link (/s/{token}) for people without an account.
+     * Null when sharing is off. */
+    shareToken: text("share_token"),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("groups_share_token_unique").on(table.shareToken)],
+);
 
 export const members = pgTable(
   "members",

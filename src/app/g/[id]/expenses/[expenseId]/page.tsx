@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { ExpenseComments } from "@/components/expense-comments";
@@ -8,24 +8,10 @@ import { ExpenseReadView } from "@/components/expense-read-view";
 import { ReceiptAttach } from "@/components/receipt-attach";
 import { ReceiptPhoto } from "@/components/receipt-photo";
 import { db } from "@/db";
-import {
-  expenseComments,
-  expenseItemAssignments,
-  expenseItems,
-  expenseSplits,
-  expenses,
-  groups,
-  members,
-  users,
-} from "@/db/schema";
+import { expenseComments, groups } from "@/db/schema";
 import { requireMember } from "@/lib/auth-guards";
 import { canDeleteComment } from "@/lib/expense-comments";
-import {
-  buildItemizedReceiptBreakdown,
-  buildSimpleReceiptBreakdown,
-  type ExpenseReceiptBreakdown,
-} from "@/lib/expense-receipt-breakdown";
-import { activeExpense } from "@/lib/expenses";
+import { loadExpenseDetail } from "@/lib/expense-detail";
 import { formatCents, formatMoney } from "@/lib/money";
 import { attachReceiptAction, updateExpenseAction } from "../actions";
 import {
@@ -53,77 +39,28 @@ export default async function ExpenseDetailPage({
   const editing = edit === "1";
   const { member: viewer } = await requireMember(id);
 
-  const [[group], [expense]] = await Promise.all([
+  const [[group], detail, commentRows] = await Promise.all([
     db.select().from(groups).where(eq(groups.id, id)).limit(1),
+    loadExpenseDetail(db, { groupId: id, expenseId }),
     db
       .select()
-      .from(expenses)
-      .where(
-        and(
-          eq(expenses.id, expenseId),
-          eq(expenses.groupId, id),
-          activeExpense(),
-        ),
-      )
-      .limit(1),
+      .from(expenseComments)
+      .where(eq(expenseComments.expenseId, expenseId))
+      .orderBy(asc(expenseComments.createdAt), asc(expenseComments.id)),
   ]);
 
-  if (!group || !expense) notFound();
+  if (!group || !detail) notFound();
 
-  const [roster, splits, itemRows, assignmentRows, commentRows] =
-    await Promise.all([
-      db
-        .select({
-          id: members.id,
-          displayName: members.displayName,
-          image: users.image,
-        })
-        .from(members)
-        .leftJoin(users, eq(members.userId, users.id))
-        .where(eq(members.groupId, id))
-        .orderBy(members.createdAt),
-      db
-        .select()
-        .from(expenseSplits)
-        .where(eq(expenseSplits.expenseId, expenseId)),
-      db
-        .select()
-        .from(expenseItems)
-        .where(eq(expenseItems.expenseId, expenseId))
-        .orderBy(expenseItems.sortOrder),
-      db
-        .select({
-          expenseItemId: expenseItemAssignments.expenseItemId,
-          memberId: expenseItemAssignments.memberId,
-          weight: expenseItemAssignments.weight,
-        })
-        .from(expenseItemAssignments)
-        .innerJoin(
-          expenseItems,
-          eq(expenseItemAssignments.expenseItemId, expenseItems.id),
-        )
-        .where(eq(expenseItems.expenseId, expenseId)),
-      db
-        .select()
-        .from(expenseComments)
-        .where(eq(expenseComments.expenseId, expenseId))
-        .orderBy(asc(expenseComments.createdAt), asc(expenseComments.id)),
-    ]);
-
-  const assignedMembers = new Map<string, string[]>();
-  const assignedWeights = new Map<string, Record<string, number>>();
-  for (const assignment of assignmentRows) {
-    assignedMembers.set(assignment.expenseItemId, [
-      ...(assignedMembers.get(assignment.expenseItemId) ?? []),
-      assignment.memberId,
-    ]);
-    if (assignment.weight != null) {
-      assignedWeights.set(assignment.expenseItemId, {
-        ...assignedWeights.get(assignment.expenseItemId),
-        [assignment.memberId]: Number(assignment.weight),
-      });
-    }
-  }
+  const {
+    expense,
+    roster,
+    splits,
+    orderedSplits,
+    itemRows,
+    assignedMembers,
+    assignedWeights,
+    personById,
+  } = detail;
 
   const weights: Record<string, number> = {};
   for (const s of splits) {
@@ -131,61 +68,11 @@ export default async function ExpenseDetailPage({
   }
 
   const action = updateExpenseAction.bind(null, id, expenseId);
-  const personById = new Map(roster.map((member) => [member.id, member]));
   const payer = personById.get(expense.paidByMemberId);
   const creator = personById.get(expense.createdByMemberId);
   const hasReceipt = Boolean(expense.receiptBlobPathname);
   const amountLabel = formatMoney(expense.amountCents, group.currency);
-
-  const memberNames = new Map(
-    roster.map((member) => [member.id, member.displayName]),
-  );
-
-  let receiptBreakdown: ExpenseReceiptBreakdown;
-  if (expense.entryMode === "itemized" && itemRows.length > 0) {
-    receiptBreakdown = buildItemizedReceiptBreakdown({
-      currency: group.currency,
-      taxCents: expense.taxCents,
-      tipCents: expense.tipCents,
-      items: itemRows.map((item) => {
-        const memberIds = assignedMembers.get(item.id) ?? [];
-        return {
-          description: item.description,
-          amountCents: item.amountCents,
-          quantity: item.quantity,
-          memberIds,
-          splitMode: item.splitMode,
-          weights: assignedWeights.get(item.id) ?? null,
-          sharedByNames: memberIds.map(
-            (memberId) => memberNames.get(memberId) ?? "Someone",
-          ),
-        };
-      }),
-      memberNames,
-      storedSplits: splits.map((split) => ({
-        memberId: split.memberId,
-        amountCents: split.amountCents,
-      })),
-    });
-  } else {
-    receiptBreakdown = buildSimpleReceiptBreakdown({
-      currency: group.currency,
-      amountCents: expense.amountCents,
-      splitMode: expense.splitMode,
-      shares: [...splits]
-        .sort(
-          (a, b) =>
-            roster.findIndex((member) => member.id === a.memberId) -
-            roster.findIndex((member) => member.id === b.memberId),
-        )
-        .map((split) => ({
-          memberId: split.memberId,
-          displayName: personById.get(split.memberId)?.displayName ?? "Someone",
-          amountCents: split.amountCents,
-          weight: Number(split.weight ?? split.amountCents),
-        })),
-    });
-  }
+  const receiptBreakdown = detail.receiptBreakdown(group.currency);
 
   const form = (
     <ExpenseForm
@@ -260,12 +147,7 @@ export default async function ExpenseDetailPage({
             displayName: payer?.displayName ?? "Someone",
             image: payer?.image ?? null,
           }}
-          shares={[...splits]
-            .sort(
-              (a, b) =>
-                roster.findIndex((member) => member.id === a.memberId) -
-                roster.findIndex((member) => member.id === b.memberId),
-            )
+          shares={orderedSplits
             .map((split) => {
               const person = personById.get(split.memberId);
               return {

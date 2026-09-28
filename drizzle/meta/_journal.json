@@ -127,6 +127,13 @@
       "when": 1790566437995,
       "tag": "0017_item_split_modes",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1790569773946,
+      "tag": "0018_group_share_token",
+      "breakpoints": true
     }
   ]
 }

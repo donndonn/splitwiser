@@ -3,7 +3,7 @@ import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { db } from "@/db";
-import { invites, members, users } from "@/db/schema";
+import { groups, invites, members, users } from "@/db/schema";
 import { requireMember } from "@/lib/auth-guards";
 import { listFriends, listFriendStatuses } from "@/lib/friends";
 import { countInviteReservations, inviteStatus } from "@/lib/invites";
@@ -12,6 +12,7 @@ import { AddFriendsToGroup } from "./add-friends-to-group";
 import { addPlaceholderFormAction } from "./actions";
 import { InvitePanel, type InvitePanelInvite } from "./invite-panel";
 import { MemberRow } from "./member-row";
+import { SharePanel } from "./share-panel";
 
 export default async function MembersPage({
   params,
@@ -21,7 +22,12 @@ export default async function MembersPage({
   const { id } = await params;
   const { user, member: me } = await requireMember(id);
 
-  const [roster, latestInvites, friends] = await Promise.all([
+  const [[group], roster, latestInvites, friends] = await Promise.all([
+    db
+      .select({ name: groups.name, shareToken: groups.shareToken })
+      .from(groups)
+      .where(eq(groups.id, id))
+      .limit(1),
     db
       .select({
         id: members.id,
@@ -122,11 +128,23 @@ export default async function MembersPage({
           </div>
 
           <InvitePanel groupId={id} invite={currentInvite} />
+
+          <SharePanel
+            groupId={id}
+            groupName={group?.name ?? "Splitwiser group"}
+            token={group?.shareToken ?? null}
+          />
         </div>
       ) : (
-        <p className="text-sm text-muted-foreground">
-          Only admins can invite people or add placeholders.
-        </p>
+        <div className="space-y-2 text-sm text-muted-foreground">
+          <p>Only admins can invite people or add placeholders.</p>
+          {group?.shareToken ? (
+            <p>
+              An admin has turned on a view-only link, so anyone with it can
+              see this group’s expenses and balances.
+            </p>
+          ) : null}
+        </div>
       )}
     </AppShell>
   );
