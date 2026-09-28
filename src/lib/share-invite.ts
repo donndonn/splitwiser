@@ -6,12 +6,16 @@ export function inviteUrl(token: string) {
  * Open the share sheet, or copy the link where sharing isn't supported.
  * Call from a click handler: browsers only allow sharing on a user gesture.
  */
-export async function shareOrCopyInvite(url: string, groupTitle: string) {
+export async function shareOrCopyInvite(
+  url: string,
+  groupTitle: string,
+  options: { text?: string } = {},
+) {
   if (typeof navigator.share === "function") {
     try {
       await navigator.share({
         title: groupTitle,
-        text: "Join this Splitwiser group",
+        text: options.text ?? "Join this Splitwiser group",
         url,
       });
       return "shared" as const;
