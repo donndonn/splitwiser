@@ -260,6 +260,140 @@ describe("calculateItemizedExpense", () => {
   });
 });
 
+describe("calculateItemizedExpense per-item split modes", () => {
+  function owed(input: ItemizedExpenseInput) {
+    return Object.fromEntries(
+      calculateItemizedExpense(input).splits.map(({ memberId, amountCents }) => [
+        memberId,
+        amountCents,
+      ]),
+    );
+  }
+
+  it("splits one item by exact amounts", () => {
+    const result = calculateItemizedExpense(
+      receipt({
+        items: [
+          {
+            description: "Wine",
+            amountCents: 2000,
+            quantity: 2,
+            memberIds: ["a", "b"],
+            splitMode: "exact",
+            weights: { a: 2500, b: 1500 },
+          },
+        ],
+      }),
+    );
+    expect(result.itemSplits[0].map((split) => split.amountCents)).toEqual([
+      2500, 1500,
+    ]);
+    expect(result.calculatedTotalCents).toBe(4000);
+  });
+
+  it("splits one item by percentage and another equally, then shares tax", () => {
+    expect(
+      owed(
+        receipt({
+          taxCents: 200,
+          items: [
+            {
+              description: "Pitcher",
+              amountCents: 1000,
+              quantity: 1,
+              memberIds: ["a", "b"],
+              splitMode: "percent",
+              weights: { a: 70, b: 30 },
+            },
+            {
+              description: "Fries",
+              amountCents: 1000,
+              quantity: 1,
+              memberIds: ["a", "b"],
+            },
+          ],
+        }),
+      ),
+    ).toEqual({ a: 1320, b: 880 });
+  });
+
+  it("splits one item by shares with cents that still add up", () => {
+    expect(
+      owed(
+        receipt({
+          items: [
+            {
+              description: "Platter",
+              amountCents: 1000,
+              quantity: 1,
+              memberIds: ["a", "b"],
+              splitMode: "shares",
+              weights: { a: 2, b: 1 },
+            },
+          ],
+        }),
+      ),
+    ).toEqual({ a: 667, b: 333 });
+  });
+
+  it("names the item when exact amounts do not add up", () => {
+    expect(() =>
+      calculateItemizedExpense(
+        receipt({
+          items: [
+            {
+              description: "Wine",
+              amountCents: 2000,
+              quantity: 1,
+              memberIds: ["a", "b"],
+              splitMode: "exact",
+              weights: { a: 1500, b: 300 },
+            },
+          ],
+        }),
+      ),
+    ).toThrow('"Wine" amounts must add up to 20.00 (2.00 left).');
+  });
+
+  it("names the item when percentages do not add up", () => {
+    expect(() =>
+      calculateItemizedExpense(
+        receipt({
+          items: [
+            {
+              description: "Wine",
+              amountCents: 2000,
+              quantity: 1,
+              memberIds: ["a", "b"],
+              splitMode: "percent",
+              weights: { a: 50, b: 40 },
+            },
+          ],
+        }),
+      ),
+    ).toThrow('"Wine" percentages must add up to 100% (10% left).');
+  });
+
+  it("requires a weight for everyone on a non-equal item", () => {
+    expect(() =>
+      calculateItemizedExpense(
+        receipt({
+          items: [
+            {
+              description: "Wine",
+              amountCents: 2000,
+              quantity: 1,
+              memberIds: ["a", "b"],
+              splitMode: "shares",
+              weights: { a: 1 },
+            },
+          ],
+        }),
+      ),
+    ).toThrow('Check the split for "Wine".');
+  });
+});
+
 describe("inferItemizedAdjustments", () => {
   it("treats leftover printed total as tax when Gemini omitted tax", () => {
     expect(

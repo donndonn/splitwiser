@@ -110,11 +110,32 @@ function parseItemizedPayload(raw: string): ItemizedPayload {
       ) {
         throw new Error("Invalid receipt item");
       }
+      const splitMode = item.splitMode ?? "equal";
+      if (!splitModes.includes(splitMode as SplitMode)) {
+        throw new Error("Invalid receipt item");
+      }
+      let weights: Record<string, number> | null = null;
+      if (splitMode !== "equal") {
+        if (!item.weights || typeof item.weights !== "object") {
+          throw new Error("Invalid receipt item");
+        }
+        const submitted = item.weights as Record<string, unknown>;
+        weights = {};
+        for (const memberId of item.memberIds) {
+          const weight = submitted[memberId];
+          if (typeof weight !== "number" || !Number.isFinite(weight)) {
+            throw new Error("Invalid receipt item");
+          }
+          weights[memberId] = weight;
+        }
+      }
       return {
         description: item.description.trim(),
         amountCents: Number(item.amountCents),
         quantity: Number(item.quantity),
         memberIds: item.memberIds,
+        splitMode: splitMode as SplitMode,
+        weights,
       };
     }),
     taxCents: parseAdjustmentCents(record.taxCents, "tax"),
@@ -284,6 +305,7 @@ export async function createExpenseAction(groupId: string, formData: FormData) {
             description: item.description,
             amountCents: item.amountCents,
             quantity: item.quantity,
+            splitMode: item.splitMode ?? "equal",
             sortOrder,
           })
           .returning({ id: expenseItems.id });
@@ -291,6 +313,10 @@ export async function createExpenseAction(groupId: string, formData: FormData) {
           item.memberIds.map((memberId) => ({
             expenseItemId: createdItem.id,
             memberId,
+            weight:
+              item.weights?.[memberId] != null
+                ? String(item.weights[memberId])
+                : null,
           })),
         );
       }
@@ -431,6 +457,7 @@ export async function updateExpenseAction(
           description: item.description,
           amountCents: item.amountCents,
           quantity: item.quantity,
+          splitMode: item.splitMode ?? "equal",
           sortOrder,
         })
         .returning({ id: expenseItems.id });
@@ -438,6 +465,10 @@ export async function updateExpenseAction(
         item.memberIds.map((memberId) => ({
           expenseItemId: createdItem.id,
           memberId,
+          weight:
+            item.weights?.[memberId] != null
+              ? String(item.weights[memberId])
+              : null,
         })),
       );
     }
