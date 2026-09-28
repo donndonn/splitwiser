@@ -1,9 +1,10 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, or } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import {
   expenseSplits,
   expenses,
   groups,
+  invites,
   members,
   users,
 } from "@/db/schema";
@@ -47,18 +48,51 @@ export async function changeGroupShareLink(
   });
 }
 
-/** The group whose sharing is on with this token, or null. */
+export type SharedGroup = {
+  id: string;
+  name: string;
+  currency: string;
+  /** "join" when the token is the group's invitation link. */
+  access: "view" | "join";
+};
+
+/**
+ * The group a link lets someone see, or null. Both kinds of group link can
+ * view: the view-only link, and the invitation link while it is neither
+ * disabled nor expired (a join link that is out of joins still shows the
+ * group).
+ */
 export async function getSharedGroup(
   client: Pick<Db, "select">,
   token: string,
-): Promise<{ id: string; name: string; currency: string } | null> {
+  now: Date = new Date(),
+): Promise<SharedGroup | null> {
   if (!token) return null;
-  const [group] = await client
-    .select({ id: groups.id, name: groups.name, currency: groups.currency })
+  const groupColumns = {
+    id: groups.id,
+    name: groups.name,
+    currency: groups.currency,
+  };
+  const [viewGroup] = await client
+    .select(groupColumns)
     .from(groups)
     .where(eq(groups.shareToken, token))
     .limit(1);
-  return group ?? null;
+  if (viewGroup) return { ...viewGroup, access: "view" };
+
+  const [joinGroup] = await client
+    .select(groupColumns)
+    .from(invites)
+    .innerJoin(groups, eq(invites.groupId, groups.id))
+    .where(
+      and(
+        eq(invites.token, token),
+        isNull(invites.revokedAt),
+        or(isNull(invites.expiresAt), gt(invites.expiresAt, now)),
+      ),
+    )
+    .limit(1);
+  return joinGroup ? { ...joinGroup, access: "join" } : null;
 }
 
 /** Receipt image for share-link viewers; the token stands in for sign-in. */
@@ -84,7 +118,7 @@ export type SharedExpense = {
 };
 
 export type SharedGroupView = {
-  group: { id: string; name: string; currency: string };
+  group: SharedGroup;
   members: SharedMember[];
   suggestions: ReturnType<typeof suggestSettlements>;
   /** Venmo handles of linked members, for pay links only. */

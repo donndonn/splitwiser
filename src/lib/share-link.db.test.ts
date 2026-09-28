@@ -67,7 +67,12 @@ describe.skipIf(!hasTestDatabase)("read-only share links", () => {
     });
     const view = await getSharedGroupView(t.db, token!);
 
-    expect(view?.group).toEqual({ id: "g1", name: "Dinner", currency: "USD" });
+    expect(view?.group).toEqual({
+      id: "g1",
+      name: "Dinner",
+      currency: "USD",
+      access: "view",
+    });
     expect(view?.members).toEqual([
       { id: "m1", displayName: "Ada", netCents: 2000 },
       { id: "m2", displayName: "Bea", netCents: -2000 },
@@ -107,6 +112,35 @@ describe.skipIf(!hasTestDatabase)("read-only share links", () => {
     expect(
       await loadExpenseDetail(t.db, { groupId: "g1", expenseId: "gone" }),
     ).toBeNull();
+  });
+
+  it("lets a live join link view the group, but not a disabled or expired one", async () => {
+    await t.sql`
+      insert into invites (id, group_id, token, expires_at, max_uses, uses, created_by_member_id) values
+        ('inv-live', 'g1', 'join-live', now() + interval '1 day', 1, 1, 'm1'),
+        ('inv-old', 'g2', 'join-expired', now() - interval '1 day', 15, 0, 'm1')
+    `;
+    await t.sql`
+      insert into invites (id, group_id, token, expires_at, max_uses, uses, revoked_at, created_by_member_id)
+      values ('inv-off', 'g1', 'join-off', now() + interval '1 day', 15, 0, now(), 'm1')
+    `;
+
+    // Out of joins still shows the group.
+    expect(await getSharedGroup(t.db, "join-live")).toEqual({
+      id: "g1",
+      name: "Dinner",
+      currency: "USD",
+      access: "join",
+    });
+    expect((await getSharedGroupView(t.db, "join-live"))?.members).toHaveLength(2);
+    expect(await getSharedGroup(t.db, "join-expired")).toBeNull();
+    expect(await getSharedGroup(t.db, "join-off")).toBeNull();
+
+    const viewToken = await changeGroupShareLink(t.db, {
+      groupId: "g1",
+      change: "create",
+    });
+    expect((await getSharedGroup(t.db, viewToken!))?.access).toBe("view");
   });
 
   it("stops the old link on reset and all links on disable", async () => {
