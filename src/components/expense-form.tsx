@@ -87,6 +87,9 @@ export type ItemizedExpenseDefaults = CommonDefaults & {
     amount: string;
     quantity: number;
     memberIds: string[];
+    splitMode?: SplitMode;
+    /** Cents (exact), percent, or share count per member. */
+    weights?: Record<string, number>;
   }[];
 };
 
@@ -112,7 +115,27 @@ type ItemDraft = {
   memberIds: string[];
   /** Set when a multi-quantity item is split per unit; one list per unit. */
   portions?: string[][] | null;
+  /** How a whole item is divided; portions are always split equally. */
+  splitMode?: SplitMode;
+  /** Raw per-member input for non-equal modes: dollars, percent, or shares. */
+  weights?: Record<string, string> | null;
 };
+
+type ItemSplitSummary = {
+  mode: SplitMode;
+  lineCents: number | null;
+  /** Cents (exact), percent, or share count entered so far. */
+  entered: number | null;
+  balanced: boolean;
+  amounts: Map<string, number>;
+};
+
+const ITEM_SPLIT_MODES = [
+  ["equal", "Equal"],
+  ["exact", "Amounts"],
+  ["percent", "%"],
+  ["shares", "Shares"],
+] as const;
 
 type SplitStatus = "idle" | "incomplete" | "invalid" | "balanced";
 
@@ -142,6 +165,84 @@ function resizePortions(item: ItemDraft, quantity: number) {
       ...item.memberIds,
     ]),
   ];
+}
+
+/** Cents for exact, a plain number otherwise. Blank counts as zero. */
+function parseItemWeight(mode: SplitMode, raw: string): number {
+  if (!raw.trim()) return 0;
+  if (mode === "exact") return parseMoneyField(raw);
+  const weight = Number(raw);
+  if (!Number.isFinite(weight) || weight < 0) throw new Error("Invalid weight");
+  return weight;
+}
+
+function itemLineCents(item: ItemDraft): number | null {
+  try {
+    if (!item.amount.trim()) return null;
+    return lineTotalCents(parseAmountToCents(item.amount), item.quantity);
+  } catch {
+    return null;
+  }
+}
+
+/** Where an item split by amount, percentage, or shares stands. */
+function summarizeItemSplit(item: ItemDraft): ItemSplitSummary {
+  const mode = item.portions ? "equal" : (item.splitMode ?? "equal");
+  const lineCents = itemLineCents(item);
+  const amounts = new Map<string, number>();
+  if (mode === "equal") {
+    if (lineCents != null && item.memberIds.length > 0) {
+      for (const split of allocateSplits(
+        lineCents,
+        "equal",
+        item.memberIds.map((memberId) => ({ memberId, weight: 1 })),
+      )) {
+        amounts.set(split.memberId, split.amountCents);
+      }
+    }
+    return {
+      mode,
+      lineCents,
+      entered: null,
+      balanced: item.memberIds.length > 0,
+      amounts,
+    };
+  }
+
+  let inputs: { memberId: string; weight: number }[];
+  try {
+    inputs = item.memberIds.map((memberId) => ({
+      memberId,
+      weight: parseItemWeight(mode, item.weights?.[memberId] ?? ""),
+    }));
+  } catch {
+    return { mode, lineCents, entered: null, balanced: false, amounts };
+  }
+  const entered = inputs.reduce((sum, input) => sum + input.weight, 0);
+  const balanced =
+    mode === "exact"
+      ? lineCents != null && entered === lineCents
+      : mode === "percent"
+        ? Math.abs(entered - 100) < 0.0001
+        : entered > 0;
+  if (lineCents != null && inputs.length > 0) {
+    for (const input of inputs) {
+      amounts.set(
+        input.memberId,
+        mode === "exact"
+          ? input.weight
+          : mode === "percent"
+            ? Math.round((lineCents * input.weight) / 100)
+            : 0,
+      );
+    }
+    if (balanced && mode !== "exact") {
+      for (const split of allocateSplits(lineCents, mode, inputs)) {
+        amounts.set(split.memberId, split.amountCents);
+      }
+    }
+  }
+  return { mode, lineCents, entered, balanced, amounts };
 }
 
 function memberInitials(displayName: string) {
@@ -259,6 +360,17 @@ export function ExpenseForm({
           amount: item.amount,
           quantity: item.quantity ?? 1,
           memberIds: item.memberIds,
+          splitMode: item.splitMode ?? "equal",
+          weights: item.weights
+            ? Object.fromEntries(
+                Object.entries(item.weights).map(([memberId, weight]) => [
+                  memberId,
+                  item.splitMode === "exact"
+                    ? formatCents(Math.round(weight))
+                    : String(weight),
+                ]),
+              )
+            : null,
         }))
       : [
           {
@@ -353,12 +465,30 @@ export function ExpenseForm({
         }
         const amountCents = parseAmountToCents(item.amount);
         itemSubtotalCents += lineTotalCents(amountCents, item.quantity);
+        const splitMode = item.portions ? "equal" : (item.splitMode ?? "equal");
+        let weights: Record<string, number> | null = null;
+        if (splitMode !== "equal") {
+          try {
+            weights = Object.fromEntries(
+              item.memberIds.map((memberId) => [
+                memberId,
+                parseItemWeight(splitMode, item.weights?.[memberId] ?? ""),
+              ]),
+            );
+          } catch {
+            throw new Error(
+              `Check the split for "${item.description.trim() || `item ${index + 1}`}".`,
+            );
+          }
+        }
         return {
           description: item.description,
           amountCents,
           quantity: item.quantity,
           memberIds: item.memberIds,
           portions: item.portions,
+          splitMode,
+          weights,
         };
       });
       const parsedItems = expandItemPortions(portionedItems);
@@ -561,6 +691,30 @@ export function ExpenseForm({
   }
 
   function assignmentSummary(item: ItemDraft) {
+    const splitMode = item.splitMode ?? "equal";
+    if (!item.portions && splitMode !== "equal") {
+      const assigned = members.filter((member) =>
+        item.memberIds.includes(member.id),
+      );
+      if (assigned.length === 0) return "Choose people";
+      if (assigned.length > 3) {
+        return `${assigned.length} people · ${
+          { exact: "by amount", percent: "by %", shares: "by shares" }[
+            splitMode
+          ]
+        }`;
+      }
+      return assigned
+        .map((member) => {
+          const raw = item.weights?.[member.id]?.trim() ?? "";
+          if (splitMode === "exact") {
+            return `${member.displayName} ${currencySymbol}${raw}`;
+          }
+          if (splitMode === "percent") return `${member.displayName} ${raw}%`;
+          return `${member.displayName} ${raw} ${raw === "1" ? "share" : "shares"}`;
+        })
+        .join(" · ");
+    }
     if (item.portions) {
       return item.portions
         .map((portion, index) => `${index + 1}. ${memberIdsSummary(portion)}`)
@@ -581,6 +735,9 @@ export function ExpenseForm({
   }
 
   function friendlyItemizedError(message: string) {
+    if (message.startsWith("Check the split for") || message.includes(" must add up to ") || message.includes("needs at least one share")) {
+      return message;
+    }
     if (message === "Invalid amount") return "Enter a valid receipt total.";
     if (message.includes("assigned to at least one member") || message.includes("Assign \"")) {
       return "Choose who shared each receipt item.";
@@ -604,6 +761,70 @@ export function ExpenseForm({
     );
   }
 
+  /** Switch an item's split, prefilling an even split to adjust from. */
+  function setItemSplitMode(item: ItemDraft, splitMode: SplitMode) {
+    setSplitInteracted(true);
+    const memberIds =
+      item.memberIds.length > 0
+        ? item.memberIds
+        : members.map((member) => member.id);
+    if (splitMode === "equal") {
+      updateItem(item.key, { splitMode, weights: null, memberIds });
+      return;
+    }
+    const evenTotal =
+      splitMode === "exact"
+        ? itemLineCents(item)
+        : splitMode === "percent"
+          ? 10000
+          : null;
+    const even =
+      evenTotal == null
+        ? null
+        : allocateSplits(
+            evenTotal,
+            "equal",
+            memberIds.map((memberId) => ({ memberId, weight: 1 })),
+          );
+    updateItem(item.key, {
+      splitMode,
+      memberIds,
+      weights: Object.fromEntries(
+        memberIds.map((memberId, index) => [
+          memberId,
+          splitMode === "shares"
+            ? "1"
+            : even == null
+              ? ""
+              : splitMode === "exact"
+                ? formatCents(even[index].amountCents)
+                : String(even[index].amountCents / 100),
+        ]),
+      ),
+    });
+  }
+
+  function setItemWeight(item: ItemDraft, memberId: string, value: string) {
+    setSplitInteracted(true);
+    const splitMode = item.splitMode ?? "equal";
+    const weights = { ...item.weights, [memberId]: value };
+    updateItem(item.key, {
+      weights,
+      // Anyone with a positive (or not-yet-valid) entry is on the item.
+      memberIds: members
+        .filter((member) => {
+          const raw = weights[member.id] ?? "";
+          if (!raw.trim()) return false;
+          try {
+            return parseItemWeight(splitMode, raw) > 0;
+          } catch {
+            return true;
+          }
+        })
+        .map((member) => member.id),
+    });
+  }
+
   function assignAllItems(memberIds: string[]) {
     setSplitInteracted(true);
     setItems((current) =>
@@ -611,6 +832,8 @@ export function ExpenseForm({
         ...item,
         memberIds: [...memberIds],
         portions: null,
+        splitMode: "equal",
+        weights: null,
       })),
     );
   }
@@ -1353,7 +1576,10 @@ export function ExpenseForm({
                       type="button"
                       className={cn(
                         "mt-0.5 flex min-h-7 w-full min-w-0 items-center gap-1.5 rounded-lg px-0.5 py-0.5 text-left text-xs transition-colors focus-visible:ring-3 focus-visible:ring-ring/20 focus-visible:outline-none",
-                        itemHasUnassignedShare(item) && splitInteracted
+                        (itemHasUnassignedShare(item) && splitInteracted) ||
+                          (!item.portions &&
+                            (item.splitMode ?? "equal") !== "equal" &&
+                            !summarizeItemSplit(item).balanced)
                           ? "text-destructive"
                           : "text-muted-foreground hover:text-foreground",
                       )}
@@ -1601,6 +1827,8 @@ export function ExpenseForm({
                               if (selected) return;
                               setSplitInteracted(true);
                               updateItem(activeAssignmentItem.key, {
+                                splitMode: "equal",
+                                weights: null,
                                 portions:
                                   value === "portions"
                                     ? Array.from(
@@ -1723,6 +1951,49 @@ export function ExpenseForm({
                     </div>
                   ) : (
                   <>
+                      <div
+                        role="radiogroup"
+                        aria-label="Split this item"
+                        className="mb-2 grid grid-cols-4 gap-1 rounded-xl bg-secondary/70 p-1"
+                      >
+                        {ITEM_SPLIT_MODES.map(([value, label]) => {
+                          const selected =
+                            (activeAssignmentItem.splitMode ?? "equal") === value;
+                          return (
+                            <button
+                              key={value}
+                              type="button"
+                              role="radio"
+                              aria-checked={selected}
+                              className={cn(
+                                "h-9 rounded-lg text-sm font-semibold transition-colors focus-visible:ring-3 focus-visible:ring-ring/20 focus-visible:outline-none",
+                                selected
+                                  ? "bg-card text-foreground shadow-sm"
+                                  : "text-muted-foreground hover:text-foreground",
+                              )}
+                              onClick={() => {
+                                if (!selected) {
+                                  setItemSplitMode(activeAssignmentItem, value);
+                                }
+                              }}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="mb-3 px-1 text-xs text-muted-foreground">
+                        {
+                          {
+                            equal: "Split evenly among the people who shared it.",
+                            exact: "Enter exactly how much each person owes.",
+                            percent: "Enter percentages that add up to 100%.",
+                            shares: "Give bigger shares to people who had more.",
+                          }[activeAssignmentItem.splitMode ?? "equal"]
+                        }
+                      </p>
+                      {(activeAssignmentItem.splitMode ?? "equal") === "equal" ? (
+                  <>
                       <button
                         type="button"
                         className={cn(
@@ -1811,6 +2082,18 @@ export function ExpenseForm({
                           );
                         })}
                       </div>
+                  </>
+                      ) : (
+                        <ItemWeightsEditor
+                          item={activeAssignmentItem}
+                          members={members}
+                          currency={currency}
+                          currencySymbol={currencySymbol}
+                          onChange={(memberId, value) =>
+                            setItemWeight(activeAssignmentItem, memberId, value)
+                          }
+                        />
+                      )}
                   </>
                   )}
                 </div>
@@ -1983,5 +2266,109 @@ export function ExpenseForm({
         </Button>
       </div>
     </form>
+  );
+}
+
+function ItemWeightsEditor({
+  item,
+  members,
+  currency,
+  currencySymbol,
+  onChange,
+}: {
+  item: ItemDraft;
+  members: MemberOption[];
+  currency: string;
+  currencySymbol: string;
+  onChange: (memberId: string, value: string) => void;
+}) {
+  const summary = summarizeItemSplit(item);
+  const { mode, lineCents, entered, balanced } = summary;
+  const money = (cents: number) => formatMoney(cents, currency);
+
+  let total: string | null = null;
+  let status: string | null = null;
+  if (mode === "exact") {
+    total =
+      lineCents == null
+        ? null
+        : `${money(entered ?? 0)} of ${money(lineCents)}`;
+    if (lineCents != null && entered != null) {
+      const left = lineCents - entered;
+      status = left >= 0 ? `${money(left)} left` : `${money(-left)} over`;
+    }
+  } else if (mode === "percent") {
+    total = `${Number((entered ?? 0).toFixed(2))}% of 100%`;
+    if (entered != null) {
+      const left = Number((100 - entered).toFixed(2));
+      status = left >= 0 ? `${left}% left` : `${-left}% over`;
+    }
+  } else {
+    const shares = Number((entered ?? 0).toFixed(4));
+    total = `${shares} ${shares === 1 ? "share" : "shares"} total`;
+  }
+
+  return (
+    <div className="space-y-3 pb-2">
+      <div className="overflow-hidden rounded-2xl border border-border/80 bg-card">
+        {members.map((member) => {
+          const raw = item.weights?.[member.id] ?? "";
+          const amount = summary.amounts.get(member.id);
+          return (
+            <label
+              key={member.id}
+              className="flex min-h-14 w-full items-center gap-3 border-b border-border/65 px-4 py-2 last:border-b-0"
+            >
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-semibold">
+                {member.displayName.slice(0, 1).toUpperCase()}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium">
+                  {member.displayName}
+                </span>
+                {mode !== "exact" && amount != null && amount > 0 && (
+                  <span className="block text-xs text-muted-foreground tabular-nums">
+                    {money(amount)}
+                  </span>
+                )}
+              </span>
+              <span className="flex shrink-0 items-baseline gap-1 text-muted-foreground">
+                {mode === "exact" && <span className="text-sm">{currencySymbol}</span>}
+                <Input
+                  aria-label={`${member.displayName} ${
+                    mode === "exact"
+                      ? "amount"
+                      : mode === "percent"
+                        ? "percent"
+                        : "shares"
+                  }`}
+                  className="h-9 w-20 text-right tabular-nums"
+                  inputMode="decimal"
+                  value={raw}
+                  placeholder={mode === "exact" ? "0.00" : "0"}
+                  onChange={(event) => onChange(member.id, event.target.value)}
+                />
+                {mode === "percent" && <span className="text-sm">%</span>}
+              </span>
+            </label>
+          );
+        })}
+      </div>
+      <div
+        className={cn(
+          "rounded-xl px-3 py-2 text-center text-sm",
+          balanced
+            ? "bg-accent text-accent-foreground"
+            : "bg-destructive/10 text-destructive",
+        )}
+        aria-live="polite"
+      >
+        {total && <p className="font-semibold tabular-nums">{total}</p>}
+        {status && <p className="text-xs tabular-nums">{status}</p>}
+        {mode === "exact" && lineCents == null && (
+          <p className="text-xs">Enter the item price first.</p>
+        )}
+      </div>
+    </div>
   );
 }

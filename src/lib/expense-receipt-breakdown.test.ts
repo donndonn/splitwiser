@@ -13,6 +13,37 @@ describe("expense-receipt-breakdown", () => {
     );
   });
 
+  it("shows each person's part of an item split by percentage", () => {
+    const breakdown = buildItemizedReceiptBreakdown({
+      currency: "USD",
+      taxCents: 0,
+      tipCents: 0,
+      memberNames: new Map([
+        ["a", "Vince"],
+        ["b", "Allison"],
+      ]),
+      items: [
+        {
+          description: "Wine",
+          amountCents: 3000,
+          quantity: 1,
+          memberIds: ["b", "a"],
+          splitMode: "percent",
+          weights: { a: 70, b: 30 },
+          sharedByNames: ["Allison", "Vince"],
+        },
+      ],
+    });
+
+    expect(breakdown.lines[0].sharedByNames).toEqual([
+      "Allison $9.00 (30%)",
+      "Vince $21.00 (70%)",
+    ]);
+    expect(breakdown.allocationNote).toBe(
+      "Each item is split among its people as shown.",
+    );
+  });
+
   it("builds an itemized receipt from stored lines", () => {
     const breakdown = buildItemizedReceiptBreakdown({
       currency: "USD",

@@ -95,6 +95,7 @@ export default async function ExpenseDetailPage({
         .select({
           expenseItemId: expenseItemAssignments.expenseItemId,
           memberId: expenseItemAssignments.memberId,
+          weight: expenseItemAssignments.weight,
         })
         .from(expenseItemAssignments)
         .innerJoin(
@@ -110,11 +111,18 @@ export default async function ExpenseDetailPage({
     ]);
 
   const assignedMembers = new Map<string, string[]>();
+  const assignedWeights = new Map<string, Record<string, number>>();
   for (const assignment of assignmentRows) {
     assignedMembers.set(assignment.expenseItemId, [
       ...(assignedMembers.get(assignment.expenseItemId) ?? []),
       assignment.memberId,
     ]);
+    if (assignment.weight != null) {
+      assignedWeights.set(assignment.expenseItemId, {
+        ...assignedWeights.get(assignment.expenseItemId),
+        [assignment.memberId]: Number(assignment.weight),
+      });
+    }
   }
 
   const weights: Record<string, number> = {};
@@ -146,6 +154,8 @@ export default async function ExpenseDetailPage({
           amountCents: item.amountCents,
           quantity: item.quantity,
           memberIds,
+          splitMode: item.splitMode,
+          weights: assignedWeights.get(item.id) ?? null,
           sharedByNames: memberIds.map(
             (memberId) => memberNames.get(memberId) ?? "Someone",
           ),
@@ -202,6 +212,8 @@ export default async function ExpenseDetailPage({
                 amount: formatCents(item.amountCents),
                 quantity: item.quantity,
                 memberIds: assignedMembers.get(item.id) ?? [],
+                splitMode: item.splitMode,
+                weights: assignedWeights.get(item.id),
               })),
             }
           : {

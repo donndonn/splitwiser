@@ -3,7 +3,7 @@ import {
   lineTotalCents,
   type ItemizedExpenseItemInput,
 } from "@/lib/itemized-expense";
-import { formatMoney, type SplitMode } from "@/lib/money";
+import { formatMoney, type SplitMode, type SplitResult } from "@/lib/money";
 
 export type ExpenseReceiptLine = {
   description: string;
@@ -125,12 +125,21 @@ export function buildItemizedReceiptBreakdown(input: {
   return {
     kind: "itemized",
     caption: itemizedSplitCaption(input.taxCents, input.tipCents),
-    lines: input.items.map((item) => ({
+    lines: input.items.map((item, index) => ({
       description: item.description.trim(),
       quantity: item.quantity,
       unitAmountLabel: money(item.amountCents),
       lineTotalLabel: money(lineTotalCents(item.amountCents, item.quantity)),
-      sharedByNames: item.sharedByNames,
+      sharedByNames:
+        item.splitMode && item.splitMode !== "equal"
+          ? unevenShareLabels(
+              item.splitMode,
+              item.memberIds,
+              calculation.itemSplits[index],
+              input.memberNames,
+              money,
+            )
+          : item.sharedByNames,
     })),
     itemSubtotalLabel: money(calculation.itemSubtotalCents),
     adjustments,
@@ -138,7 +147,11 @@ export function buildItemizedReceiptBreakdown(input: {
     allocationNote:
       input.taxCents > 0 || input.tipCents > 0
         ? "Tax and tip are shared in proportion to each person’s item totals."
-        : "Each item is split evenly among the people assigned to it.",
+        : input.items.some(
+              (item) => item.splitMode && item.splitMode !== "equal",
+            )
+          ? "Each item is split among its people as shown."
+          : "Each item is split evenly among the people assigned to it.",
     personRollups: rollupSource.map((split) => ({
       memberId: split.memberId,
       displayName: input.memberNames.get(split.memberId) ?? "Someone",
@@ -146,6 +159,30 @@ export function buildItemizedReceiptBreakdown(input: {
       totalLabel: money(split.amountCents),
     })),
   };
+}
+
+/** "Ana $6.00 (60%)" for items split by amount, percentage, or shares. */
+function unevenShareLabels(
+  mode: SplitMode,
+  memberIds: string[],
+  splits: SplitResult[],
+  memberNames: Map<string, string>,
+  money: (cents: number) => string,
+) {
+  const byMember = new Map(splits.map((split) => [split.memberId, split]));
+  return memberIds.flatMap((memberId) => {
+    const split = byMember.get(memberId);
+    if (!split) return [];
+    const name = memberNames.get(split.memberId) ?? "Someone";
+    const amount = money(split.amountCents);
+    if (mode === "percent") return `${name} ${amount} (${split.weight}%)`;
+    if (mode === "shares") {
+      return `${name} ${amount} (${split.weight} ${
+        split.weight === 1 ? "share" : "shares"
+      })`;
+    }
+    return `${name} ${amount}`;
+  });
 }
 
 export function buildSimpleReceiptBreakdown(input: {

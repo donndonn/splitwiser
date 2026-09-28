@@ -256,6 +256,8 @@ export const expenseItems = pgTable(
     description: text("description").notNull(),
     amountCents: bigint("amount_cents", { mode: "number" }).notNull(),
     quantity: integer("quantity").notNull().default(1),
+    /** How the line total is divided among its assigned members. */
+    splitMode: splitModeEnum("split_mode").notNull().default("equal"),
     sortOrder: integer("sort_order").notNull(),
   },
   (table) => [index("expense_items_expense_id_idx").on(table.expenseId)],
@@ -270,6 +272,8 @@ export const expenseItemAssignments = pgTable(
     memberId: text("member_id")
       .notNull()
       .references(() => members.id, { onDelete: "restrict" }),
+    /** Cents (exact), percent, or share count; null for equal splits. */
+    weight: numeric("weight", { precision: 12, scale: 4 }),
   },
   (table) => [
     primaryKey({ columns: [table.expenseItemId, table.memberId] }),
