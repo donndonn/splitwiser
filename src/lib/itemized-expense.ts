@@ -181,3 +181,30 @@ export function calculateItemizedExpense(
     splits,
   };
 }
+
+export type PortionedItemInput = ItemizedExpenseItemInput & {
+  /** One member list per unit when a multi-quantity item is split by portion. */
+  portions?: string[][] | null;
+};
+
+/**
+ * Expand items split by portion into one quantity-1 line per portion so each
+ * unit is shared only by its own people. Whole items pass through unchanged.
+ */
+export function expandItemPortions(
+  items: PortionedItemInput[],
+): ItemizedExpenseItemInput[] {
+  return items.flatMap(({ portions, ...item }) => {
+    if (!portions || item.quantity <= 1) return [item];
+    if (portions.length !== item.quantity) {
+      throw new Error(
+        `"${item.description.trim()}" needs people for each portion`,
+      );
+    }
+    return portions.map((memberIds) => ({
+      ...item,
+      quantity: 1,
+      memberIds,
+    }));
+  });
+}

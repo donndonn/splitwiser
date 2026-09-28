@@ -43,10 +43,11 @@ import {
 } from "@/lib/ai/compress-receipt-image";
 import {
   calculateItemizedExpense,
+  expandItemPortions,
   inferItemizedAdjustments,
   lineTotalCents,
   tipCentsFromPercent,
-  type ItemizedExpenseItemInput,
+  type PortionedItemInput,
 } from "@/lib/itemized-expense";
 import {
   allocateSplits,
@@ -109,6 +110,8 @@ type ItemDraft = {
   amount: string;
   quantity: number;
   memberIds: string[];
+  /** Set when a multi-quantity item is split per unit; one list per unit. */
+  portions?: string[][] | null;
 };
 
 type SplitStatus = "idle" | "incomplete" | "invalid" | "balanced";
@@ -117,6 +120,29 @@ const TIP_PERCENT_PRESETS = [15, 18, 20] as const;
 const fieldLabelClassName = "text-xs font-medium text-muted-foreground";
 const rowButtonClassName =
   "flex min-h-16 w-full min-w-0 items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none disabled:opacity-60";
+
+/** Everyone who shares any part of the item. */
+function itemMemberIds(item: ItemDraft): string[] {
+  return item.portions ? [...new Set(item.portions.flat())] : item.memberIds;
+}
+
+function itemHasUnassignedShare(item: ItemDraft) {
+  return item.portions
+    ? item.portions.some((portion) => portion.length === 0)
+    : item.memberIds.length === 0;
+}
+
+/** Keep one portion per unit when the quantity changes. */
+function resizePortions(item: ItemDraft, quantity: number) {
+  if (!item.portions || quantity <= 1) return null;
+  if (quantity <= item.portions.length) return item.portions.slice(0, quantity);
+  return [
+    ...item.portions,
+    ...Array.from({ length: quantity - item.portions.length }, () => [
+      ...item.memberIds,
+    ]),
+  ];
+}
 
 function memberInitials(displayName: string) {
   const parts = displayName.trim().split(/\s+/).filter(Boolean);
@@ -319,7 +345,7 @@ export function ExpenseForm({
     let taxCents: number | null = null;
     let tipCents: number | null = null;
     try {
-      const parsedItems: ItemizedExpenseItemInput[] = items.map((item, index) => {
+      const portionedItems: PortionedItemInput[] = items.map((item, index) => {
         if (!item.amount.trim()) {
           throw new Error(
             `Enter an amount for ${item.description.trim() || `item ${index + 1}`}.`,
@@ -332,8 +358,10 @@ export function ExpenseForm({
           amountCents,
           quantity: item.quantity,
           memberIds: item.memberIds,
+          portions: item.portions,
         };
       });
+      const parsedItems = expandItemPortions(portionedItems);
       taxCents = parseMoneyField(taxAmount);
       tipCents = parseMoneyField(tipAmount);
       const calculation = calculateItemizedExpense({
@@ -433,7 +461,7 @@ export function ExpenseForm({
         return null;
       }
     })();
-  const hasUnassignedItems = items.some((item) => item.memberIds.length === 0);
+  const hasUnassignedItems = items.some(itemHasUnassignedShare);
   const splitStatus: SplitStatus = (() => {
     if (entryMode === "simple") {
       if (!amount.trim()) {
@@ -500,7 +528,7 @@ export function ExpenseForm({
   const splitMembers =
     entryMode === "itemized"
       ? members.filter((member) =>
-          items.some((item) => item.memberIds.includes(member.id)),
+          items.some((item) => itemMemberIds(item).includes(member.id)),
         )
       : selectedMembers;
   const splitCaption = (() => {
@@ -519,10 +547,8 @@ export function ExpenseForm({
     return null;
   })();
 
-  function assignmentSummary(item: ItemDraft) {
-    const assigned = members.filter((member) =>
-      item.memberIds.includes(member.id),
-    );
+  function memberIdsSummary(memberIds: string[]) {
+    const assigned = members.filter((member) => memberIds.includes(member.id));
     if (assigned.length === members.length && members.length > 0) {
       return "Everyone";
     }
@@ -534,8 +560,24 @@ export function ExpenseForm({
     return `${assigned[0].displayName} + ${assigned.length - 1} others`;
   }
 
+  function assignmentSummary(item: ItemDraft) {
+    if (item.portions) {
+      return item.portions
+        .map((portion, index) => `${index + 1}. ${memberIdsSummary(portion)}`)
+        .join(" · ");
+    }
+    return memberIdsSummary(item.memberIds);
+  }
+
   function assignedMembersFor(item: ItemDraft) {
-    return members.filter((member) => item.memberIds.includes(member.id));
+    const memberIds = itemMemberIds(item);
+    return members.filter((member) => memberIds.includes(member.id));
+  }
+
+  function toggleMemberId(memberIds: string[], memberId: string) {
+    return memberIds.includes(memberId)
+      ? memberIds.filter((id) => id !== memberId)
+      : [...memberIds, memberId];
   }
 
   function friendlyItemizedError(message: string) {
@@ -565,7 +607,11 @@ export function ExpenseForm({
   function assignAllItems(memberIds: string[]) {
     setSplitInteracted(true);
     setItems((current) =>
-      current.map((item) => ({ ...item, memberIds: [...memberIds] })),
+      current.map((item) => ({
+        ...item,
+        memberIds: [...memberIds],
+        portions: null,
+      })),
     );
   }
 
@@ -1248,6 +1294,10 @@ export function ExpenseForm({
                             onClick={() =>
                               updateItem(item.key, {
                                 quantity: Math.max(1, item.quantity - 1),
+                                portions: resizePortions(
+                                  item,
+                                  Math.max(1, item.quantity - 1),
+                                ),
                               })
                             }
                           >
@@ -1268,6 +1318,10 @@ export function ExpenseForm({
                             onClick={() =>
                               updateItem(item.key, {
                                 quantity: item.quantity + 1,
+                                portions: resizePortions(
+                                  item,
+                                  item.quantity + 1,
+                                ),
                               })
                             }
                           >
@@ -1299,7 +1353,7 @@ export function ExpenseForm({
                       type="button"
                       className={cn(
                         "mt-0.5 flex min-h-7 w-full min-w-0 items-center gap-1.5 rounded-lg px-0.5 py-0.5 text-left text-xs transition-colors focus-visible:ring-3 focus-visible:ring-ring/20 focus-visible:outline-none",
-                        item.memberIds.length === 0 && splitInteracted
+                        itemHasUnassignedShare(item) && splitInteracted
                           ? "text-destructive"
                           : "text-muted-foreground hover:text-foreground",
                       )}
@@ -1425,10 +1479,10 @@ export function ExpenseForm({
                     </button>
                   );
                 })}
-                <div className="relative w-[4.5rem]">
+                <div className="relative w-[5.75rem]">
                   <Input
                     aria-label="Custom tip percent"
-                    className="h-7 rounded-full border-0 bg-secondary/70 pr-5 text-right text-xs font-semibold tabular-nums shadow-none focus-visible:bg-secondary focus-visible:ring-0"
+                    className="h-7 rounded-full border-0 bg-secondary/70 pr-5 pl-2.5 text-right text-xs font-semibold tabular-nums shadow-none focus-visible:bg-secondary focus-visible:ring-0 md:text-xs"
                     inputMode="decimal"
                     value={customTipPercent}
                     onChange={(event) => {
@@ -1516,94 +1570,249 @@ export function ExpenseForm({
               </SheetHeader>
               {activeAssignmentItem && (
                 <div className="overflow-y-auto px-4">
-                  <button
-                    type="button"
-                    className={cn(
-                      "mb-3 flex min-h-16 w-full items-center gap-3 rounded-2xl border px-4 text-left transition-colors",
-                      activeAssignmentItem.memberIds.length === members.length &&
-                        members.length > 0
-                        ? "border-primary/25 bg-accent text-accent-foreground"
-                        : "border-border bg-card hover:bg-muted",
-                    )}
-                    onClick={() => {
-                      setSplitInteracted(true);
-                      updateItem(activeAssignmentItem.key, {
-                        memberIds: members.map((member) => member.id),
-                      });
-                      setAssignmentItemKey(null);
-                    }}
-                  >
-                    <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-                      <Users className="size-5" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-semibold">
-                        Shared by everyone
-                      </span>
-                      <span className="block text-xs opacity-70">
-                        Split this course across the whole group
-                      </span>
-                    </span>
-                    {activeAssignmentItem.memberIds.length === members.length &&
-                      members.length > 0 && <Check className="size-5" />}
-                  </button>
-
-                  <div className="mb-2 flex items-center justify-between px-1">
-                    <Label>Choose individually</Label>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setSplitInteracted(true);
-                        updateItem(activeAssignmentItem.key, { memberIds: [] });
-                      }}
+                  {activeAssignmentItem.quantity > 1 && (
+                    <div
+                      role="radiogroup"
+                      aria-label="How to split this item"
+                      className="mb-3 grid grid-cols-2 gap-1 rounded-xl bg-secondary/70 p-1"
                     >
-                      Clear
-                    </Button>
-                  </div>
-                  <div className="overflow-hidden rounded-2xl border border-border/80 bg-card">
-                    {members.map((member) => {
-                      const selected =
-                        activeAssignmentItem.memberIds.includes(member.id);
-                      return (
-                        <button
-                          key={member.id}
+                      {(
+                        [
+                          ["whole", "Whole item"],
+                          ["portions", `By portion (×${activeAssignmentItem.quantity})`],
+                        ] as const
+                      ).map(([value, label]) => {
+                        const selected =
+                          (value === "portions") ===
+                          !!activeAssignmentItem.portions;
+                        return (
+                          <button
+                            key={value}
+                            type="button"
+                            role="radio"
+                            aria-checked={selected}
+                            className={cn(
+                              "h-9 rounded-lg text-sm font-semibold transition-colors focus-visible:ring-3 focus-visible:ring-ring/20 focus-visible:outline-none",
+                              selected
+                                ? "bg-card text-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground",
+                            )}
+                            onClick={() => {
+                              if (selected) return;
+                              setSplitInteracted(true);
+                              updateItem(activeAssignmentItem.key, {
+                                portions:
+                                  value === "portions"
+                                    ? Array.from(
+                                        { length: activeAssignmentItem.quantity },
+                                        () => [...activeAssignmentItem.memberIds],
+                                      )
+                                    : null,
+                              });
+                            }}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {activeAssignmentItem.portions ? (
+                    <div className="space-y-3 pb-2">
+                      <p className="px-1 text-xs text-muted-foreground">
+                        Choose who shared each one. Each portion is split only
+                        among its own people.
+                      </p>
+                      {activeAssignmentItem.portions.map((portion, portionIndex) => {
+                        const portions = activeAssignmentItem.portions ?? [];
+                        const setPortion = (memberIds: string[]) => {
+                          setSplitInteracted(true);
+                          updateItem(activeAssignmentItem.key, {
+                            portions: portions.map((current, index) =>
+                              index === portionIndex ? memberIds : current,
+                            ),
+                          });
+                        };
+                        const everyone =
+                          portion.length === members.length &&
+                          members.length > 0;
+                        return (
+                          <div
+                            key={portionIndex}
+                            role="group"
+                            aria-label={`Portion ${portionIndex + 1}`}
+                            className="rounded-2xl border border-border/80 bg-card p-3"
+                          >
+                            <div className="mb-2 flex items-center justify-between gap-2">
+                              <span
+                                className={cn(
+                                  "text-sm font-semibold",
+                                  portion.length === 0 &&
+                                    splitInteracted &&
+                                    "text-destructive",
+                                )}
+                              >
+                                Portion {portionIndex + 1}
+                              </span>
+                              <button
+                                type="button"
+                                className={cn(
+                                  "inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-xs font-semibold transition-colors focus-visible:ring-3 focus-visible:ring-ring/20 focus-visible:outline-none",
+                                  everyone
+                                    ? "border-primary/25 bg-accent text-accent-foreground"
+                                    : "border-border bg-secondary text-secondary-foreground hover:bg-muted",
+                                )}
+                                aria-pressed={everyone}
+                                onClick={() =>
+                                  setPortion(
+                                    everyone
+                                      ? []
+                                      : members.map((member) => member.id),
+                                  )
+                                }
+                              >
+                                <Users className="size-3.5" />
+                                Everyone
+                              </button>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {members.map((member) => {
+                                const selected = portion.includes(member.id);
+                                return (
+                                  <button
+                                    key={member.id}
+                                    type="button"
+                                    role="checkbox"
+                                    aria-checked={selected}
+                                    aria-label={`${member.displayName} shared portion ${portionIndex + 1}`}
+                                    className={cn(
+                                      "inline-flex h-8 max-w-full items-center gap-1.5 rounded-full border pr-3 pl-1 text-xs font-medium transition-colors focus-visible:ring-3 focus-visible:ring-ring/20 focus-visible:outline-none",
+                                      selected
+                                        ? "border-primary bg-primary text-primary-foreground"
+                                        : "border-border bg-secondary/60 text-foreground hover:bg-muted",
+                                    )}
+                                    onClick={() =>
+                                      setPortion(toggleMemberId(portion, member.id))
+                                    }
+                                  >
+                                    <span
+                                      className={cn(
+                                        "flex size-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold",
+                                        selected
+                                          ? "bg-primary-foreground/20"
+                                          : "bg-secondary",
+                                      )}
+                                    >
+                                      {selected ? (
+                                        <Check className="size-3.5" />
+                                      ) : (
+                                        memberInitials(member.displayName)
+                                      )}
+                                    </span>
+                                    <span className="truncate">
+                                      {member.displayName}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                  <>
+                      <button
+                        type="button"
+                        className={cn(
+                          "mb-3 flex min-h-16 w-full items-center gap-3 rounded-2xl border px-4 text-left transition-colors",
+                          activeAssignmentItem.memberIds.length === members.length &&
+                            members.length > 0
+                            ? "border-primary/25 bg-accent text-accent-foreground"
+                            : "border-border bg-card hover:bg-muted",
+                        )}
+                        onClick={() => {
+                          setSplitInteracted(true);
+                          updateItem(activeAssignmentItem.key, {
+                            memberIds: members.map((member) => member.id),
+                          });
+                          setAssignmentItemKey(null);
+                        }}
+                      >
+                        <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+                          <Users className="size-5" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-semibold">
+                            Shared by everyone
+                          </span>
+                          <span className="block text-xs opacity-70">
+                            Split this course across the whole group
+                          </span>
+                        </span>
+                        {activeAssignmentItem.memberIds.length === members.length &&
+                          members.length > 0 && <Check className="size-5" />}
+                      </button>
+
+                      <div className="mb-2 flex items-center justify-between px-1">
+                        <Label>Choose individually</Label>
+                        <Button
                           type="button"
-                          role="checkbox"
-                          aria-checked={selected}
-                          className="flex min-h-14 w-full items-center gap-3 border-b border-border/65 px-4 text-left last:border-b-0 hover:bg-muted/60"
+                          variant="ghost"
+                          size="sm"
                           onClick={() => {
                             setSplitInteracted(true);
-                            updateItem(activeAssignmentItem.key, {
-                              memberIds: selected
-                                ? activeAssignmentItem.memberIds.filter(
-                                    (id) => id !== member.id,
-                                  )
-                                : [...activeAssignmentItem.memberIds, member.id],
-                            });
+                            updateItem(activeAssignmentItem.key, { memberIds: [] });
                           }}
                         >
-                          <span className="flex size-9 items-center justify-center rounded-full bg-secondary text-sm font-semibold">
-                            {member.displayName.slice(0, 1).toUpperCase()}
-                          </span>
-                          <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                            {member.displayName}
-                          </span>
-                          <span
-                            className={cn(
-                              "flex size-6 items-center justify-center rounded-full border",
-                              selected
-                                ? "border-primary bg-primary text-primary-foreground"
-                                : "border-input",
-                            )}
-                          >
-                            {selected && <Check className="size-4" />}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                          Clear
+                        </Button>
+                      </div>
+                      <div className="overflow-hidden rounded-2xl border border-border/80 bg-card">
+                        {members.map((member) => {
+                          const selected =
+                            activeAssignmentItem.memberIds.includes(member.id);
+                          return (
+                            <button
+                              key={member.id}
+                              type="button"
+                              role="checkbox"
+                              aria-checked={selected}
+                              className="flex min-h-14 w-full items-center gap-3 border-b border-border/65 px-4 text-left last:border-b-0 hover:bg-muted/60"
+                              onClick={() => {
+                                setSplitInteracted(true);
+                                updateItem(activeAssignmentItem.key, {
+                                  memberIds: selected
+                                    ? activeAssignmentItem.memberIds.filter(
+                                        (id) => id !== member.id,
+                                      )
+                                    : [...activeAssignmentItem.memberIds, member.id],
+                                });
+                              }}
+                            >
+                              <span className="flex size-9 items-center justify-center rounded-full bg-secondary text-sm font-semibold">
+                                {member.displayName.slice(0, 1).toUpperCase()}
+                              </span>
+                              <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                                {member.displayName}
+                              </span>
+                              <span
+                                className={cn(
+                                  "flex size-6 items-center justify-center rounded-full border",
+                                  selected
+                                    ? "border-primary bg-primary text-primary-foreground"
+                                    : "border-input",
+                                )}
+                              >
+                                {selected && <Check className="size-4" />}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                  </>
+                  )}
                 </div>
               )}
               {activeAssignmentItem ? (

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   assertAllowedMemberIds,
   calculateItemizedExpense,
+  expandItemPortions,
   inferItemizedAdjustments,
   tipCentsFromPercent,
   type ItemizedExpenseInput,
@@ -317,5 +318,63 @@ describe("assertAllowedMemberIds", () => {
     expect(() =>
       assertAllowedMemberIds(["a", "outside"], new Set(["a", "b"])),
     ).toThrow(/belong to this group/);
+  });
+});
+
+describe("expandItemPortions", () => {
+  it("splits each portion of a multi-quantity item among its own people", () => {
+    const items = expandItemPortions([
+      {
+        description: "Donuts",
+        amountCents: 300,
+        quantity: 3,
+        memberIds: ["a", "b", "c", "d", "e"],
+        portions: [["a", "b"], ["c", "d"], ["e"]],
+      },
+    ]);
+
+    expect(items).toEqual([
+      { description: "Donuts", amountCents: 300, quantity: 1, memberIds: ["a", "b"] },
+      { description: "Donuts", amountCents: 300, quantity: 1, memberIds: ["c", "d"] },
+      { description: "Donuts", amountCents: 300, quantity: 1, memberIds: ["e"] },
+    ]);
+
+    const { memberItemSubtotals } = calculateItemizedExpense({
+      items,
+      taxCents: 0,
+      tipCents: 0,
+    });
+    expect(
+      Object.fromEntries(
+        memberItemSubtotals.map(({ memberId, amountCents }) => [
+          memberId,
+          amountCents,
+        ]),
+      ),
+    ).toEqual({ a: 150, b: 150, c: 150, d: 150, e: 300 });
+  });
+
+  it("leaves whole items unchanged", () => {
+    const item = {
+      description: "Fries",
+      amountCents: 500,
+      quantity: 2,
+      memberIds: ["a", "b"],
+    };
+    expect(expandItemPortions([{ ...item, portions: null }])).toEqual([item]);
+  });
+
+  it("rejects portions that do not match the quantity", () => {
+    expect(() =>
+      expandItemPortions([
+        {
+          description: "Donuts",
+          amountCents: 300,
+          quantity: 3,
+          memberIds: ["a"],
+          portions: [["a"], ["b"]],
+        },
+      ]),
+    ).toThrow("needs people for each portion");
   });
 });
