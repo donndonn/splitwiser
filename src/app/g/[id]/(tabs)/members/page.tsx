@@ -10,9 +10,11 @@ import { countInviteReservations, inviteStatus } from "@/lib/invites";
 import { cn, groupedListClass } from "@/lib/utils";
 import { AddFriendsToGroup } from "./add-friends-to-group";
 import { addPlaceholderFormAction } from "./actions";
-import { InvitePanel, type InvitePanelInvite } from "./invite-panel";
 import { MemberRow } from "./member-row";
-import { SharePanel } from "./share-panel";
+import {
+  ShareGroupPanel,
+  type ShareGroupInvite,
+} from "./share-group-panel";
 
 export default async function MembersPage({
   params,
@@ -67,7 +69,7 @@ export default async function MembersPage({
 
   const latest = latestInvites[0];
   const reserved = latest ? await countInviteReservations(db, latest.id) : 0;
-  const currentInvite: InvitePanelInvite | null = latest
+  const currentInvite: ShareGroupInvite | null = latest
     ? {
         token: latest.token,
         status: inviteStatus(latest, new Date(), reserved),
@@ -127,23 +129,20 @@ export default async function MembersPage({
             </form>
           </div>
 
-          <InvitePanel groupId={id} invite={currentInvite} />
-
-          <SharePanel
+          <ShareGroupPanel
             groupId={id}
             groupName={group?.name ?? "Splitwiser group"}
-            token={group?.shareToken ?? null}
+            viewToken={group?.shareToken ?? null}
+            invite={currentInvite}
           />
         </div>
       ) : (
         <div className="space-y-2 text-sm text-muted-foreground">
           <p>Only admins can invite people or add placeholders.</p>
-          {group?.shareToken ? (
-            <p>
-              An admin has turned on a view-only link, so anyone with it can
-              see this group’s expenses and balances.
-            </p>
-          ) : null}
+          <p>
+            Anyone with one of this group’s join or view-only links can see its
+            expenses and balances.
+          </p>
         </div>
       )}
     </AppShell>

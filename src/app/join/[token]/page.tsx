@@ -27,7 +27,9 @@ import {
   inviteStatus,
   inviteUnavailableMessage,
 } from "@/lib/invites";
+import { getSharedGroupView } from "@/lib/share-link";
 import { isVerifyAuthEnabled } from "@/lib/verify-auth";
+import { SharedGroupContent } from "@/app/s/[token]/shared-group-content";
 import {
   claimPlaceholderAction,
   joinAsNewMemberAction,
@@ -113,9 +115,12 @@ export default async function JoinPage({
   }
 
   if (!user) {
+    // A join link also shows the group, so friends can look before signing
+    // up. Null once the link has expired.
+    const view = await getSharedGroupView(db, token);
     return (
       <AppShell title="Join group" backHref="/">
-        <Card>
+        <Card className="mb-6">
           <CardHeader>
             <CardTitle>Join {invite.groupName}</CardTitle>
             <CardDescription>
@@ -137,6 +142,9 @@ export default async function JoinPage({
             ) : null}
           </CardContent>
         </Card>
+        {view ? (
+          <SharedGroupContent view={view} token={token} viewerId={null} />
+        ) : null}
       </AppShell>
     );
   }
