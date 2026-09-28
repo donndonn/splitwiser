@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  normalizeReceiptItems,
   receiptDraftSchema,
   receiptToExpenseDefaults,
   type ReceiptDraft,
@@ -155,5 +156,95 @@ describe("receiptToExpenseDefaults", () => {
     expect(defaults.tax).toBe("4.30");
     expect(defaults.tip).toBe("0.00");
     expect(defaults.items).toHaveLength(5);
+  });
+});
+
+describe("normalizeReceiptItems", () => {
+  const oriana = {
+    merchant: "Oriana",
+    amount: 882.43,
+    spentAt: "2026-09-25",
+    subtotal: 810.5,
+    tax: 71.93,
+    items: [
+      { description: "Smoking Sol", lineTotal: 22, quantity: 1 },
+      { description: "Ghost Flame", lineTotal: 36, quantity: 2 },
+      { description: "Grilled Bread", lineTotal: 28, quantity: 2 },
+      { description: "Scallop", lineTotal: 66, quantity: 2 },
+      { description: "Bluefin Tuna", lineTotal: 28, quantity: 1 },
+      { description: "Coffee & Donut", lineTotal: 54, quantity: 3 },
+    ],
+  };
+
+  it("divides a printed line total by its quantity", () => {
+    const items = normalizeReceiptItems(oriana);
+    expect(items[1]).toEqual({
+      description: "Ghost Flame",
+      amount: 18,
+      quantity: 2,
+    });
+    expect(items[5]).toEqual({
+      description: "Coffee & Donut",
+      amount: 18,
+      quantity: 3,
+    });
+  });
+
+  it("keeps quantity 1 lines as printed", () => {
+    expect(normalizeReceiptItems(oriana)[0]).toEqual({
+      description: "Smoking Sol",
+      amount: 22,
+      quantity: 1,
+    });
+  });
+
+  it("treats a null quantity as 1", () => {
+    expect(
+      normalizeReceiptItems({
+        ...oriana,
+        subtotal: null,
+        items: [{ description: "Soup", lineTotal: 8, quantity: null }],
+      }),
+    ).toEqual([{ description: "Soup", amount: 8, quantity: 1 }]);
+  });
+
+  it("splits a line total that doesn't divide evenly into two rows", () => {
+    const items = normalizeReceiptItems({
+      ...oriana,
+      subtotal: null,
+      items: [{ description: "Taco", lineTotal: 10, quantity: 3 }],
+    });
+    expect(items).toEqual([
+      { description: "Taco", amount: 3.33, quantity: 2 },
+      { description: "Taco", amount: 3.34, quantity: 1 },
+    ]);
+  });
+
+  it("reads prices as unit prices when that is what matches the subtotal", () => {
+    const items = normalizeReceiptItems({
+      ...oriana,
+      subtotal: 47,
+      items: [
+        { description: "Latte", lineTotal: 5.5, quantity: 2 },
+        { description: "Pasta", lineTotal: 18, quantity: 2 },
+      ],
+    });
+    expect(items).toEqual([
+      { description: "Latte", amount: 5.5, quantity: 2 },
+      { description: "Pasta", amount: 18, quantity: 2 },
+    ]);
+  });
+
+  it("gives an itemized subtotal equal to the printed subtotal", () => {
+    const receipt = { ...oriana, amount: 305.93, subtotal: 234 };
+    const defaults = receiptToExpenseDefaults(
+      { ...receipt, items: normalizeReceiptItems(receipt) },
+      "assign",
+      roster,
+      "m1",
+    );
+    if (defaults.entryMode !== "itemized") throw new Error("expected itemized");
+    expect(defaults.tax).toBe("71.93");
+    expect(defaults.amount).toBe("305.93");
   });
 });
