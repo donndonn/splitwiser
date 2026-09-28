@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Eye } from "lucide-react";
@@ -19,17 +18,10 @@ import { formatMoney } from "@/lib/money";
 import { paymentActionLabel } from "@/lib/settlement-copy";
 import { formatExpenseDateParts } from "@/lib/settle-marker";
 import { getSharedGroupView, type SharedGroupView } from "@/lib/share-link";
+import { sharedExpenseHref } from "./shared-href";
 import { cn, groupedListClass } from "@/lib/utils";
 import { listVenmoPayLinks } from "@/lib/venmo";
 import { VenmoPayButton } from "./venmo-pay-button";
-
-// The token is the only secret: keep it out of search results and out of
-// the Referer header sent to Venmo.
-export const metadata: Metadata = {
-  title: "Shared group",
-  robots: { index: false, follow: false },
-  referrer: "no-referrer",
-};
 
 function balanceTone(netCents: number) {
   return netCents > 0
@@ -108,7 +100,7 @@ export default async function SharedGroupPage({
       <h2 className="mb-2 text-sm font-medium text-muted-foreground">
         Expenses
       </h2>
-      <ExpenseList view={view} viewerId={viewer?.id ?? null} />
+      <ExpenseList view={view} viewerId={viewer?.id ?? null} token={token} />
 
       <p className="mt-8 text-center text-xs text-muted-foreground">
         Want to add expenses yourself? Ask the group admin for an invite to
@@ -253,9 +245,11 @@ const shareLabel = {
 function ExpenseList({
   view,
   viewerId,
+  token,
 }: {
   view: SharedGroupView;
   viewerId: string | null;
+  token: string;
 }) {
   const { currency } = view.group;
   if (view.expenses.length === 0) {
@@ -282,41 +276,46 @@ function ExpenseList({
               })
             : ({ kind: "none" } as const);
           return (
-            <li key={e.id} className="flex items-center gap-3 px-3 py-3">
-              <div className="flex w-9 shrink-0 flex-col items-center leading-none text-muted-foreground">
-                <span className="text-[11px] font-medium">{date.month}</span>
-                <span className="mt-1 text-base font-medium tabular-nums">
-                  {date.day}
-                </span>
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold">
-                  {e.description}
-                </p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {paidByViewer ? "You" : e.paidByName} paid{" "}
-                  {formatMoney(e.amountCents, currency)}
-                </p>
-              </div>
-              {share.kind === "borrowed" || share.kind === "lent" ? (
-                <div
-                  className={cn(
-                    "shrink-0 text-right leading-tight",
-                    shareToneClass[share.kind],
-                  )}
-                >
-                  <p className="text-[11px] font-medium">
-                    {shareLabel[share.kind]}
+            <li key={e.id}>
+              <Link
+                href={sharedExpenseHref(token, e.id, viewerId)}
+                className="flex items-center gap-3 px-3 py-3 transition-colors hover:bg-muted/60"
+              >
+                <div className="flex w-9 shrink-0 flex-col items-center leading-none text-muted-foreground">
+                  <span className="text-[11px] font-medium">{date.month}</span>
+                  <span className="mt-1 text-base font-medium tabular-nums">
+                    {date.day}
+                  </span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold">
+                    {e.description}
                   </p>
-                  <p className="text-sm font-semibold tabular-nums">
-                    {formatMoney(share.amountCents, currency)}
+                  <p className="truncate text-xs text-muted-foreground">
+                    {paidByViewer ? "You" : e.paidByName} paid{" "}
+                    {formatMoney(e.amountCents, currency)}
                   </p>
                 </div>
-              ) : share.kind === "settled" ? (
-                <p className="shrink-0 text-xs font-medium text-muted-foreground">
-                  Settled
-                </p>
-              ) : null}
+                {share.kind === "borrowed" || share.kind === "lent" ? (
+                  <div
+                    className={cn(
+                      "shrink-0 text-right leading-tight",
+                      shareToneClass[share.kind],
+                    )}
+                  >
+                    <p className="text-[11px] font-medium">
+                      {shareLabel[share.kind]}
+                    </p>
+                    <p className="text-sm font-semibold tabular-nums">
+                      {formatMoney(share.amountCents, currency)}
+                    </p>
+                  </div>
+                ) : share.kind === "settled" ? (
+                  <p className="shrink-0 text-xs font-medium text-muted-foreground">
+                    Settled
+                  </p>
+                ) : null}
+              </Link>
             </li>
           );
         })}

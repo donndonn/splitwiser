@@ -47,6 +47,25 @@ export async function changeGroupShareLink(
   });
 }
 
+/** The group whose sharing is on with this token, or null. */
+export async function getSharedGroup(
+  client: Pick<Db, "select">,
+  token: string,
+): Promise<{ id: string; name: string; currency: string } | null> {
+  if (!token) return null;
+  const [group] = await client
+    .select({ id: groups.id, name: groups.name, currency: groups.currency })
+    .from(groups)
+    .where(eq(groups.shareToken, token))
+    .limit(1);
+  return group ?? null;
+}
+
+/** Receipt image for share-link viewers; the token stands in for sign-in. */
+export function sharedReceiptPath(token: string, expenseId: string): string {
+  return `/s/${encodeURIComponent(token)}/receipt/${encodeURIComponent(expenseId)}`;
+}
+
 export type SharedMember = {
   id: string;
   displayName: string;
@@ -75,18 +94,13 @@ export type SharedGroupView = {
 
 /**
  * Everything the read-only share page shows, or null when the token does not
- * match a group with sharing on. Receipts, comments, and emails stay out.
+ * match a group with sharing on. Comments and emails stay out.
  */
 export async function getSharedGroupView(
   client: Db,
   token: string,
 ): Promise<SharedGroupView | null> {
-  if (!token) return null;
-  const [group] = await client
-    .select({ id: groups.id, name: groups.name, currency: groups.currency })
-    .from(groups)
-    .where(eq(groups.shareToken, token))
-    .limit(1);
+  const group = await getSharedGroup(client, token);
   if (!group) return null;
 
   const [roster, balancesByGroup, expenseRows] = await Promise.all([

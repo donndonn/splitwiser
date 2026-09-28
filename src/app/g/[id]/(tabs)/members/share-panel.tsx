@@ -69,8 +69,8 @@ export function SharePanel({
         <h3 className="text-sm font-medium">View-only link</h3>
         <p className="text-xs text-muted-foreground">
           For friends without an account. Anyone with this link can see member
-          names, expenses, and balances, but can’t change anything. Receipts
-          and comments stay hidden.
+          names, expenses with their items and receipt photos, and balances,
+          but can’t change anything. Comments stay hidden.
         </p>
       </div>
 

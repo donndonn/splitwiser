@@ -1,5 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { changeGroupShareLink, getSharedGroupView } from "@/lib/share-link";
+import { loadExpenseDetail } from "@/lib/expense-detail";
+import {
+  changeGroupShareLink,
+  getSharedGroup,
+  getSharedGroupView,
+} from "@/lib/share-link";
 import {
   createTestDatabase,
   hasTestDatabase,
@@ -79,6 +84,29 @@ describe.skipIf(!hasTestDatabase)("read-only share links", () => {
       { fromMemberId: "m2", toMemberId: "m1", amountCents: 2000 },
     ]);
     expect(view?.venmoUsernameByMemberId.get("m1")).toBe("ada-v");
+  });
+
+  it("loads an expense's detail only within the shared group", async () => {
+    const token = await changeGroupShareLink(t.db, {
+      groupId: "g1",
+      change: "create",
+    });
+    const group = await getSharedGroup(t.db, token!);
+    expect(group?.id).toBe("g1");
+
+    const detail = await loadExpenseDetail(t.db, {
+      groupId: group!.id,
+      expenseId: "live",
+    });
+    expect(detail?.orderedSplits.map((s) => s.memberId)).toEqual(["m1", "m2"]);
+    expect(detail?.receiptBreakdown("USD").kind).toBe("simple");
+
+    expect(
+      await loadExpenseDetail(t.db, { groupId: "g2", expenseId: "live" }),
+    ).toBeNull();
+    expect(
+      await loadExpenseDetail(t.db, { groupId: "g1", expenseId: "gone" }),
+    ).toBeNull();
   });
 
   it("stops the old link on reset and all links on disable", async () => {
