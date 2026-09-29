@@ -7,6 +7,10 @@ import { groups, invites, members, users } from "@/db/schema";
 import { requireMember } from "@/lib/auth-guards";
 import { listFriends, listFriendStatuses } from "@/lib/friends";
 import { countInviteReservations, inviteStatus } from "@/lib/invites";
+import {
+  listLinkCandidates,
+  suggestedCandidates,
+} from "@/lib/placeholder-links";
 import { cn, groupedListClass } from "@/lib/utils";
 import { AddFriendsToGroup } from "./add-friends-to-group";
 import { addPlaceholderFormAction } from "./actions";
@@ -62,6 +66,20 @@ export default async function MembersPage({
     roster.flatMap((member) => (member.userId ? [member.userId] : [])),
   );
 
+  const hasPlaceholders = roster.some((m) => m.userId == null);
+  const linkCandidates =
+    me.isAdmin && hasPlaceholders
+      ? await listLinkCandidates(db, { userId: user.id, groupId: id })
+      : [];
+  function linkChoices(displayName: string) {
+    const suggested = suggestedCandidates(displayName, linkCandidates);
+    const suggestedIds = new Set(suggested.map((c) => c.id));
+    return {
+      suggested,
+      others: linkCandidates.filter((c) => !suggestedIds.has(c.id)),
+    };
+  }
+
   const linkedUserIds = new Set(
     roster.map((m) => m.userId).filter((uid): uid is string => uid != null),
   );
@@ -103,6 +121,11 @@ export default async function MembersPage({
               isSelf={m.id === me.id}
               canRename={me.isAdmin || me.id === m.id}
               canRemove={me.isAdmin && me.id !== m.id}
+              link={
+                me.isAdmin && m.userId == null
+                  ? linkChoices(m.displayName)
+                  : undefined
+              }
             />
           ))}
         </ul>

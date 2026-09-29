@@ -8,6 +8,7 @@ import { logGroupActivity } from "@/lib/activity";
 import { requireAdmin, requireMember } from "@/lib/auth-guards";
 import { areFriends, displayNameForUser } from "@/lib/friends";
 import { changeGroupInviteLink, type InviteLinkChange } from "@/lib/invites";
+import { linkPlaceholderToUser } from "@/lib/placeholder-links";
 import { changeGroupShareLink, type ShareLinkChange } from "@/lib/share-link";
 
 /**
@@ -188,6 +189,30 @@ export async function addFriendAsMemberAction(
 
   revalidateMemberPaths(groupId);
   return added;
+}
+
+/**
+ * Link a placeholder to a friend or someone the admin shares a group with.
+ * They keep the placeholder's name, expenses, and balances.
+ */
+export async function linkPlaceholderAction(
+  groupId: string,
+  memberId: string,
+  targetUserId: string,
+): Promise<AddedMember> {
+  const { user, member: actor } = await requireAdmin(groupId);
+  const { displayName } = await linkPlaceholderToUser(db, {
+    groupId,
+    memberId,
+    targetUserId,
+    actor: {
+      userId: user.id,
+      memberId: actor.id,
+      displayName: actor.displayName,
+    },
+  });
+  revalidateMemberPaths(groupId);
+  return { id: memberId, displayName };
 }
 
 export async function renameMemberAction(
