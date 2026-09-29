@@ -31,7 +31,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import type { FriendStatus } from "@/lib/friends";
+import type { LinkCandidate } from "@/lib/placeholder-links";
 import { removeMemberAction, renameMemberAction } from "./actions";
+import { LinkAccountDialog } from "./link-account-dialog";
 
 type MemberInfo = {
   id: string;
@@ -50,14 +52,18 @@ export function MemberRow({
   isSelf,
   canRename,
   canRemove,
+  link,
 }: {
   groupId: string;
   member: MemberInfo;
   isSelf: boolean;
   canRename: boolean;
   canRemove: boolean;
+  /** Accounts an admin can link this placeholder to; absent otherwise. */
+  link?: { suggested: LinkCandidate[]; others: LinkCandidate[] };
 }) {
   const [renameOpen, setRenameOpen] = useState(false);
+  const [linkOpen, setLinkOpen] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [friendPending, startFriendTransition] = useTransition();
@@ -116,6 +122,15 @@ export function MemberRow({
               )}
             </div>
           )}
+          {link && link.suggested.length > 0 && (
+            <button
+              type="button"
+              className="mt-0.5 block truncate text-left text-xs text-primary underline-offset-2 hover:underline"
+              onClick={() => setLinkOpen(true)}
+            >
+              Is this {link.suggested[0].displayName}?
+            </button>
+          )}
         </div>
       </div>
 
@@ -156,7 +171,7 @@ export function MemberRow({
           </Button>
         )}
 
-        {(canRename || canRemove) && (
+        {(canRename || canRemove || link) && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -169,6 +184,16 @@ export function MemberRow({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              {link && (
+                <DropdownMenuItem
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    setLinkOpen(true);
+                  }}
+                >
+                  Link to account
+                </DropdownMenuItem>
+              )}
               {canRename && (
                 <DropdownMenuItem
                   onSelect={(e) => {
@@ -194,6 +219,18 @@ export function MemberRow({
           </DropdownMenu>
         )}
       </div>
+
+      {link && (
+        <LinkAccountDialog
+          groupId={groupId}
+          memberId={member.id}
+          memberName={member.displayName}
+          suggested={link.suggested}
+          others={link.others}
+          open={linkOpen}
+          onOpenChange={setLinkOpen}
+        />
+      )}
 
       {canRename && (
         <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
