@@ -84,6 +84,8 @@ export function buildItemizedReceiptBreakdown(input: {
     }
   >;
   memberNames: Map<string, string>;
+  /** Every member of the group; an even item shared by all of them reads "Everyone". */
+  groupMemberIds?: string[];
   /** Final owed amounts from expense_splits — preferred for rollup totals. */
   storedSplits?: Array<{ memberId: string; amountCents: number }>;
 }): ItemizedReceiptBreakdown {
@@ -139,7 +141,9 @@ export function buildItemizedReceiptBreakdown(input: {
               input.memberNames,
               money,
             )
-          : item.sharedByNames,
+          : sharedByEveryone(item.memberIds, input.groupMemberIds)
+            ? ["Everyone"]
+            : item.sharedByNames,
     })),
     itemSubtotalLabel: money(calculation.itemSubtotalCents),
     adjustments,
@@ -159,6 +163,12 @@ export function buildItemizedReceiptBreakdown(input: {
       totalLabel: money(split.amountCents),
     })),
   };
+}
+
+function sharedByEveryone(memberIds: string[], groupMemberIds?: string[]) {
+  if (!groupMemberIds || groupMemberIds.length < 2) return false;
+  const assigned = new Set(memberIds);
+  return groupMemberIds.every((memberId) => assigned.has(memberId));
 }
 
 /** "Ana $6.00 (60%)" for items split by amount, percentage, or shares. */

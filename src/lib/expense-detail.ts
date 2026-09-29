@@ -154,6 +154,7 @@ function receiptBreakdownFor(input: {
         };
       }),
       memberNames,
+      groupMemberIds: [...memberNames.keys()],
       storedSplits: orderedSplits.map((split) => ({
         memberId: split.memberId,
         amountCents: split.amountCents,
