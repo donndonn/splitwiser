@@ -44,6 +44,41 @@ describe("expense-receipt-breakdown", () => {
     );
   });
 
+  it("says Everyone when the whole group shares an item", () => {
+    const breakdown = buildItemizedReceiptBreakdown({
+      currency: "USD",
+      taxCents: 0,
+      tipCents: 0,
+      memberNames: new Map([
+        ["a", "Vince"],
+        ["b", "Allison"],
+        ["c", "Eric"],
+      ]),
+      groupMemberIds: ["a", "b", "c"],
+      items: [
+        {
+          description: "Bread",
+          amountCents: 1400,
+          quantity: 2,
+          memberIds: ["a", "b", "c"],
+          sharedByNames: ["Vince", "Allison", "Eric"],
+        },
+        {
+          description: "Tuna",
+          amountCents: 2800,
+          quantity: 1,
+          memberIds: ["a", "b"],
+          sharedByNames: ["Vince", "Allison"],
+        },
+      ],
+    });
+
+    expect(breakdown.lines.map((line) => line.sharedByNames)).toEqual([
+      ["Everyone"],
+      ["Vince", "Allison"],
+    ]);
+  });
+
   it("builds an itemized receipt from stored lines", () => {
     const breakdown = buildItemizedReceiptBreakdown({
       currency: "USD",
