@@ -10,7 +10,7 @@ import {
 } from "@/lib/avatar";
 import { setAvatarWithoutUpload } from "@/lib/avatar-store";
 import {
-  InviteUnavailableError,
+  joinFailurePath,
   joinGroupWithInvite,
   type JoinChoice,
 } from "@/lib/invites";
@@ -30,10 +30,10 @@ async function join(
       choice,
     }));
   } catch (error) {
-    // The join page explains why the link stopped working.
-    if (error instanceof InviteUnavailableError) {
-      redirect(`/join/${encodeURIComponent(token)}`);
-    }
+    // Expected failures return to the invite as a GET. A thrown error would
+    // be a 500, and an in-app browser reloads that by resubmitting the POST.
+    const failurePath = joinFailurePath(token, error);
+    if (failurePath) redirect(failurePath);
     throw error;
   }
 

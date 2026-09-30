@@ -9,6 +9,7 @@ import {
 import {
   INVITE_MAX_USES,
   InviteUnavailableError,
+  PlaceholderUnavailableError,
   changeGroupInviteLink,
   joinGroupWithInvite,
 } from "./invites";
@@ -119,6 +120,71 @@ describe.skipIf(!hasTestDatabase)("group invitations", () => {
         choice: { kind: "new", displayName: "Vet" },
       });
       expect(await uses(g.inviteId)).toBe(1);
+    });
+
+    it("claims a placeholder once when the same person submits twice at once", async () => {
+      const g = await seedGroupWithInvite(t.sql);
+      await t.sql`
+        insert into members (id, group_id, display_name)
+        values ('placeholder', ${g.groupId}, 'Sam')
+      `;
+      const userId = await pendingUser("sam");
+      const pools = Array.from({ length: 4 }, () => t.connect(1));
+      const results = await Promise.all(
+        pools.map(({ db }) =>
+          joinGroupWithInvite(db, {
+            token: g.token,
+            userId,
+            choice: { kind: "claim", memberId: "placeholder" },
+          }),
+        ),
+      );
+      expect(results.every((result) => result.groupId === g.groupId)).toBe(
+        true,
+      );
+      expect(results.filter((result) => result.joined)).toHaveLength(1);
+      expect(await uses(g.inviteId)).toBe(1);
+      expect(await memberCount(g.groupId, userId)).toBe(1);
+      const [member] = await t.sql`select user_id from members where id = 'placeholder'`;
+      expect(member.user_id).toBe(userId);
+    });
+
+    it("refuses a placeholder someone else already claimed", async () => {
+      const g = await seedGroupWithInvite(t.sql);
+      await t.sql`
+        insert into members (id, group_id, display_name)
+        values ('placeholder', ${g.groupId}, 'Sam')
+      `;
+      const first = await pendingUser("sam");
+      const second = await pendingUser("alex");
+      await joinGroupWithInvite(t.db, {
+        token: g.token,
+        userId: first,
+        choice: { kind: "claim", memberId: "placeholder" },
+      });
+      await expect(
+        joinGroupWithInvite(t.db, {
+          token: g.token,
+          userId: second,
+          choice: { kind: "claim", memberId: "placeholder" },
+        }),
+      ).rejects.toBeInstanceOf(PlaceholderUnavailableError);
+      expect(await memberCount(g.groupId, second)).toBe(0);
+      expect(await uses(g.inviteId)).toBe(1);
+    });
+
+    it("refuses a claim that does not name a placeholder", async () => {
+      const g = await seedGroupWithInvite(t.sql);
+      const userId = await pendingUser("sam");
+      await expect(
+        joinGroupWithInvite(t.db, {
+          token: g.token,
+          userId,
+          choice: { kind: "claim", memberId: "" },
+        }),
+      ).rejects.toBeInstanceOf(PlaceholderUnavailableError);
+      expect(await memberCount(g.groupId, userId)).toBe(0);
+      expect(await uses(g.inviteId)).toBe(0);
     });
 
     it("consumes a use when claiming a placeholder", async () => {

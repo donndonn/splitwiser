@@ -147,6 +147,27 @@ export class InviteUnavailableError extends Error {
   }
 }
 
+/** The named placeholder was claimed, removed, or never submitted. */
+export class PlaceholderUnavailableError extends Error {
+  constructor(message = "That placeholder is no longer available") {
+    super(message);
+    this.name = "PlaceholderUnavailableError";
+  }
+}
+
+/**
+ * Join-page path for an expected claim failure. Unexpected errors return
+ * null so the action still fails loudly instead of looking like a full link.
+ */
+export function joinFailurePath(token: string, error: unknown): string | null {
+  const path = `/join/${encodeURIComponent(token)}`;
+  if (error instanceof InviteUnavailableError) return path;
+  if (error instanceof PlaceholderUnavailableError) {
+    return `${path}?error=placeholder`;
+  }
+  return null;
+}
+
 export type JoinChoice =
   | { kind: "new"; displayName: string }
   | { kind: "claim"; memberId: string };
@@ -244,7 +265,25 @@ export async function joinGroupWithInvite(
         .for("update");
 
       if (!placeholder) {
-        throw new Error("That placeholder is no longer available");
+        // The invite row lock usually makes a duplicate submit wait until
+        // the first commit, so the existing-member check above wins. This
+        // covers a claim that lost the placeholder itself: same account
+        // already joined, or the name was taken by someone else.
+        const [joinedAs] = await tx
+          .select({ id: members.id })
+          .from(members)
+          .where(
+            and(
+              eq(members.groupId, invite.groupId),
+              eq(members.userId, input.userId),
+            ),
+          )
+          .limit(1);
+        if (joinedAs) {
+          await markOnboarded();
+          return { groupId: invite.groupId, joined: false };
+        }
+        throw new PlaceholderUnavailableError();
       }
 
       await tx
