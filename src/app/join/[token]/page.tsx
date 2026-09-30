@@ -3,7 +3,6 @@ import { and, eq, isNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { SignInProviders } from "@/components/sign-in-providers";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,15 +11,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { db } from "@/db";
 import { groups, invites, members } from "@/db/schema";
 import { getOptionalUser } from "@/lib/auth-guards";
-import {
-  USE_ACCOUNT_PHOTO_CHOICE_FIELD,
-  USE_ACCOUNT_PHOTO_FIELD,
-} from "@/lib/avatar";
 import { getAccountPhoto } from "@/lib/avatar-store";
 import {
   countInviteReservations,
@@ -34,13 +27,17 @@ import {
   claimPlaceholderAction,
   joinAsNewMemberAction,
 } from "./actions";
+import { JoinMembershipForms } from "./join-forms";
 
 export default async function JoinPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ token: string }>;
+  searchParams: Promise<{ error?: string | string[] }>;
 }) {
-  const { token } = await params;
+  const [{ token }, query] = await Promise.all([params, searchParams]);
+  const error = Array.isArray(query.error) ? query.error[0] : query.error;
   const [invite] = await db
     .select({
       id: invites.id,
@@ -162,6 +159,10 @@ export default async function JoinPage({
   // Only new accounts choose here; members change their photo in Profile.
   const accountPhoto =
     !user.onboarded && user.image ? await getAccountPhoto(db, user.id) : null;
+  const placeholderNotice =
+    error === "placeholder"
+      ? "That name isn't available anymore. Choose another, or join with a new name."
+      : null;
 
   return (
     <AppShell title="Join group" backHref="/">
@@ -183,88 +184,26 @@ export default async function JoinPage({
           )}
         </div>
 
-        {/* One form so the photo choice applies to every way of joining. */}
-        <form action={joinAsNewMemberAction} className="space-y-6">
-          <input type="hidden" name="token" value={token} />
+        {placeholderNotice ? (
+          <p
+            role="alert"
+            className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          >
+            {placeholderNotice}
+          </p>
+        ) : null}
 
-          {accountPhoto ? (
-            <label className="flex items-center gap-3 rounded-2xl border bg-card p-3">
-              <Avatar className="size-10">
-                <AvatarImage src={accountPhoto.image} alt="" />
-                <AvatarFallback>
-                  {defaultName.slice(0, 1).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <span className="min-w-0 flex-1 text-sm">
-                <span className="block font-medium">
-                  Use your {accountPhoto.provider ?? "account"} photo
-                </span>
-                <span className="block text-muted-foreground">
-                  You can change it anytime in Profile.
-                </span>
-              </span>
-              <input
-                type="hidden"
-                name={USE_ACCOUNT_PHOTO_CHOICE_FIELD}
-                value="1"
-              />
-              <input
-                type="checkbox"
-                name={USE_ACCOUNT_PHOTO_FIELD}
-                defaultChecked
-                className="size-5 shrink-0 accent-primary"
-              />
-            </label>
-          ) : null}
-
-          {hasPlaceholders && (
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Already on the list?</p>
-              <ul className="space-y-2">
-                {placeholders.map((p) => (
-                  <li key={p.id}>
-                    <Button
-                      type="submit"
-                      name="memberId"
-                      value={p.id}
-                      formAction={claimPlaceholderAction}
-                      formNoValidate
-                      variant="outline"
-                      className="w-full justify-between"
-                      size="lg"
-                    >
-                      <span>{p.displayName}</span>
-                      <span className="text-muted-foreground">Join as</span>
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          <div className="space-y-3">
-            <div className="space-y-2">
-              <Label htmlFor="displayName">
-                {hasPlaceholders ? "Or join as" : "Join as"}
-              </Label>
-              <Input
-                id="displayName"
-                name="displayName"
-                placeholder="Your name"
-                defaultValue={hasPlaceholders ? undefined : defaultName}
-                required
-              />
-            </div>
-            <Button
-              type="submit"
-              className="w-full"
-              variant={hasPlaceholders ? "secondary" : "default"}
-              size="lg"
-            >
-              Join group
-            </Button>
-          </div>
-        </form>
+        <JoinMembershipForms
+          token={token}
+          placeholders={placeholders.map((placeholder) => ({
+            id: placeholder.id,
+            displayName: placeholder.displayName,
+          }))}
+          defaultName={defaultName}
+          accountPhoto={accountPhoto}
+          claimPlaceholderAction={claimPlaceholderAction}
+          joinAsNewMemberAction={joinAsNewMemberAction}
+        />
       </div>
     </AppShell>
   );

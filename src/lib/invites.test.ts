@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { inviteStatus } from "./invites";
+import {
+  InviteUnavailableError,
+  PlaceholderUnavailableError,
+  inviteStatus,
+  joinFailurePath,
+} from "./invites";
 
 const now = new Date("2026-09-25T12:00:00Z");
 const base = { revokedAt: null, expiresAt: null, maxUses: null, uses: 0 };
@@ -34,5 +39,23 @@ describe("inviteStatus", () => {
     expect(
       inviteStatus({ ...base, revokedAt: now, maxUses: 1, uses: 1 }, now),
     ).toBe("revoked");
+  });
+});
+
+describe("joinFailurePath", () => {
+  it("sends a dead invite back to the join page", () => {
+    expect(
+      joinFailurePath("tok en", new InviteUnavailableError()),
+    ).toBe("/join/tok%20en");
+  });
+
+  it("sends a missed placeholder back with a recoverable notice", () => {
+    expect(
+      joinFailurePath("tok", new PlaceholderUnavailableError()),
+    ).toBe("/join/tok?error=placeholder");
+  });
+
+  it("returns null for unexpected errors so they are not swallowed", () => {
+    expect(joinFailurePath("tok", new Error("db down"))).toBeNull();
   });
 });
