@@ -223,11 +223,11 @@ export default async function JoinPage({
               <ul className="space-y-2">
                 {placeholders.map((p) => (
                   <li key={p.id}>
+                    {/* React drops name/value on a button whose formAction is
+                        a server action, so the member id is bound instead. */}
                     <Button
                       type="submit"
-                      name="memberId"
-                      value={p.id}
-                      formAction={claimPlaceholderAction}
+                      formAction={claimPlaceholderAction.bind(null, p.id)}
                       formNoValidate
                       variant="outline"
                       className="w-full justify-between"
