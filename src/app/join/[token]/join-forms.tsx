@@ -1,6 +1,3 @@
-"use client";
-
-import { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,14 +12,16 @@ export type JoinPlaceholder = {
   displayName: string;
 };
 
+type ClaimAction = (
+  memberId: string,
+  formData: FormData,
+) => void | Promise<void>;
 type JoinAction = (formData: FormData) => void | Promise<void>;
 
 /**
- * Each way of joining is its own form, and the placeholder id is a hidden
- * field. A submit button's name cannot carry it: React overwrites that name
- * to identify a `formAction`, then builds FormData without the submitter, so
- * the claim ran with an empty id and 500'd. In-app browsers resubmit that POST
- * on reload.
+ * One form, so the photo choice applies to every way of joining. The
+ * placeholder id is bound to the action: React drops name/value on a submit
+ * button whose formAction is a server action, which made the claim throw.
  */
 export function JoinMembershipForms({
   token,
@@ -36,14 +35,15 @@ export function JoinMembershipForms({
   placeholders: readonly JoinPlaceholder[];
   defaultName: string;
   accountPhoto: { image: string; provider: string | null } | null;
-  claimPlaceholderAction: JoinAction;
+  claimPlaceholderAction: ClaimAction;
   joinAsNewMemberAction: JoinAction;
 }) {
-  const [usePhoto, setUsePhoto] = useState(true);
   const hasPlaceholders = placeholders.length > 0;
 
   return (
-    <div className="space-y-6">
+    <form action={joinAsNewMemberAction} className="space-y-6">
+      <input type="hidden" name="token" value={token} />
+
       {accountPhoto ? (
         <label className="flex items-center gap-3 rounded-2xl border bg-card p-3">
           <Avatar className="size-10">
@@ -61,9 +61,14 @@ export function JoinMembershipForms({
             </span>
           </span>
           <input
+            type="hidden"
+            name={USE_ACCOUNT_PHOTO_CHOICE_FIELD}
+            value="1"
+          />
+          <input
             type="checkbox"
-            checked={usePhoto}
-            onChange={(event) => setUsePhoto(event.target.checked)}
+            name={USE_ACCOUNT_PHOTO_FIELD}
+            defaultChecked
             className="size-5 shrink-0 accent-primary"
           />
         </label>
@@ -75,33 +80,24 @@ export function JoinMembershipForms({
           <ul className="space-y-2">
             {placeholders.map((placeholder) => (
               <li key={placeholder.id}>
-                <form action={claimPlaceholderAction}>
-                  <input type="hidden" name="token" value={token} />
-                  <input
-                    type="hidden"
-                    name="memberId"
-                    value={placeholder.id}
-                  />
-                  {accountPhoto ? <PhotoFields usePhoto={usePhoto} /> : null}
-                  <Button
-                    type="submit"
-                    variant="outline"
-                    className="w-full justify-between"
-                    size="lg"
-                  >
-                    <span>{placeholder.displayName}</span>
-                    <span className="text-muted-foreground">Join as</span>
-                  </Button>
-                </form>
+                <Button
+                  type="submit"
+                  formAction={claimPlaceholderAction.bind(null, placeholder.id)}
+                  formNoValidate
+                  variant="outline"
+                  className="w-full justify-between"
+                  size="lg"
+                >
+                  <span>{placeholder.displayName}</span>
+                  <span className="text-muted-foreground">Join as</span>
+                </Button>
               </li>
             ))}
           </ul>
         </div>
       ) : null}
 
-      <form action={joinAsNewMemberAction} className="space-y-3">
-        <input type="hidden" name="token" value={token} />
-        {accountPhoto ? <PhotoFields usePhoto={usePhoto} /> : null}
+      <div className="space-y-3">
         <div className="space-y-2">
           <Label htmlFor="displayName">
             {hasPlaceholders ? "Or join as" : "Join as"}
@@ -122,22 +118,7 @@ export function JoinMembershipForms({
         >
           Join group
         </Button>
-      </form>
-    </div>
-  );
-}
-
-function PhotoFields({ usePhoto }: { usePhoto: boolean }) {
-  return (
-    <>
-      <input
-        type="hidden"
-        name={USE_ACCOUNT_PHOTO_CHOICE_FIELD}
-        value="1"
-      />
-      {usePhoto ? (
-        <input type="hidden" name={USE_ACCOUNT_PHOTO_FIELD} value="on" />
-      ) : null}
-    </>
+      </div>
+    </form>
   );
 }

@@ -62,8 +62,10 @@ export async function joinAsNewMemberAction(formData: FormData) {
   await join(token, { kind: "new", displayName }, readUseAccountPhoto(formData));
 }
 
-export async function claimPlaceholderAction(formData: FormData) {
+export async function claimPlaceholderAction(
+  memberId: string,
+  formData: FormData,
+) {
   const token = String(formData.get("token") ?? "");
-  const memberId = String(formData.get("memberId") ?? "");
   await join(token, { kind: "claim", memberId }, readUseAccountPhoto(formData));
 }

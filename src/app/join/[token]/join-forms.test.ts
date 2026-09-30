@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { JoinMembershipForms } from "./join-forms";
 
-const claim = async () => {};
+const claim: (memberId: string, formData: FormData) => Promise<void> = async () => {};
 const joinNew = async () => {};
 
 function render(placeholders: { id: string; displayName: string }[]) {
@@ -20,27 +20,24 @@ function render(placeholders: { id: string; displayName: string }[]) {
 }
 
 describe("join membership forms", () => {
-  it("puts each placeholder id in a hidden field on its own form", () => {
+  it("binds the placeholder id instead of putting it on the submit button", () => {
     const html = render([
       { id: "member-1", displayName: "Sam" },
       { id: "member-2", displayName: "Alex" },
     ]);
 
-    expect(html.match(/<form\b/g)).toHaveLength(3);
-    expect(html).toContain('name="memberId"');
-    expect(html).toContain('value="member-1"');
-    expect(html).toContain('value="member-2"');
+    expect(html.match(/<form\b/g)).toHaveLength(1);
     expect(html).toContain('name="token"');
-    // React overwrites a formAction button's name and omits it from FormData.
-    expect(html).not.toMatch(/<button\b[^>]*\bname="memberId"/);
-    expect(html).not.toMatch(/<button\b[^>]*\bformAction=/);
+    expect(html).not.toMatch(/name="memberId"/);
+    expect(html).not.toMatch(/<button\b[^>]*\bname=/);
+    expect(html).toMatch(/<button\b[^>]*\bformAction=/);
+    expect(html).toContain(">Sam<");
+    expect(html).toContain(">Alex<");
   });
 
-  it("keeps the account-photo choice on the claim form", () => {
+  it("keeps the account-photo choice in the same form", () => {
     const html = render([{ id: "member-1", displayName: "Sam" }]);
-    const claimForm = html.slice(0, html.lastIndexOf("<form"));
-    expect(claimForm).toContain('name="accountPhotoChoice"');
-    expect(claimForm).toContain('name="useAccountPhoto"');
-    expect(claimForm).toContain('value="on"');
+    expect(html).toContain('name="accountPhotoChoice"');
+    expect(html).toContain('name="useAccountPhoto"');
   });
 });
