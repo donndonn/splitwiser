@@ -8,6 +8,8 @@ import { logGroupActivity } from "@/lib/activity";
 import { requireMember } from "@/lib/auth-guards";
 import { getGroupBalances } from "@/lib/balances";
 import { parseAmountToCents, suggestSettlements } from "@/lib/money";
+import { activityPushBody } from "@/lib/push";
+import { notifyGroupMembers } from "@/lib/push-send";
 
 function revalidateSettlementPaths(groupId: string) {
   revalidatePath(`/g/${groupId}`);
@@ -79,6 +81,14 @@ export async function recordSettlementAction(
     });
   });
 
+  notifySettlement(groupId, member.id, member.displayName, {
+    fromMemberId,
+    toMemberId,
+    fromName: nameById.get(fromMemberId) ?? "Someone",
+    toName: nameById.get(toMemberId) ?? "someone",
+    amountCents,
+  });
+
   revalidateSettlementPaths(groupId);
 }
 
@@ -137,6 +147,16 @@ export async function settleGroupAction(groupId: string) {
     }
   });
 
+  for (const suggestion of suggestions) {
+    notifySettlement(groupId, member.id, member.displayName, {
+      fromMemberId: suggestion.fromMemberId,
+      toMemberId: suggestion.toMemberId,
+      fromName: nameById.get(suggestion.fromMemberId) ?? "Someone",
+      toName: nameById.get(suggestion.toMemberId) ?? "someone",
+      amountCents: suggestion.amountCents,
+    });
+  }
+
   revalidateSettlementPaths(groupId);
 }
 
@@ -190,4 +210,36 @@ export async function reverseSettlementAction(
 
   revalidateSettlementPaths(groupId);
   return { ok: true as const };
+}
+
+/** Tell both sides of a recorded payment, unless they recorded it. */
+function notifySettlement(
+  groupId: string,
+  actorMemberId: string,
+  actorName: string,
+  payment: {
+    fromMemberId: string;
+    toMemberId: string;
+    fromName: string;
+    toName: string;
+    amountCents: number;
+  },
+) {
+  notifyGroupMembers({
+    groupId,
+    memberIds: [payment.fromMemberId, payment.toMemberId],
+    actorMemberId,
+    body: (group) =>
+      activityPushBody(
+        actorName,
+        {
+          kind: "settlement_recorded",
+          fromName: payment.fromName,
+          toName: payment.toName,
+          amountCents: payment.amountCents,
+        },
+        group.currency,
+      ),
+    url: `/g/${groupId}/balances`,
+  });
 }

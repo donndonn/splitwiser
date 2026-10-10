@@ -22,6 +22,8 @@ import {
 } from "@/lib/itemized-expense";
 import { activeExpense } from "@/lib/expenses";
 import { allocateSplits, parseAmountToCents } from "@/lib/money";
+import { activityPushBody } from "@/lib/push";
+import { notifyGroupMembers } from "@/lib/push-send";
 import { readReceiptImageFromFormData } from "@/lib/receipt-blob";
 import {
   deleteReceiptBlob,
@@ -340,6 +342,26 @@ export async function createExpenseAction(groupId: string, formData: FormData) {
     throw err;
   }
 
+  notifyGroupMembers({
+    groupId,
+    memberIds: [
+      common.paidByMemberId,
+      ...details.splits.map((split) => split.memberId),
+    ],
+    actorMemberId: member.id,
+    body: (group) =>
+      activityPushBody(
+        member.displayName,
+        {
+          kind: "expense_created",
+          description: common.description,
+          amountCents: details.amountCents,
+        },
+        group.currency,
+      ),
+    url: `/g/${groupId}/expenses/${expenseId}`,
+  });
+
   revalidatePath(`/g/${groupId}`);
   revalidatePath(`/g/${groupId}/balances`);
   revalidatePath(`/g/${groupId}/activity`);
@@ -371,6 +393,7 @@ export async function updateExpenseAction(
   const [existing] = await db
     .select({
       receiptBlobPathname: expenses.receiptBlobPathname,
+      paidByMemberId: expenses.paidByMemberId,
     })
     .from(expenses)
     .where(
@@ -382,6 +405,10 @@ export async function updateExpenseAction(
     )
     .limit(1);
   if (!existing) throw new Error("Expense not found");
+  const previousSplits = await db
+    .select({ memberId: expenseSplits.memberId })
+    .from(expenseSplits)
+    .where(eq(expenseSplits.expenseId, expenseId));
 
   const receiptImage = readReceiptImageFromFormData(formData);
   let uploadedPathname: string | null = null;
@@ -503,6 +530,25 @@ export async function updateExpenseAction(
     await deleteReceiptBlob(existing.receiptBlobPathname).catch(() => {});
   }
 
+  // Anyone on the expense before or after the edit hears about it.
+  notifyGroupMembers({
+    groupId,
+    memberIds: [
+      existing.paidByMemberId,
+      ...previousSplits.map((split) => split.memberId),
+      common.paidByMemberId,
+      ...details.splits.map((split) => split.memberId),
+    ],
+    actorMemberId: member.id,
+    body: (group) =>
+      activityPushBody(
+        member.displayName,
+        { kind: "expense_updated", description: common.description },
+        group.currency,
+      ),
+    url: `/g/${groupId}/expenses/${expenseId}`,
+  });
+
   revalidatePath(`/g/${groupId}`);
   revalidatePath(`/g/${groupId}/balances`);
   revalidatePath(`/g/${groupId}/activity`);
@@ -594,7 +640,7 @@ function revalidateExpenseViews(groupId: string, expenseId: string) {
 export async function removeExpenseAction(groupId: string, expenseId: string) {
   const { member } = await requireMember(groupId);
 
-  await db.transaction(async (tx) => {
+  const deleted = await db.transaction(async (tx) => {
     const [existing] = await tx
       .update(expenses)
       .set({
@@ -612,9 +658,15 @@ export async function removeExpenseAction(groupId: string, expenseId: string) {
         id: expenses.id,
         description: expenses.description,
         amountCents: expenses.amountCents,
+        paidByMemberId: expenses.paidByMemberId,
       });
 
-    if (!existing) return;
+    if (!existing) return null;
+
+    const splitRows = await tx
+      .select({ memberId: expenseSplits.memberId })
+      .from(expenseSplits)
+      .where(eq(expenseSplits.expenseId, existing.id));
 
     await logGroupActivity(tx, {
       groupId,
@@ -627,7 +679,28 @@ export async function removeExpenseAction(groupId: string, expenseId: string) {
         amountCents: existing.amountCents,
       },
     });
+
+    return {
+      description: existing.description,
+      paidByMemberId: existing.paidByMemberId,
+      memberIds: splitRows.map((split) => split.memberId),
+    };
   });
+
+  if (deleted) {
+    notifyGroupMembers({
+      groupId,
+      memberIds: [deleted.paidByMemberId, ...deleted.memberIds],
+      actorMemberId: member.id,
+      body: (group) =>
+        activityPushBody(
+          member.displayName,
+          { kind: "expense_deleted", description: deleted.description },
+          group.currency,
+        ),
+      url: `/g/${groupId}`,
+    });
+  }
 
   revalidateExpenseViews(groupId, expenseId);
   return { ok: true as const };
