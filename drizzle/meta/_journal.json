@@ -134,6 +134,13 @@
       "when": 1790569773946,
       "tag": "0018_group_share_token",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791646578674,
+      "tag": "0019_web_push_subscriptions",
+      "breakpoints": true
     }
   ]
 }
