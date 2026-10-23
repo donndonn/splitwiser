@@ -9,6 +9,7 @@ import { requireAdmin, requireMember } from "@/lib/auth-guards";
 import { areFriends, displayNameForUser } from "@/lib/friends";
 import { changeGroupInviteLink, type InviteLinkChange } from "@/lib/invites";
 import { linkPlaceholderToUser } from "@/lib/placeholder-links";
+import { notifyGroupMembers } from "@/lib/push-send";
 import { changeGroupShareLink, type ShareLinkChange } from "@/lib/share-link";
 
 /**
@@ -185,6 +186,14 @@ export async function addFriendAsMemberAction(
     });
 
     return row;
+  });
+
+  notifyGroupMembers({
+    groupId,
+    memberIds: [added.id],
+    actorMemberId: actor.id,
+    body: (group) => `${actor.displayName} added you to ${group.name}`,
+    url: `/g/${groupId}`,
   });
 
   revalidateMemberPaths(groupId);
